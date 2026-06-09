@@ -79,7 +79,7 @@ export default function Dashboard({ setPage }) {
         <button style={styles.navItemActive}>🏠 Inicio</button>
         <button style={styles.navItem} onClick={() => setPage("agenda")}>📅 Mi agenda</button>
         <button style={styles.navItem} onClick={() => setPage("clientes")}>👥 Clientes</button>
-        <button style={styles.navItem}>💰 Cobros</button>
+       <button style={styles.navItem} onClick={() => setPage("cobros")}>💰 Cobros</button>
         <button style={styles.navItem} onClick={() => setPage("config")}>⚙️ Configuración</button>
         <button style={styles.logoutBtn} onClick={handleLogout}>← Cerrar sesión</button>
       </div>

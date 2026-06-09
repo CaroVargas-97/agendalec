@@ -5,6 +5,7 @@ import Dashboard from "./pages/internal/Dashboard";
 import Agenda from "./pages/internal/Agenda";
 import Configuracion from "./pages/internal/Configuracion";
 import Clientes from "./pages/internal/Clientes";
+import Cobros from "./pages/internal/Cobros";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -31,6 +32,7 @@ function App() {
   if (page === "agenda") return <Agenda setPage={setPage} />;
   if (page === "config") return <Configuracion setPage={setPage} />;
   if (page === "clientes") return <Clientes setPage={setPage} />;
+  if (page === "cobros") return <Cobros setPage={setPage} />;
   return <Dashboard setPage={setPage} />;
 }
 

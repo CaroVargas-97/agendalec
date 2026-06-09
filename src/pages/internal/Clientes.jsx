@@ -72,7 +72,7 @@ export default function Clientes({ setPage }) {
         <button style={s.navItem} onClick={() => setPage("dashboard")}>🏠 Inicio</button>
         <button style={s.navItem} onClick={() => setPage("agenda")}>📅 Mi agenda</button>
         <button style={s.navItemActive}>👥 Clientes</button>
-        <button style={s.navItem}>💰 Cobros</button>
+        <button style={s.navItem} onClick={() => setPage("cobros")}>💰 Cobros</button>
         <button style={s.navItem} onClick={() => setPage("config")}>⚙️ Configuración</button>
         <button style={s.logoutBtn} onClick={handleLogout}>← Cerrar sesión</button>
       </div>
