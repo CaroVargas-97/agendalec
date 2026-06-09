@@ -34,6 +34,7 @@ const styles = {
     color: "#2A1845",
     outline: "none",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
+    width: "100%",
   },
   btn: {
     width: "100%",
@@ -46,36 +47,70 @@ const styles = {
     fontWeight: "500",
     cursor: "pointer",
     fontFamily: "'Plus Jakarta Sans', sans-serif",
-    marginTop: "4px",
   },
   link: { textAlign: "center", fontSize: "13px", color: "#9B72C0", cursor: "pointer", marginTop: "4px" },
   error: { fontSize: "12px", color: "#A32D2D" },
+  success: { fontSize: "12px", color: "#3B6D11", background: "#EAF3DE", padding: "10px 12px", borderRadius: "8px" },
 };
 
-export default function Login({ onRegistro }) {
+export default function Registro({ onLogin }) {
+  const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleRegistro = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError("Email o contraseña incorrectos");
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: nombre } }
+    });
+    if (error) setError(error.message);
+    else setSuccess(true);
     setLoading(false);
   };
+
+  if (success) return (
+    <div style={styles.container}>
+      <div style={styles.wrapper}>
+        <div style={styles.header}>
+          <div style={styles.logo}>🗓 AgendaLec</div>
+        </div>
+        <div style={styles.card}>
+          <div style={styles.success}>
+            ✅ ¡Cuenta creada! Revisá tu mail para confirmar tu cuenta y después podés ingresar.
+          </div>
+          <button style={styles.btn} onClick={onLogin}>Ir al login</button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={styles.container}>
       <div style={styles.wrapper}>
         <div style={styles.header}>
           <div style={styles.logo}>🗓 AgendaLec</div>
-          <div style={styles.sub}>Ingresá a tu cuenta</div>
+          <div style={styles.sub}>Creá tu cuenta de profesional</div>
         </div>
         <div style={styles.card}>
-          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <form onSubmit={handleRegistro} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={styles.field}>
+              <label style={styles.label}>Nombre completo</label>
+              <input
+                type="text"
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Maru González"
+                style={styles.input}
+                required
+              />
+            </div>
             <div style={styles.field}>
               <label style={styles.label}>Email</label>
               <input
@@ -93,17 +128,18 @@ export default function Login({ onRegistro }) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Mínimo 6 caracteres"
                 style={styles.input}
                 required
+                minLength={6}
               />
             </div>
             {error && <div style={styles.error}>{error}</div>}
             <button type="submit" disabled={loading} style={styles.btn}>
-              {loading ? "Ingresando..." : "Ingresar"}
+              {loading ? "Creando cuenta..." : "Crear cuenta"}
             </button>
           </form>
-          <div style={styles.link} onClick={onRegistro}>¿No tenés cuenta? Registrate →</div>
+          <div style={styles.link} onClick={onLogin}>¿Ya tenés cuenta? Ingresá →</div>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 import Login from "./pages/internal/Login";
+import Registro from "./pages/internal/Registro";
 import Dashboard from "./pages/internal/Dashboard";
 import Agenda from "./pages/internal/Agenda";
 import Configuracion from "./pages/internal/Configuracion";
@@ -12,6 +13,7 @@ function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
+  const [authPage, setAuthPage] = useState("login");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -23,7 +25,6 @@ function App() {
     });
   }, []);
 
-  // App pública — sin login
   const isPublic = window.location.pathname === "/reservar";
   if (isPublic) return <Reserva />;
 
@@ -33,7 +34,11 @@ function App() {
     </div>
   );
 
-  if (!session) return <Login />;
+  if (!session) {
+    if (authPage === "registro") return <Registro onLogin={() => setAuthPage("login")} />;
+    return <Login onRegistro={() => setAuthPage("registro")} />;
+  }
+
   if (page === "agenda") return <Agenda setPage={setPage} />;
   if (page === "config") return <Configuracion setPage={setPage} />;
   if (page === "clientes") return <Clientes setPage={setPage} />;
