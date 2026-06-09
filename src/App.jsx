@@ -3,6 +3,8 @@ import { supabase } from "./supabase";
 import Login from "./pages/internal/Login";
 import Dashboard from "./pages/internal/Dashboard";
 import Agenda from "./pages/internal/Agenda";
+import Configuracion from "./pages/internal/Configuracion";
+import Clientes from "./pages/internal/Clientes";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -27,6 +29,8 @@ function App() {
 
   if (!session) return <Login />;
   if (page === "agenda") return <Agenda setPage={setPage} />;
+  if (page === "config") return <Configuracion setPage={setPage} />;
+  if (page === "clientes") return <Clientes setPage={setPage} />;
   return <Dashboard setPage={setPage} />;
 }
 
