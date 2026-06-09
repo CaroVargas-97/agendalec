@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 import Login from "./pages/internal/Login";
 import Dashboard from "./pages/internal/Dashboard";
+import Agenda from "./pages/internal/Agenda";
 
 function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState("dashboard");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -24,7 +26,8 @@ function App() {
   );
 
   if (!session) return <Login />;
-  return <Dashboard />;
+  if (page === "agenda") return <Agenda setPage={setPage} />;
+  return <Dashboard setPage={setPage} />;
 }
 
 export default App;

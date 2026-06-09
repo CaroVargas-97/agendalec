@@ -55,7 +55,7 @@ const profesionales = [
   { initials: "SB", nombre: "Sofía B.", turnos: 1, activo: true, color: "#FDE8F0" },
 ];
 
-export default function Dashboard() {
+export default function Dashboard({ setPage }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
@@ -77,10 +77,10 @@ export default function Dashboard() {
       <div style={styles.sidebar}>
         <div style={styles.logo}>🗓 AgendaLec</div>
         <button style={styles.navItemActive}>🏠 Inicio</button>
-        <button style={styles.navItem}>📅 Mi agenda</button>
-        <button style={styles.navItem}>👥 Clientes</button>
+        <button style={styles.navItem} onClick={() => setPage("agenda")}>📅 Mi agenda</button>
+        <button style={styles.navItem} onClick={() => setPage("clientes")}>👥 Clientes</button>
         <button style={styles.navItem}>💰 Cobros</button>
-        <button style={styles.navItem}>⚙️ Configuración</button>
+        <button style={styles.navItem} onClick={() => setPage("config")}>⚙️ Configuración</button>
         <button style={styles.logoutBtn} onClick={handleLogout}>← Cerrar sesión</button>
       </div>
 
@@ -120,7 +120,7 @@ export default function Dashboard() {
           <div style={styles.card}>
             <div style={styles.cardTitle}>
               Turnos de hoy
-              <span style={styles.cardLink}>Ver agenda completa →</span>
+              <span style={styles.cardLink} onClick={() => setPage("agenda")}>Ver agenda completa →</span>
             </div>
             {turnos.map((t, i) => (
               <div key={i} style={{ ...styles.turnoRow, borderBottom: i === turnos.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
