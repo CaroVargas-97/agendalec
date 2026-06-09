@@ -6,6 +6,7 @@ import Agenda from "./pages/internal/Agenda";
 import Configuracion from "./pages/internal/Configuracion";
 import Clientes from "./pages/internal/Clientes";
 import Cobros from "./pages/internal/Cobros";
+import Reserva from "./pages/public/Reserva";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -21,6 +22,10 @@ function App() {
       setSession(session);
     });
   }, []);
+
+  // App pública — sin login
+  const isPublic = window.location.pathname === "/reservar";
+  if (isPublic) return <Reserva />;
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#F8F4FC", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
