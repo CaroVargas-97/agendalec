@@ -8,6 +8,7 @@ import Configuracion from "./pages/internal/Configuracion";
 import Clientes from "./pages/internal/Clientes";
 import Cobros from "./pages/internal/Cobros";
 import Reserva from "./pages/public/Reserva";
+import Layout from "./components/internal/Layout";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -39,11 +40,19 @@ function App() {
     return <Login onRegistro={() => setAuthPage("registro")} />;
   }
 
-  if (page === "agenda") return <Agenda setPage={setPage} />;
-  if (page === "config") return <Configuracion setPage={setPage} />;
-  if (page === "clientes") return <Clientes setPage={setPage} />;
-  if (page === "cobros") return <Cobros setPage={setPage} />;
-  return <Dashboard setPage={setPage} />;
+  const renderPage = () => {
+    if (page === "agenda") return <Agenda setPage={setPage} />;
+    if (page === "config") return <Configuracion setPage={setPage} />;
+    if (page === "clientes") return <Clientes setPage={setPage} />;
+    if (page === "cobros") return <Cobros setPage={setPage} />;
+    return <Dashboard setPage={setPage} />;
+  };
+
+  return (
+    <Layout page={page} setPage={setPage}>
+      {renderPage()}
+    </Layout>
+  );
 }
 
 export default App;
