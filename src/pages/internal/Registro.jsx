@@ -65,13 +65,30 @@ export default function Registro({ onLogin }) {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const { error } = await supabase.auth.signUp({
+
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: nombre } }
     });
-    if (error) setError(error.message);
-    else setSuccess(true);
+
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
+      return;
+    }
+
+    // Guardar perfil directamente
+    if (data?.user) {
+      await supabase.from("profiles").upsert({
+        id: data.user.id,
+        full_name: nombre,
+        email: email,
+        role: "professional"
+      }, { onConflict: "id" });
+    }
+
+    setSuccess(true);
     setLoading(false);
   };
 
