@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../../supabase";
 
 const s = {
   wrap: { minHeight: "100vh", background: "#F8F4FC", fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "1.5rem 1rem" },
@@ -14,10 +15,8 @@ const s = {
   profCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "12px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
   profCardSelected: { background: "#F3EEFA", borderRadius: "12px", border: "0.5px solid #9B72C0", padding: "12px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
   avatar: { width: "40px", height: "40px", borderRadius: "50%", background: "#C4A8D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "500", color: "#3B2460", flexShrink: 0 },
-  profNombre: { fontSize: "13px", fontWeight: "500", color: "#2A1845" },
-  profEsp: { fontSize: "11px", color: "#9B72C0" },
-  servicioCard: { background: "#fff", borderRadius: "10px", border: "0.5px solid #E0D0F0", padding: "10px 12px", cursor: "pointer" },
-  servicioCardSelected: { background: "#F3EEFA", borderRadius: "10px", border: "0.5px solid #9B72C0", padding: "10px 12px", cursor: "pointer" },
+  servicioCard: { background: "#fff", borderRadius: "10px", border: "0.5px solid #E0D0F0", padding: "10px 12px", cursor: "pointer", marginBottom: "6px" },
+  servicioCardSelected: { background: "#F3EEFA", borderRadius: "10px", border: "0.5px solid #9B72C0", padding: "10px 12px", cursor: "pointer", marginBottom: "6px" },
   srvTop: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   srvNombre: { fontSize: "13px", fontWeight: "500", color: "#2A1845" },
   srvPrecio: { fontSize: "13px", fontWeight: "500", color: "#7B5EA7" },
@@ -49,19 +48,8 @@ const s = {
   btnMP: { width: "100%", padding: "13px", background: "#009EE3", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   confirmCircle: { width: "64px", height: "64px", borderRadius: "50%", background: "#EAF3DE", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontSize: "28px" },
   avisoBox: { background: "#FDE8F0", borderRadius: "10px", padding: "10px 12px", fontSize: "12px", color: "#A0407A" },
+  loadingText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
 };
-
-const profesionales = [
-  { initials: "MA", nombre: "Maru", esp: "Terapeuta holística", color: "#C4A8D8" },
-  { initials: "CL", nombre: "Clara L.", esp: "Reiki · Biodescodificación", color: "#F4B8D1" },
-  { initials: "RV", nombre: "Romina V.", esp: "Constelaciones", color: "#D8EAD0" },
-];
-
-const servicios = [
-  { nombre: "Reiki", duracion: 60, precio: 24000, modalidad: "ambas" },
-  { nombre: "Biodescodificación", duracion: 90, precio: 36000, modalidad: "virtual" },
-  { nombre: "Constelaciones", duracion: 60, precio: 28000, modalidad: "presencial" },
-];
 
 const horariosDisponibles = ["09:00", "10:00", "11:00", "15:00", "16:00", "17:00"];
 
@@ -75,16 +63,87 @@ const StepDots = ({ step }) => (
 
 export default function Reserva() {
   const [step, setStep] = useState(1);
+  const [profesionales, setProfesionales] = useState([]);
+  const [servicios, setServicios] = useState([]);
   const [prof, setProf] = useState(null);
   const [servicio, setServicio] = useState(null);
   const [dia, setDia] = useState(null);
   const [hora, setHora] = useState(null);
   const [modalidad, setModalidad] = useState(null);
   const [form, setForm] = useState({ nombre: "", celular: "", mail: "" });
+  const [loading, setLoading] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
 
-  const srv = servicios.find(s => s.nombre === servicio);
-  const total = srv?.precio || 0;
+  useEffect(() => {
+    const cargar = async () => {
+      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
+      setProfesionales(profs || []);
+      setLoading(false);
+    };
+    cargar();
+  }, []);
+
+  useEffect(() => {
+    if (!prof) return;
+    const cargarServicios = async () => {
+      const profData = profesionales.find(p => p.full_name === prof);
+      if (!profData) return;
+      const { data: svs } = await supabase.from("services").select("*").eq("professional_id", profData.id).eq("active", true);
+      setServicios(svs || []);
+    };
+    cargarServicios();
+  }, [prof]);
+
+  const srv = servicios.find(s => s.name === servicio);
+  const total = srv?.price || 0;
   const sena = Math.round(total / 2);
+
+  const confirmarReserva = async () => {
+    setGuardando(true);
+    setError("");
+    try {
+      // 1. Guardar o buscar cliente
+      let clienteId;
+      const { data: clienteExistente } = await supabase.from("clients").select("id").eq("email", form.mail).single();
+      if (clienteExistente) {
+        clienteId = clienteExistente.id;
+      } else {
+        const { data: nuevoCliente } = await supabase.from("clients").insert({ full_name: form.nombre, phone: form.celular, email: form.mail }).select("id").single();
+        clienteId = nuevoCliente.id;
+      }
+
+      // 2. Crear turno
+      const profData = profesionales.find(p => p.full_name === prof);
+      const fecha = `2026-06-${String(dia).padStart(2, "0")}`;
+      const [h, m] = hora.split(":").map(Number);
+      const endH = h + Math.floor((m + srv.duration_minutes) / 60);
+      const endM = (m + srv.duration_minutes) % 60;
+      const endTime = `${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}`;
+
+      const { data: turno } = await supabase.from("appointments").insert({
+        professional_id: profData.id, client_id: clienteId, service_id: srv.id,
+        date: fecha, start_time: hora, end_time: endTime,
+        modality: modalidad || srv.modality, status: "confirmed", total_price: total
+      }).select("id").single();
+
+      // 3. Crear pago seña
+      await supabase.from("payments").insert({
+        appointment_id: turno.id, type: "seña", amount: sena, status: "pending"
+      });
+
+      setStep(4);
+    } catch (e) {
+      setError("Hubo un error al confirmar el turno. Intentá de nuevo.");
+    }
+    setGuardando(false);
+  };
+
+  if (loading) return (
+    <div style={s.wrap}>
+      <div style={s.loadingText}>Cargando...</div>
+    </div>
+  );
 
   return (
     <div style={s.wrap}>
@@ -99,29 +158,32 @@ export default function Reserva() {
             <div style={s.title}>¿Con quién querés atenderte?</div>
             <div style={s.sub}>Seleccioná un profesional y servicio</div>
           </div>
-          {profesionales.map((p, i) => (
-            <div key={i} style={prof === p.nombre ? s.profCardSelected : s.profCard} onClick={() => setProf(p.nombre)}>
-              <div style={{ ...s.avatar, background: p.color }}>{p.initials}</div>
-              <div style={{ flex: 1 }}>
-                <div style={s.profNombre}>{p.nombre}</div>
-                <div style={s.profEsp}>{p.esp}</div>
+          {profesionales.length === 0 ? (
+            <div style={s.loadingText}>No hay profesionales disponibles aún.</div>
+          ) : profesionales.map((p, i) => (
+            <div key={i} style={prof === p.full_name ? s.profCardSelected : s.profCard} onClick={() => { setProf(p.full_name); setServicio(null); }}>
+              <div style={{ ...s.avatar, background: i % 2 === 0 ? "#C4A8D8" : "#F4B8D1" }}>
+                {p.full_name?.split(" ").map(n => n[0]).join("").slice(0,2)}
               </div>
-              {prof === p.nombre && <span style={{ color: "#9B72C0", fontSize: "18px" }}>✓</span>}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{p.full_name}</div>
+              </div>
+              {prof === p.full_name && <span style={{ color: "#9B72C0", fontSize: "18px" }}>✓</span>}
             </div>
           ))}
-          {prof && (
+          {prof && servicios.length > 0 && (
             <div>
               <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
               {servicios.map((sv, i) => (
-                <div key={i} style={{ ...(servicio === sv.nombre ? s.servicioCardSelected : s.servicioCard), marginBottom: "6px" }} onClick={() => setServicio(sv.nombre)}>
+                <div key={i} style={servicio === sv.name ? s.servicioCardSelected : s.servicioCard} onClick={() => setServicio(sv.name)}>
                   <div style={s.srvTop}>
-                    <span style={s.srvNombre}>{sv.nombre}</span>
-                    <span style={s.srvPrecio}>${sv.precio.toLocaleString("es-AR")}</span>
+                    <span style={s.srvNombre}>{sv.name}</span>
+                    <span style={s.srvPrecio}>${sv.price.toLocaleString("es-AR")}</span>
                   </div>
                   <div style={s.srvDet}>
-                    <span>{sv.duracion} min</span>
-                    {(sv.modalidad === "ambas" || sv.modalidad === "virtual") && <span style={s.tagV}>Virtual</span>}
-                    {(sv.modalidad === "ambas" || sv.modalidad === "presencial") && <span style={s.tagP}>Presencial</span>}
+                    <span>{sv.duration_minutes} min</span>
+                    {(sv.modality === "ambas" || sv.modality === "virtual") && <span style={s.tagV}>Virtual</span>}
+                    {(sv.modality === "ambas" || sv.modality === "presencial") && <span style={s.tagP}>Presencial</span>}
                   </div>
                 </div>
               ))}
@@ -137,7 +199,7 @@ export default function Reserva() {
         <div style={s.card}>
           <div>
             <div style={s.title}>¿Cuándo querés tu turno?</div>
-            <div style={s.sub}>{servicio} con {prof} · {srv?.duracion} min</div>
+            <div style={s.sub}>{servicio} con {prof} · {srv?.duration_minutes} min</div>
           </div>
           <div>
             <div style={s.calHeader}>
@@ -147,10 +209,10 @@ export default function Reserva() {
             </div>
             <div style={s.calGrid}>
               {["L","M","X","J","V","S","D"].map(d => <div key={d} style={s.calDayName}>{d}</div>)}
-              {[null,null,null,null,null,null,null].map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
+              {Array(0).fill(null).map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
               {Array.from({length: 30}, (_, i) => i + 1).map(d => (
                 <div key={d} onClick={() => setDia(d)}
-                  style={dia === d ? s.calDaySelected : d === 9 ? s.calDayToday : [1,7,8,14,15,21,22,28,29].includes(d) ? s.calDayOff : s.calDay}>
+                  style={dia === d ? s.calDaySelected : d === 9 ? s.calDayToday : [1,7,8,14,15,21,22,28,29,30].includes(d) ? s.calDayOff : s.calDay}>
                   {d}
                 </div>
               ))}
@@ -166,7 +228,7 @@ export default function Reserva() {
               </div>
             </div>
           )}
-          {dia && hora && srv?.modalidad === "ambas" && (
+          {dia && hora && srv?.modality === "ambas" && (
             <div>
               <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "8px" }}>Modalidad</div>
               <div style={{ display: "flex", gap: "8px" }}>
@@ -177,9 +239,9 @@ export default function Reserva() {
           )}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(1)}>← Volver</button>
-            <button style={{ ...s.btnNext, background: dia && hora && (modalidad || srv?.modalidad !== "ambas") ? "#9B72C0" : "#E0D0F0" }}
-              disabled={!dia || !hora || (!modalidad && srv?.modalidad === "ambas")}
-              onClick={() => { if (srv?.modalidad !== "ambas") setModalidad(srv?.modalidad); setStep(3); }}>
+            <button style={{ ...s.btnNext, background: dia && hora && (modalidad || srv?.modality !== "ambas") ? "#9B72C0" : "#E0D0F0" }}
+              disabled={!dia || !hora || (!modalidad && srv?.modality === "ambas")}
+              onClick={() => { if (srv?.modality !== "ambas") setModalidad(srv?.modality); setStep(3); }}>
               Continuar
             </button>
           </div>
@@ -190,23 +252,14 @@ export default function Reserva() {
         <div style={s.card}>
           <div>
             <div style={s.title}>Tus datos</div>
-            <div style={s.sub}>Solo la primera vez — guardamos tu información para próximas reservas</div>
+            <div style={s.sub}>Solo la primera vez</div>
           </div>
-          <div style={s.field}>
-            <label style={s.label}>Nombre y apellido</label>
-            <input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} />
-          </div>
-          <div style={s.field}>
-            <label style={s.label}>Celular (WhatsApp)</label>
-            <input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} />
-          </div>
-          <div style={s.field}>
-            <label style={s.label}>Mail</label>
-            <input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} placeholder="tu@mail.com" style={s.input} />
-          </div>
+          <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
+          <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
+          <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} placeholder="tu@mail.com" style={s.input} /></div>
           <div style={s.resumenBox}>
             <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen</div>
-            <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {srv?.duracion} min</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {srv?.duration_minutes} min</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{dia} jun · {hora}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Modalidad</span><span style={s.resValor}>{modalidad === "virtual" ? "📹 Virtual" : "📍 Presencial"}</span></div>
@@ -216,12 +269,13 @@ export default function Reserva() {
               <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Saldo 24hs antes del turno</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
             </div>
           </div>
+          {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
             <button style={{ ...s.btnMP, opacity: form.nombre && form.celular && form.mail ? 1 : 0.5 }}
-              disabled={!form.nombre || !form.celular || !form.mail}
-              onClick={() => setStep(4)}>
-              💳 Pagar seña ${sena.toLocaleString("es-AR")}
+              disabled={!form.nombre || !form.celular || !form.mail || guardando}
+              onClick={confirmarReserva}>
+              {guardando ? "Confirmando..." : `💳 Pagar seña $${sena.toLocaleString("es-AR")}`}
             </button>
           </div>
         </div>
@@ -236,13 +290,11 @@ export default function Reserva() {
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {modalidad}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{dia} jun · {hora}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Seña abonada</span><span style={s.resSeña}>${sena.toLocaleString("es-AR")} ✓</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Saldo pendiente</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>Seña pendiente</span><span style={s.resSeña}>${sena.toLocaleString("es-AR")}</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>Saldo 24hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
           </div>
-          <div style={s.avisoBox}>
-            🔔 Te avisaremos 24hs antes para abonar el saldo restante.
-          </div>
-          <button style={s.btnNext} onClick={() => { setStep(1); setProf(null); setServicio(null); setDia(null); setHora(null); setModalidad(null); }}>
+          <div style={s.avisoBox}>🔔 Te avisaremos 24hs antes para abonar el saldo restante.</div>
+          <button style={s.btnNext} onClick={() => { setStep(1); setProf(null); setServicio(null); setDia(null); setHora(null); setModalidad(null); setForm({ nombre: "", celular: "", mail: "" }); }}>
             Volver al inicio
           </button>
         </div>

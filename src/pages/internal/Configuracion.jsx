@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 
 const s = {
@@ -18,28 +18,26 @@ const s = {
   diaNombre: { fontSize: "13px", fontWeight: "500", color: "#2A1845", minWidth: "90px" },
   diaNombreOff: { fontSize: "13px", fontWeight: "500", color: "#C4A8D8", minWidth: "90px" },
   select: { fontSize: "12px", padding: "5px 8px", border: "0.5px solid #E0D0F0", borderRadius: "7px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  modPill: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   modPillP: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", cursor: "pointer", border: "0.5px solid #E88BB0", background: "#FDE8F0", color: "#A0407A", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   modPillV: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#EDE8FA", color: "#5C3F99", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   modPillPV: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#F3EEFA", color: "#5C3F99", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  modPill: { fontSize: "11px", padding: "3px 10px", borderRadius: "20px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   servicioRow: { display: "flex", alignItems: "center", gap: "10px", padding: "9px 0", borderBottom: "0.5px solid #F0E8F8" },
   input: { fontSize: "12px", padding: "5px 8px", border: "0.5px solid #E0D0F0", borderRadius: "7px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  trashBtn: { width: "26px", height: "26px", borderRadius: "6px", border: "0.5px solid #F0D0D8", background: "#FEF0F3", cursor: "pointer", color: "#C06080", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "center" },
+  trashBtn: { width: "26px", height: "26px", borderRadius: "6px", border: "0.5px solid #F0D0D8", background: "#FEF0F3", cursor: "pointer", color: "#C06080", fontSize: "13px" },
   addBtn: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "7px 14px", background: "#fff", color: "#9B72C0", border: "0.5px solid #C4A8D8", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", marginTop: "10px" },
   saveBtn: { padding: "9px 24px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  bloqueoRow: { display: "flex", alignItems: "center", gap: "10px", padding: "9px 0", borderBottom: "0.5px solid #F0E8F8", fontSize: "13px" },
-  tagDia: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FAEEDA", color: "#854F0B" },
-  tagHora: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99" },
+  saveBtnOk: { padding: "9px 24px", background: "#3B6D11", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   pausaRow: { display: "flex", alignItems: "center", gap: "10px", padding: "12px 0", borderBottom: "0.5px solid #F0E8F8" },
-  pausaLabel: { fontSize: "13px", color: "#2A1845", flex: 1 },
   pausaSub: { fontSize: "12px", color: "#9B72C0" },
   inputSm: { fontSize: "13px", padding: "6px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "70px" },
   logoutBtn: { marginTop: "auto", padding: "8px 12px", borderRadius: "8px", fontSize: "13px", color: "#C06080", cursor: "pointer", border: "none", background: "transparent", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  loadingText: { fontSize: "13px", color: "#B89FD0", padding: "1rem 0" },
 };
 
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-const initialDias = [
+const defaultDias = [
   { activo: true, inicio: "09:00", fin: "18:00", modalidad: "ambas" },
   { activo: true, inicio: "09:00", fin: "18:00", modalidad: "presencial" },
   { activo: true, inicio: "10:00", fin: "14:00", modalidad: "virtual" },
@@ -49,45 +47,86 @@ const initialDias = [
   { activo: false, inicio: "09:00", fin: "13:00", modalidad: "presencial" },
 ];
 
-const initialServicios = [
-  { nombre: "Reiki", duracion: 60, precio: 24000, modalidad: "ambas" },
-  { nombre: "Biodescodificación", duracion: 90, precio: 36000, modalidad: "virtual" },
-  { nombre: "Constelaciones", duracion: 60, precio: 28000, modalidad: "presencial" },
-];
-
-const bloqueos = [
-  { tipo: "dia", descripcion: "Lunes 23 de junio", motivo: "Feriado" },
-  { tipo: "dia", descripcion: "Vie 4 al Lun 7 jul", motivo: "Vacaciones" },
-  { tipo: "hora", descripcion: "Miércoles · 12:00 a 14:00", motivo: "Reunión de equipo" },
-  { tipo: "hora", descripcion: "Viernes · 13:00 a 15:00", motivo: "Uso personal" },
-];
+const getUid = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id || null;
+};
 
 export default function Configuracion({ setPage }) {
   const [tab, setTab] = useState("disponibilidad");
-  const [dias, setDias] = useState(initialDias);
-  const [servicios, setServicios] = useState(initialServicios);
+  const [dias, setDias] = useState(defaultDias);
+  const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas" }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
-  const toggleDia = (i) => {
-    const d = [...dias];
-    d[i].activo = !d[i].activo;
-    setDias(d);
+  useEffect(() => {
+    const cargar = async () => {
+      const uid = await getUid();
+      if (!uid) { setLoading(false); return; }
+
+      const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid);
+      if (svs && svs.length > 0) {
+        setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality })));
+      }
+
+      const { data: avail } = await supabase.from("availability").select("*").eq("professional_id", uid).order("day_of_week");
+      if (avail && avail.length > 0) {
+        const nd = [...defaultDias];
+        avail.forEach(a => {
+          const idx = a.day_of_week === 0 ? 6 : a.day_of_week - 1;
+          nd[idx] = { activo: a.active, inicio: a.start_time.slice(0,5), fin: a.end_time.slice(0,5), modalidad: a.modality };
+        });
+        setDias(nd);
+      }
+
+      const { data: cfg } = await supabase.from("settings").select("*").eq("professional_id", uid).maybeSingle();
+      if (cfg) setPausas({ pausa: cfg.break_minutes, anticipacion: cfg.min_advance_hours, cancelacion: cfg.cancellation_hours });
+
+      setLoading(false);
+    };
+    cargar();
+  }, []);
+
+  const guardarServicios = async () => {
+    setSaving(true);
+    const uid = await getUid();
+    if (!uid) { setSaving(false); return; }
+    await supabase.from("services").delete().eq("professional_id", uid);
+    const rows = servicios.filter(sv => sv.nombre).map(sv => ({
+      professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, active: true
+    }));
+    if (rows.length > 0) await supabase.from("services").insert(rows);
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
-  const updateDia = (i, key, val) => {
-    const d = [...dias];
-    d[i][key] = val;
-    setDias(d);
+  const guardarDisponibilidad = async () => {
+    setSaving(true);
+    const uid = await getUid();
+    if (!uid) { setSaving(false); return; }
+    await supabase.from("availability").delete().eq("professional_id", uid);
+    const rows = dias.map((d, i) => ({
+      professional_id: uid, day_of_week: i === 6 ? 0 : i + 1, start_time: d.inicio, end_time: d.fin, modality: d.modalidad, active: d.activo
+    }));
+    await supabase.from("availability").insert(rows);
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
-  const updateServicio = (i, key, val) => {
-    const sv = [...servicios];
-    sv[i][key] = val;
-    setServicios(sv);
+  const guardarPausas = async () => {
+    setSaving(true);
+    const uid = await getUid();
+    if (!uid) { setSaving(false); return; }
+    await supabase.from("settings").upsert({
+      professional_id: uid, break_minutes: parseInt(pausas.pausa), min_advance_hours: parseInt(pausas.anticipacion), cancellation_hours: parseInt(pausas.cancelacion)
+    }, { onConflict: "professional_id" });
+    setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
+  const toggleDia = (i) => { const d = [...dias]; d[i].activo = !d[i].activo; setDias(d); };
+  const updateDia = (i, key, val) => { const d = [...dias]; d[i][key] = val; setDias(d); };
+  const updateServicio = (i, key, val) => { const sv = [...servicios]; sv[i][key] = val; setServicios(sv); };
   const removeServicio = (i) => setServicios(servicios.filter((_, idx) => idx !== i));
-
   const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas" }]);
 
   const getModStyle = (mod) => {
@@ -99,18 +138,12 @@ export default function Configuracion({ setPage }) {
 
   const cycleModalidad = (i) => {
     const order = ["presencial", "virtual", "ambas"];
-    const d = [...dias];
-    const cur = order.indexOf(d[i].modalidad);
-    d[i].modalidad = order[(cur + 1) % order.length];
-    setDias(d);
+    const d = [...dias]; d[i].modalidad = order[(order.indexOf(d[i].modalidad) + 1) % order.length]; setDias(d);
   };
 
   const cycleServicioMod = (i) => {
     const order = ["presencial", "virtual", "ambas"];
-    const sv = [...servicios];
-    const cur = order.indexOf(sv[i].modalidad);
-    sv[i].modalidad = order[(cur + 1) % order.length];
-    setServicios(sv);
+    const sv = [...servicios]; sv[i].modalidad = order[(order.indexOf(sv[i].modalidad) + 1) % order.length]; setServicios(sv);
   };
 
   const getModLabel = (mod) => {
@@ -134,134 +167,99 @@ export default function Configuracion({ setPage }) {
       </div>
 
       <div style={s.main}>
-        <div style={s.title}>Configuración — Maru</div>
-
+        <div style={s.title}>Configuración</div>
         <div style={s.tabs}>
-          {["disponibilidad", "servicios", "bloqueos", "pausas"].map(t => (
+          {["disponibilidad", "servicios", "pausas"].map(t => (
             <button key={t} style={tab === t ? s.tabActive : s.tab} onClick={() => setTab(t)}>
               {t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ))}
         </div>
 
-        {tab === "disponibilidad" && (
+        {loading ? <div style={s.loadingText}>Cargando tu configuración...</div> : (
           <>
-            <div style={s.card}>
-              <div style={s.cardTitle}>Días y horarios de atención</div>
-              {diasSemana.map((dia, i) => (
-                <div key={dia} style={{ ...s.diaRow, borderBottom: i === 6 ? "none" : "0.5px solid #F0E8F8" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-                    <div onClick={() => toggleDia(i)} style={{ width: "36px", height: "20px", borderRadius: "20px", background: dias[i].activo ? "#9B72C0" : "#E0D0F0", position: "relative", cursor: "pointer", transition: "0.2s" }}>
-                      <div style={{ position: "absolute", width: "14px", height: "14px", borderRadius: "50%", background: "#fff", top: "3px", left: dias[i].activo ? "19px" : "3px", transition: "0.2s" }}></div>
+            {tab === "disponibilidad" && (
+              <>
+                <div style={s.card}>
+                  <div style={s.cardTitle}>Días y horarios de atención</div>
+                  {diasSemana.map((dia, i) => (
+                    <div key={dia} style={{ ...s.diaRow, borderBottom: i === 6 ? "none" : "0.5px solid #F0E8F8" }}>
+                      <div onClick={() => toggleDia(i)} style={{ width: "36px", height: "20px", borderRadius: "20px", background: dias[i].activo ? "#9B72C0" : "#E0D0F0", position: "relative", cursor: "pointer", flexShrink: 0 }}>
+                        <div style={{ position: "absolute", width: "14px", height: "14px", borderRadius: "50%", background: "#fff", top: "3px", left: dias[i].activo ? "19px" : "3px", transition: "0.2s" }}></div>
+                      </div>
+                      <div style={dias[i].activo ? s.diaNombre : s.diaNombreOff}>{dia}</div>
+                      {dias[i].activo ? (
+                        <>
+                          <select value={dias[i].inicio} onChange={e => updateDia(i, "inicio", e.target.value)} style={s.select}>
+                            {["08:00","09:00","10:00","11:00","12:00"].map(h => <option key={h}>{h}</option>)}
+                          </select>
+                          <span style={{ fontSize: "12px", color: "#C4A8D8" }}>a</span>
+                          <select value={dias[i].fin} onChange={e => updateDia(i, "fin", e.target.value)} style={s.select}>
+                            {["13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"].map(h => <option key={h}>{h}</option>)}
+                          </select>
+                          <button style={getModStyle(dias[i].modalidad)} onClick={() => cycleModalidad(i)}>{getModLabel(dias[i].modalidad)}</button>
+                        </>
+                      ) : <span style={{ fontSize: "12px", color: "#C4A8D8" }}>No atiende</span>}
                     </div>
-                  </label>
-                  <div style={dias[i].activo ? s.diaNombre : s.diaNombreOff}>{dia}</div>
-                  {dias[i].activo ? (
-                    <>
-                      <select value={dias[i].inicio} onChange={e => updateDia(i, "inicio", e.target.value)} style={s.select}>
-                        {["08:00","09:00","10:00","11:00","12:00"].map(h => <option key={h}>{h}</option>)}
-                      </select>
-                      <span style={{ fontSize: "12px", color: "#C4A8D8" }}>a</span>
-                      <select value={dias[i].fin} onChange={e => updateDia(i, "fin", e.target.value)} style={s.select}>
-                        {["13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"].map(h => <option key={h}>{h}</option>)}
-                      </select>
-                      <button style={getModStyle(dias[i].modalidad)} onClick={() => cycleModalidad(i)}>
-                        {getModLabel(dias[i].modalidad)}
-                      </button>
-                    </>
-                  ) : (
-                    <span style={{ fontSize: "12px", color: "#C4A8D8" }}>No atiende</span>
-                  )}
+                  ))}
                 </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button style={s.saveBtn}>Guardar cambios</button>
-            </div>
-          </>
-        )}
-
-        {tab === "servicios" && (
-          <>
-            <div style={s.card}>
-              <div style={s.cardTitle}>Mis servicios</div>
-              {servicios.map((sv, i) => (
-                <div key={i} style={{ ...s.servicioRow, borderBottom: i === servicios.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
-                  <input value={sv.nombre} onChange={e => updateServicio(i, "nombre", e.target.value)} placeholder="Nombre del servicio" style={{ ...s.input, flex: 1 }} />
-                  <span style={{ fontSize: "12px", color: "#9B72C0" }}>Duración</span>
-                  <input type="number" value={sv.duracion} onChange={e => updateServicio(i, "duracion", e.target.value)} style={{ ...s.input, width: "60px" }} />
-                  <span style={{ fontSize: "12px", color: "#C4A8D8" }}>min</span>
-                  <span style={{ fontSize: "12px", color: "#9B72C0" }}>Precio</span>
-                  <input type="number" value={sv.precio} onChange={e => updateServicio(i, "precio", e.target.value)} style={{ ...s.input, width: "90px" }} />
-                  <button style={getModStyle(sv.modalidad)} onClick={() => cycleServicioMod(i)}>
-                    {getModLabel(sv.modalidad)}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarDisponibilidad} disabled={saving}>
+                    {saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}
                   </button>
-                  <button style={s.trashBtn} onClick={() => removeServicio(i)}>🗑</button>
                 </div>
-              ))}
-              <button style={s.addBtn} onClick={addServicio}>+ Agregar servicio</button>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button style={s.saveBtn}>Guardar cambios</button>
-            </div>
-          </>
-        )}
+              </>
+            )}
 
-        {tab === "bloqueos" && (
-          <>
-            <div style={s.card}>
-              <div style={s.cardTitle}>Días y horarios bloqueados</div>
-              {bloqueos.map((b, i) => (
-                <div key={i} style={{ ...s.bloqueoRow, borderBottom: i === bloqueos.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
-                  <span style={b.tipo === "dia" ? s.tagDia : s.tagHora}>{b.tipo === "dia" ? "Día completo" : "Horario"}</span>
-                  <span style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", flex: 1 }}>{b.descripcion}</span>
-                  <span style={{ fontSize: "12px", color: "#9B72C0" }}>{b.motivo}</span>
-                  <button style={s.trashBtn}>🗑</button>
+            {tab === "servicios" && (
+              <>
+                <div style={s.card}>
+                  <div style={s.cardTitle}>Mis servicios</div>
+                  {servicios.map((sv, i) => (
+                    <div key={i} style={{ ...s.servicioRow, borderBottom: i === servicios.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
+                      <input value={sv.nombre} onChange={e => updateServicio(i, "nombre", e.target.value)} placeholder="Nombre del servicio" style={{ ...s.input, flex: 1 }} />
+                      <span style={{ fontSize: "12px", color: "#9B72C0" }}>Duración</span>
+                      <input type="number" value={sv.duracion} onChange={e => updateServicio(i, "duracion", e.target.value)} style={{ ...s.input, width: "60px" }} />
+                      <span style={{ fontSize: "12px", color: "#C4A8D8" }}>min</span>
+                      <span style={{ fontSize: "12px", color: "#9B72C0" }}>Precio</span>
+                      <input type="number" value={sv.precio} onChange={e => updateServicio(i, "precio", e.target.value)} style={{ ...s.input, width: "90px" }} />
+                      <button style={getModStyle(sv.modalidad)} onClick={() => cycleServicioMod(i)}>{getModLabel(sv.modalidad)}</button>
+                      <button style={s.trashBtn} onClick={() => removeServicio(i)}>🗑</button>
+                    </div>
+                  ))}
+                  <button style={s.addBtn} onClick={addServicio}>+ Agregar servicio</button>
                 </div>
-              ))}
-              <button style={s.addBtn}>+ Agregar bloqueo</button>
-            </div>
-          </>
-        )}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarServicios} disabled={saving}>
+                    {saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}
+                  </button>
+                </div>
+              </>
+            )}
 
-        {tab === "pausas" && (
-          <>
-            <div style={s.card}>
-              <div style={s.cardTitle}>Pausa entre turnos</div>
-              <div style={s.pausaRow}>
-                <div>
-                  <div style={s.pausaLabel}>Tiempo de pausa entre sesiones</div>
-                  <div style={s.pausaSub}>El sistema bloqueará este tiempo automáticamente entre turno y turno</div>
+            {tab === "pausas" && (
+              <>
+                {[
+                  { key: "pausa", label: "Pausa entre sesiones", sub: "Tiempo bloqueado automáticamente entre turno y turno", unit: "min" },
+                  { key: "anticipacion", label: "Anticipación mínima para reservar", sub: "Horas antes en que puede reservar un cliente online", unit: "hs" },
+                  { key: "cancelacion", label: "Plazo de cancelación con reembolso", sub: "Horas antes del turno para cancelar con devolución de seña", unit: "hs" },
+                ].map(f => (
+                  <div key={f.key} style={s.card}>
+                    <div style={s.cardTitle}>{f.label}</div>
+                    <div style={{ ...s.pausaRow, borderBottom: "none" }}>
+                      <div style={{ flex: 1 }}><div style={s.pausaSub}>{f.sub}</div></div>
+                      <input type="number" value={pausas[f.key]} onChange={e => setPausas({ ...pausas, [f.key]: e.target.value })} style={s.inputSm} />
+                      <span style={{ fontSize: "13px", color: "#9B72C0" }}>{f.unit}</span>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarPausas} disabled={saving}>
+                    {saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}
+                  </button>
                 </div>
-                <input type="number" value={pausas.pausa} onChange={e => setPausas({ ...pausas, pausa: e.target.value })} style={s.inputSm} />
-                <span style={{ fontSize: "13px", color: "#9B72C0" }}>min</span>
-              </div>
-            </div>
-            <div style={s.card}>
-              <div style={s.cardTitle}>Anticipación mínima para reservar</div>
-              <div style={{ ...s.pausaRow, borderBottom: "none" }}>
-                <div>
-                  <div style={s.pausaLabel}>¿Con cuántas horas de anticipación puede reservar un cliente?</div>
-                  <div style={s.pausaSub}>Turnos más cercanos no estarán disponibles online</div>
-                </div>
-                <input type="number" value={pausas.anticipacion} onChange={e => setPausas({ ...pausas, anticipacion: e.target.value })} style={s.inputSm} />
-                <span style={{ fontSize: "13px", color: "#9B72C0" }}>hs</span>
-              </div>
-            </div>
-            <div style={s.card}>
-              <div style={s.cardTitle}>Plazo de cancelación con reembolso</div>
-              <div style={{ ...s.pausaRow, borderBottom: "none" }}>
-                <div>
-                  <div style={s.pausaLabel}>Horas antes del turno para cancelar con devolución de seña</div>
-                  <div style={s.pausaSub}>Cancelaciones después de este plazo retienen la seña</div>
-                </div>
-                <input type="number" value={pausas.cancelacion} onChange={e => setPausas({ ...pausas, cancelacion: e.target.value })} style={s.inputSm} />
-                <span style={{ fontSize: "13px", color: "#9B72C0" }}>hs</span>
-              </div>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button style={s.saveBtn}>Guardar cambios</button>
-            </div>
+              </>
+            )}
           </>
         )}
       </div>
