@@ -7,6 +7,7 @@ import Agenda from "./pages/internal/Agenda";
 import Configuracion from "./pages/internal/Configuracion";
 import Clientes from "./pages/internal/Clientes";
 import Cobros from "./pages/internal/Cobros";
+import Estadisticas from "./pages/internal/Estadisticas";
 import Reserva from "./pages/public/Reserva";
 import Layout from "./components/internal/Layout";
 
@@ -45,6 +46,7 @@ function App() {
     if (page === "config") return <Configuracion setPage={setPage} />;
     if (page === "clientes") return <Clientes setPage={setPage} />;
     if (page === "cobros") return <Cobros setPage={setPage} />;
+    if (page === "estadisticas") return <Estadisticas setPage={setPage} />;
     return <Dashboard setPage={setPage} />;
   };
 

@@ -27,6 +27,7 @@ const navItems = [
   { key: "agenda", icon: "📅", label: "Agenda" },
   { key: "clientes", icon: "👥", label: "Clientes" },
   { key: "cobros", icon: "💰", label: "Cobros" },
+  { key: "estadisticas", icon: "📊", label: "Stats" },
   { key: "config", icon: "⚙️", label: "Config" },
 ];
 
