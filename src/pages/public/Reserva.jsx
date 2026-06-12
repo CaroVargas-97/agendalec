@@ -45,9 +45,14 @@ const s = {
   resValor: { color: "#2A1845", fontWeight: "500" },
   resSeña: { color: "#7B5EA7", fontWeight: "500" },
   btnNext: { width: "100%", padding: "13px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  btnMP: { width: "100%", padding: "13px", background: "#009EE3", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  confirmCircle: { width: "64px", height: "64px", borderRadius: "50%", background: "#EAF3DE", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontSize: "28px" },
+  btnConfirmar: { width: "100%", padding: "13px", background: "#3B2460", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  aliasBox: { background: "#EDE8FA", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center", textAlign: "center" },
+  aliasTitulo: { fontSize: "13px", color: "#5C3F99", fontWeight: "500" },
+  aliasValor: { fontSize: "22px", fontWeight: "500", color: "#3B2460", letterSpacing: "0.5px" },
+  aliasCopy: { fontSize: "12px", color: "#9B72C0", cursor: "pointer", textDecoration: "underline" },
   avisoBox: { background: "#FDE8F0", borderRadius: "10px", padding: "10px 12px", fontSize: "12px", color: "#A0407A" },
+  confirmCircle: { width: "64px", height: "64px", borderRadius: "50%", background: "#EAF3DE", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontSize: "28px" },
+  pendienteCircle: { width: "64px", height: "64px", borderRadius: "50%", background: "#FAEEDA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontSize: "28px" },
   loadingText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
 };
 
@@ -66,6 +71,8 @@ export default function Reserva() {
   const [profesionales, setProfesionales] = useState([]);
   const [servicios, setServicios] = useState([]);
   const [prof, setProf] = useState(null);
+  const [profData, setProfData] = useState(null);
+  const [profSettings, setProfSettings] = useState(null);
   const [servicio, setServicio] = useState(null);
   const [dia, setDia] = useState(null);
   const [hora, setHora] = useState(null);
@@ -74,6 +81,7 @@ export default function Reserva() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  const [copiado, setCopiado] = useState(false);
 
   useEffect(() => {
     const cargar = async () => {
@@ -87,10 +95,13 @@ export default function Reserva() {
   useEffect(() => {
     if (!prof) return;
     const cargarServicios = async () => {
-      const profData = profesionales.find(p => p.full_name === prof);
-      if (!profData) return;
-      const { data: svs } = await supabase.from("services").select("*").eq("professional_id", profData.id).eq("active", true);
+      const pd = profesionales.find(p => p.full_name === prof);
+      if (!pd) return;
+      setProfData(pd);
+      const { data: svs } = await supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true);
       setServicios(svs || []);
+      const { data: cfg } = await supabase.from("settings").select("payment_method, alias, cbu").eq("professional_id", pd.id).maybeSingle();
+      setProfSettings(cfg);
     };
     cargarServicios();
   }, [prof]);
@@ -99,13 +110,18 @@ export default function Reserva() {
   const total = srv?.price || 0;
   const sena = Math.round(total / 2);
 
+  const copiarAlias = () => {
+    navigator.clipboard.writeText(profSettings?.alias || "");
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  };
+
   const confirmarReserva = async () => {
     setGuardando(true);
     setError("");
     try {
-      // 1. Guardar o buscar cliente
       let clienteId;
-      const { data: clienteExistente } = await supabase.from("clients").select("id").eq("email", form.mail).single();
+      const { data: clienteExistente } = await supabase.from("clients").select("id").eq("email", form.mail).maybeSingle();
       if (clienteExistente) {
         clienteId = clienteExistente.id;
       } else {
@@ -113,8 +129,6 @@ export default function Reserva() {
         clienteId = nuevoCliente.id;
       }
 
-      // 2. Crear turno
-      const profData = profesionales.find(p => p.full_name === prof);
       const fecha = `2026-06-${String(dia).padStart(2, "0")}`;
       const [h, m] = hora.split(":").map(Number);
       const endH = h + Math.floor((m + srv.duration_minutes) / 60);
@@ -124,10 +138,9 @@ export default function Reserva() {
       const { data: turno } = await supabase.from("appointments").insert({
         professional_id: profData.id, client_id: clienteId, service_id: srv.id,
         date: fecha, start_time: hora, end_time: endTime,
-        modality: modalidad || srv.modality, status: "confirmed", total_price: total
+        modality: modalidad || srv.modality, status: "pending", total_price: total
       }).select("id").single();
 
-      // 3. Crear pago seña
       await supabase.from("payments").insert({
         appointment_id: turno.id, type: "seña", amount: sena, status: "pending"
       });
@@ -140,9 +153,7 @@ export default function Reserva() {
   };
 
   if (loading) return (
-    <div style={s.wrap}>
-      <div style={s.loadingText}>Cargando...</div>
-    </div>
+    <div style={s.wrap}><div style={s.loadingText}>Cargando...</div></div>
   );
 
   return (
@@ -212,7 +223,7 @@ export default function Reserva() {
               {Array(0).fill(null).map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
               {Array.from({length: 30}, (_, i) => i + 1).map(d => (
                 <div key={d} onClick={() => setDia(d)}
-                  style={dia === d ? s.calDaySelected : d === 9 ? s.calDayToday : [1,7,8,14,15,21,22,28,29,30].includes(d) ? s.calDayOff : s.calDay}>
+                  style={dia === d ? s.calDaySelected : d === 12 ? s.calDayToday : [1,7,8,14,15,21,22,28,29,30].includes(d) ? s.calDayOff : s.calDay}>
                   {d}
                 </div>
               ))}
@@ -257,6 +268,7 @@ export default function Reserva() {
           <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
           <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
           <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} placeholder="tu@mail.com" style={s.input} /></div>
+          
           <div style={s.resumenBox}>
             <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen</div>
             <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {srv?.duration_minutes} min</span></div>
@@ -265,35 +277,58 @@ export default function Reserva() {
             <div style={s.resRow}><span style={s.resLabel}>Modalidad</span><span style={s.resValor}>{modalidad === "virtual" ? "📹 Virtual" : "📍 Presencial"}</span></div>
             <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "2px" }}>
               <div style={s.resRow}><span style={s.resLabel}>Precio total</span><span style={s.resValor}>${total.toLocaleString("es-AR")}</span></div>
-              <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña a pagar ahora (50%)</span><span style={s.resSeña}>${sena.toLocaleString("es-AR")}</span></div>
-              <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Saldo 24hs antes del turno</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
+              <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña ahora (50%)</span><span style={s.resSeña}>${sena.toLocaleString("es-AR")}</span></div>
+              <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
             </div>
           </div>
+
+          {profSettings?.alias && (
+            <div style={s.aliasBox}>
+              <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno</div>
+              <div style={s.aliasValor}>{profSettings.alias}</div>
+              {profSettings.cbu && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {profSettings.cbu}</div>}
+              <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a transferir: <strong style={{ color: "#5C3F99" }}>${sena.toLocaleString("es-AR")}</strong></div>
+            </div>
+          )}
+
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
-            <button style={{ ...s.btnMP, opacity: form.nombre && form.celular && form.mail ? 1 : 0.5 }}
+            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail ? 1 : 0.5 }}
               disabled={!form.nombre || !form.celular || !form.mail || guardando}
               onClick={confirmarReserva}>
-              {guardando ? "Confirmando..." : `💳 Pagar seña $${sena.toLocaleString("es-AR")}`}
+              {guardando ? "Confirmando..." : "✓ Confirmar turno"}
             </button>
+          </div>
+          <div style={{ fontSize: "11px", color: "#B89FD0", textAlign: "center" }}>
+            Tu turno quedará pendiente hasta que se confirme la transferencia
           </div>
         </div>
       )}
 
       {step === 4 && (
         <div style={{ ...s.card, alignItems: "center", textAlign: "center" }}>
-          <div style={s.confirmCircle}>✅</div>
-          <div style={s.title}>¡Turno confirmado!</div>
-          <div style={s.sub}>Te enviamos la confirmación por mail y WhatsApp</div>
+          <div style={s.pendienteCircle}>⏳</div>
+          <div style={s.title}>¡Reserva recibida!</div>
+          <div style={s.sub}>Tu turno quedará confirmado una vez que se verifique la transferencia</div>
+          
+          {profSettings?.alias && (
+            <div style={s.aliasBox}>
+              <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora</div>
+              <div style={s.aliasValor}>{profSettings.alias}</div>
+              <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>${sena.toLocaleString("es-AR")}</strong></div>
+            </div>
+          )}
+
           <div style={{ ...s.resumenBox, width: "100%", textAlign: "left" }}>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {modalidad}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{dia} jun · {hora}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Seña pendiente</span><span style={s.resSeña}>${sena.toLocaleString("es-AR")}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Saldo 24hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
           </div>
-          <div style={s.avisoBox}>🔔 Te avisaremos 24hs antes para abonar el saldo restante.</div>
+          <div style={s.avisoBox}>🔔 Recibirás una confirmación por mail/WhatsApp cuando se verifique el pago.</div>
           <button style={s.btnNext} onClick={() => { setStep(1); setProf(null); setServicio(null); setDia(null); setHora(null); setModalidad(null); setForm({ nombre: "", celular: "", mail: "" }); }}>
             Volver al inicio
           </button>
