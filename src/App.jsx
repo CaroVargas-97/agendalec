@@ -9,6 +9,7 @@ import Clientes from "./pages/internal/Clientes";
 import Cobros from "./pages/internal/Cobros";
 import Estadisticas from "./pages/internal/Estadisticas";
 import Reserva from "./pages/public/Reserva";
+import Terminos from "./pages/public/Terminos";
 import Layout from "./components/internal/Layout";
 
 function App() {
@@ -27,8 +28,9 @@ function App() {
     });
   }, []);
 
-  const isPublic = window.location.pathname === "/reservar";
-  if (isPublic) return <Reserva />;
+  const path = window.location.pathname;
+  if (path === "/reservar") return <Reserva />;
+  if (path === "/terminos") return <Terminos />;
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#F8F4FC", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
