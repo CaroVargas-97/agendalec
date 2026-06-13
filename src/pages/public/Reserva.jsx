@@ -82,6 +82,7 @@ export default function Reserva() {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [copiado, setCopiado] = useState(false);
+  const [aceptaTyC, setAceptaTyC] = useState(false);
 
   useEffect(() => {
     const cargar = async () => {
@@ -292,11 +293,15 @@ export default function Reserva() {
             </div>
           )}
 
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+            <input type="checkbox" id="tyc" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
+            <label htmlFor="tyc" style={{ fontSize: "12px", color: "#9B72C0", cursor: "pointer" }}>Acepto los <a href="/terminos" target="_blank" style={{ color: "#7B5EA7", fontWeight: "500" }}>Términos y Condiciones</a></label>
+          </div>
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
             <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail ? 1 : 0.5 }}
-              disabled={!form.nombre || !form.celular || !form.mail || guardando}
+              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC}
               onClick={confirmarReserva}>
               {guardando ? "Confirmando..." : "✓ Confirmar turno"}
             </button>
@@ -328,7 +333,7 @@ export default function Reserva() {
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{dia} jun · {hora}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
           </div>
-          <div style={s.avisoBox}>🔔 Recibirás una confirmación por mail/WhatsApp cuando se verifique el pago.</div>
+          <div style={s.avisoBox}>🔔 Recibirás una confirmación por WhatsApp cuando se verifique el pago.</div>
           <button style={s.btnNext} onClick={() => { setStep(1); setProf(null); setServicio(null); setDia(null); setHora(null); setModalidad(null); setForm({ nombre: "", celular: "", mail: "" }); }}>
             Volver al inicio
           </button>
