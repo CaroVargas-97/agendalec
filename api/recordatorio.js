@@ -29,35 +29,47 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    // Fecha de mañana en Argentina (UTC-3)
     const ahora = new Date();
     const argentinaTime = new Date(ahora.getTime() - 3 * 60 * 60 * 1000);
     argentinaTime.setDate(argentinaTime.getDate() + 1);
     const fechaManana = argentinaTime.toISOString().split("T")[0];
 
-    console.log("Buscando turnos para fecha:", fechaManana);
+    console.log("Fecha mañana:", fechaManana);
 
-    const { data: turnos, error } = await supabase
-      .from("appointments")
-      .select(`id, professional_id, start_time, status, clients(full_name, phone), services(name), profiles(full_name)`)
-      .eq("date", fechaManana)
-      .eq("status", "confirmed");
+    // Query directa con join de payments
+    const { data: pagos, error } = await supabase
+      .from("payments")
+      .select(`
+        id,
+        amount,
+        type,
+        status,
+        appointments!inner(
+          id,
+          professional_id,
+          start_time,
+          date,
+          status,
+          clients(full_name, phone),
+          services(name),
+          profiles(full_name)
+        )
+      `)
+      .eq("type", "saldo")
+      .eq("status", "pending")
+      .eq("appointments.date", fechaManana)
+      .eq("appointments.status", "confirmed");
 
-    if (error) throw error;
-    console.log("Turnos encontrados:", turnos?.length);
+    if (error) { console.log("Error:", JSON.stringify(error)); throw error; }
+    console.log("Pagos pendientes encontrados:", pagos?.length, JSON.stringify(pagos?.map(p => p.id)));
 
     const resultados = [];
 
-    for (const turno of turnos || []) {
-      const { data: pagos } = await supabase
-        .from("payments")
-        .select("type, amount, status")
-        .eq("appointment_id", turno.id);
-
-      const pagoSaldo = pagos?.find(p => p.type === "saldo" && p.status === "pending");
-      if (!pagoSaldo) continue;
-
-      const celular = turno.clients?.phone?.replace(/\D/g, "");
+    for (const pago of pagos || []) {
+      const turno = pago.appointments;
+      const celular = turno?.clients?.phone?.replace(/\D/g, "");
+      
+      console.log("Procesando pago:", pago.id, "celular:", celular);
       if (!celular) continue;
 
       const { data: settings } = await supabase
@@ -67,10 +79,10 @@ export default async function handler(req, res) {
         .maybeSingle();
 
       const alias = settings?.alias || "consultar con el profesional";
-      const monto = pagoSaldo.amount;
 
-      const mensaje = `Hola ${turno.clients.full_name}! 👋 Te recordamos que mañana tenés tu turno de ${turno.services.name} con ${turno.profiles.full_name} a las ${turno.start_time.slice(0,5)}. El saldo pendiente es $${parseInt(monto).toLocaleString("es-AR")}. Por favor transferí al alias: *${alias}* antes del turno. ¡Gracias! 🗓`;
+      const mensaje = `Hola ${turno.clients.full_name}! 👋 Te recordamos que mañana tenés tu turno de ${turno.services.name} con ${turno.profiles.full_name} a las ${turno.start_time.slice(0,5)}. El saldo pendiente es $${parseInt(pago.amount).toLocaleString("es-AR")}. Por favor transferí al alias: *${alias}* antes del turno. ¡Gracias! 🗓`;
 
+      console.log("Enviando a:", celular);
       await enviarWhatsApp(celular, mensaje);
       resultados.push({ cliente: turno.clients.full_name, estado: "enviado" });
     }
@@ -80,4 +92,4 @@ export default async function handler(req, res) {
     console.error("Error:", error.message);
     return res.status(500).json({ error: error.message });
   }
-}// v3
+}
