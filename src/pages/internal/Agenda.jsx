@@ -24,6 +24,8 @@ const s = {
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
   clienteTag: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EAF3DE", color: "#3B6D11", marginTop: "4px", display: "inline-block" },
   clienteTagNew: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99", marginTop: "4px", display: "inline-block" },
+  pagoBtn: { flex: 1, padding: "8px 4px", borderRadius: "8px", border: "0.5px solid #E0D0F0", fontSize: "11px", fontWeight: "500", cursor: "pointer", textAlign: "center", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  pagoBtnActive: { flex: 1, padding: "8px 4px", borderRadius: "8px", border: "0.5px solid #9B72C0", fontSize: "11px", fontWeight: "500", cursor: "pointer", textAlign: "center", background: "#EDE8FA", color: "#5C3F99", fontFamily: "'Plus Jakarta Sans', sans-serif" },
 };
 
 const toISO = (date) => date.toISOString().split("T")[0];
@@ -57,7 +59,8 @@ export default function Agenda() {
   const [clienteEncontrado, setClienteEncontrado] = useState(null);
   const [clienteNuevo, setClienteNuevo] = useState(false);
   const [nuevoClienteData, setNuevoClienteData] = useState({ phone: "", email: "" });
-  const [form, setForm] = useState({ clienteId: "", profesional: "", servicioId: "", modalidad: "presencial", fecha: toISO(new Date()), hora: "09:00", notas: "" });
+  const [estadoPago, setEstadoPago] = useState("sena"); // sena | completo | pendiente
+  const [form, setForm] = useState({ profesional: "", servicioId: "", modalidad: "presencial", fecha: toISO(new Date()), hora: "09:00", notas: "" });
 
   useEffect(() => { cargarDatos(); }, [fecha, vista, filtroProf, filtroMod]);
 
@@ -75,7 +78,6 @@ export default function Agenda() {
 
   const cargarDatos = async () => {
     setLoading(true);
-
     if (vista === "dia") {
       let query = supabase.from("appointments")
         .select("*, clients(full_name), services(name, duration_minutes, price), profiles(full_name)")
@@ -96,7 +98,6 @@ export default function Agenda() {
       const { data } = await query;
       setTurnosSemana(data || []);
     }
-
     const { data: profs } = await supabase.from("profiles").select("id, full_name").eq("role", "professional");
     setProfesionales(profs || []);
     const { data: svs } = await supabase.from("services").select("id, name, duration_minutes, price, professional_id");
@@ -124,30 +125,42 @@ export default function Agenda() {
   const guardarTurno = async () => {
     setSaving(true);
     const srv = servicios.find(s => s.id === form.servicioId);
-    if (!srv || !form.profesional) { setSaving(false); return; }
+    if (!srv || !form.profesional || !busquedaCliente) { setSaving(false); return; }
 
     let clienteId = clienteEncontrado?.id;
     if (!clienteId) {
-      if (!busquedaCliente) { setSaving(false); return; }
       const { data: nc } = await supabase.from("clients").insert({
         full_name: busquedaCliente,
-        phone: nuevoClienteData.phone,
-        email: nuevoClienteData.email
+        phone: nuevoClienteData.phone || null,
+        email: nuevoClienteData.email || null
       }).select("id").single();
       clienteId = nc?.id;
     }
-
     if (!clienteId) { setSaving(false); return; }
 
     const [h, m] = form.hora.split(":").map(Number);
     const endMin = h * 60 + m + srv.duration_minutes;
     const endTime = `${String(Math.floor(endMin/60)).padStart(2,"0")}:${String(endMin%60).padStart(2,"0")}`;
 
-    await supabase.from("appointments").insert({
+    const status = estadoPago === "pendiente" ? "pending" : "confirmed";
+    const { data: turno } = await supabase.from("appointments").insert({
       professional_id: form.profesional, client_id: clienteId, service_id: form.servicioId,
       date: form.fecha, start_time: form.hora, end_time: endTime,
-      modality: form.modalidad, status: "confirmed", total_price: srv.price, notes: form.notas
-    });
+      modality: form.modalidad, status, total_price: srv.price, notes: form.notas
+    }).select("id").single();
+
+    // Registrar pagos según el estado
+    if (estadoPago === "sena") {
+      const sena = Math.round(srv.price / 2);
+      await supabase.from("payments").insert([
+        { appointment_id: turno.id, type: "seña", amount: sena, status: "paid", paid_at: new Date().toISOString() },
+        { appointment_id: turno.id, type: "saldo", amount: sena, status: "pending" }
+      ]);
+    } else if (estadoPago === "completo") {
+      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: srv.price, status: "paid", paid_at: new Date().toISOString() });
+    } else {
+      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: Math.round(srv.price / 2), status: "pending" });
+    }
 
     await cargarDatos();
     setPanelAbierto(false);
@@ -155,10 +168,21 @@ export default function Agenda() {
     setBusquedaCliente("");
     setClienteEncontrado(null);
     setClienteNuevo(false);
+    setEstadoPago("sena");
+    setNuevoClienteData({ phone: "", email: "" });
   };
 
   const serviciosFiltrados = servicios.filter(sv => !form.profesional || sv.professional_id === form.profesional);
   const semana = getSemana(fecha);
+
+  const getPrecioInfo = () => {
+    const srv = servicios.find(s => s.id === form.servicioId);
+    if (!srv) return null;
+    const sena = Math.round(srv.price / 2);
+    if (estadoPago === "sena") return `Seña $${sena.toLocaleString("es-AR")} · Saldo $${sena.toLocaleString("es-AR")} pendiente`;
+    if (estadoPago === "completo") return `Pago completo $${srv.price.toLocaleString("es-AR")}`;
+    return `Pendiente · Seña $${sena.toLocaleString("es-AR")} a confirmar`;
+  };
 
   return (
     <div style={{ display: "flex", flex: 1, flexDirection: "column" }}>
@@ -209,7 +233,6 @@ export default function Agenda() {
                     </div>
                   </div>
                 )}
-
                 {vista === "semana" && (
                   <div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, minWidth: "600px" }}>
                     <div></div>
@@ -218,25 +241,23 @@ export default function Agenda() {
                         {DIAS_SEMANA[i]}<br/>{d.getDate()}
                       </div>
                     ))}
-                    <div style={{ display: "contents" }}>
-                      {HORAS.map(h => (
-                        <>
-                          <div key={`h-${h}`} style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>
-                          {semana.map((d, di) => {
-                            const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.startsWith(h.split(":")[0]));
-                            return (
-                              <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative" }}>
-                                {turnosDia.map((t, ti) => (
-                                  <div key={ti} style={{ position: "absolute", left: "2px", right: "2px", top: "2px", borderRadius: "6px", padding: "3px 6px", background: t.modality === "virtual" ? "#EDE8FA" : "#FDE8F0", borderLeft: `2px solid ${t.modality === "virtual" ? "#9B72C0" : "#E88BB0"}`, fontSize: "10px", color: "#2A1845", overflow: "hidden" }}>
-                                    {t.clients?.full_name}<br/>{t.services?.name}
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })}
-                        </>
-                      ))}
-                    </div>
+                    {HORAS.map(h => (
+                      <>
+                        <div style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>
+                        {semana.map((d, di) => {
+                          const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.slice(0,2) === h.slice(0,2));
+                          return (
+                            <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative" }}>
+                              {turnosDia.map((t, ti) => (
+                                <div key={ti} style={{ position: "absolute", left: "2px", right: "2px", top: "2px", borderRadius: "6px", padding: "3px 6px", background: t.modality === "virtual" ? "#EDE8FA" : "#FDE8F0", borderLeft: `2px solid ${t.modality === "virtual" ? "#9B72C0" : "#E88BB0"}`, fontSize: "10px", color: "#2A1845", overflow: "hidden" }}>
+                                  {t.clients?.full_name}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </>
+                    ))}
                   </div>
                 )}
               </>
@@ -254,9 +275,7 @@ export default function Agenda() {
                 <label style={s.label}>Cliente</label>
                 <input type="text" value={busquedaCliente} onChange={e => buscarCliente(e.target.value)} placeholder="Escribí el nombre..." style={s.input} />
                 {clienteEncontrado && <span style={s.clienteTag}>✓ {clienteEncontrado.full_name} (existente)</span>}
-                {clienteNuevo && busquedaCliente.length >= 3 && (
-                  <span style={s.clienteTagNew}>+ Se creará nuevo cliente: {busquedaCliente}</span>
-                )}
+                {clienteNuevo && busquedaCliente.length >= 3 && <span style={s.clienteTagNew}>+ Se creará nuevo cliente</span>}
               </div>
 
               {clienteNuevo && busquedaCliente.length >= 3 && (
@@ -278,12 +297,14 @@ export default function Agenda() {
                   {profesionales.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
               </div>
+
               <div style={s.field}><label style={s.label}>Servicio</label>
                 <select style={s.input} value={form.servicioId} onChange={e => setForm({...form, servicioId: e.target.value})}>
                   <option value="">Seleccioná un servicio</option>
                   {serviciosFiltrados.map(sv => <option key={sv.id} value={sv.id}>{sv.name} · {sv.duration_minutes}min · ${sv.price?.toLocaleString("es-AR")}</option>)}
                 </select>
               </div>
+
               <div style={s.field}><label style={s.label}>Modalidad</label>
                 <div style={{ display: "flex", gap: "8px" }}>
                   {["presencial","virtual"].map(m => (
@@ -293,13 +314,26 @@ export default function Agenda() {
                   ))}
                 </div>
               </div>
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <div style={s.field}><label style={s.label}>Fecha</label><input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} style={s.input} /></div>
                 <div style={s.field}><label style={s.label}>Hora</label><input type="time" value={form.hora} onChange={e => setForm({...form, hora: e.target.value})} style={s.input} /></div>
               </div>
+
+              <div style={s.field}>
+                <label style={s.label}>Estado del pago</label>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button style={estadoPago === "sena" ? s.pagoBtnActive : s.pagoBtn} onClick={() => setEstadoPago("sena")}>💰 Seña pagada</button>
+                  <button style={estadoPago === "completo" ? s.pagoBtnActive : s.pagoBtn} onClick={() => setEstadoPago("completo")}>✅ Pago completo</button>
+                  <button style={estadoPago === "pendiente" ? s.pagoBtnActive : s.pagoBtn} onClick={() => setEstadoPago("pendiente")}>⏳ Pendiente</button>
+                </div>
+                {form.servicioId && <div style={{ fontSize: "11px", color: "#9B72C0", marginTop: "4px" }}>{getPrecioInfo()}</div>}
+              </div>
+
               <div style={s.field}><label style={s.label}>Notas</label>
                 <textarea value={form.notas} onChange={e => setForm({...form, notas: e.target.value})} placeholder="Aclaraciones..." style={{...s.input, height: "64px", resize: "none"}} />
               </div>
+
               <button style={s.saveBtn} onClick={guardarTurno} disabled={saving}>{saving ? "Guardando..." : "✓ Guardar turno"}</button>
               <button style={s.cancelBtn} onClick={() => setPanelAbierto(false)}>Cancelar</button>
             </div>
