@@ -45,7 +45,7 @@ const getHeight = (inicio, fin) => {
 
 export default function Agenda() {
   const [fecha, setFecha] = useState(new Date());
-  const [vista, setVista] = useState("dia");
+  const [vista, setVista] = useState("semana");
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [turnos, setTurnos] = useState([]);
   const [turnosSemana, setTurnosSemana] = useState([]);
@@ -55,12 +55,17 @@ export default function Agenda() {
   const [filtroMod, setFiltroMod] = useState("todas");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingError, setSavingError] = useState("");
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [clienteEncontrado, setClienteEncontrado] = useState(null);
   const [clienteNuevo, setClienteNuevo] = useState(false);
   const [nuevoClienteData, setNuevoClienteData] = useState({ phone: "", email: "" });
   const [estadoPago, setEstadoPago] = useState("sena"); // sena | completo | pendiente
   const [form, setForm] = useState({ profesional: "", servicioId: "", modalidad: "presencial", fecha: toISO(new Date()), hora: "09:00", notas: "" });
+  const [turnoSeleccionado, setTurnoSeleccionado] = useState(null);
+  const [pagosDelTurno, setPagosDelTurno] = useState([]);
+  const [loadingPagos, setLoadingPagos] = useState(false);
+  const [savingPago, setSavingPago] = useState(false);
 
   useEffect(() => { cargarDatos(); }, [fecha, vista, filtroProf, filtroMod]);
 
@@ -100,7 +105,7 @@ export default function Agenda() {
     }
     const { data: profs } = await supabase.from("profiles").select("id, full_name").eq("role", "professional");
     setProfesionales(profs || []);
-    const { data: svs } = await supabase.from("services").select("id, name, duration_minutes, price, professional_id");
+    const { data: svs } = await supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency");
     setServicios(svs || []);
     setLoading(false);
   };
@@ -110,6 +115,49 @@ export default function Agenda() {
     if (vista === "semana") nueva.setDate(nueva.getDate() + delta * 7);
     else nueva.setDate(nueva.getDate() + delta);
     setFecha(nueva);
+  };
+
+  const abrirTurno = async (t) => {
+    setPanelAbierto(false);
+    setTurnoSeleccionado(t);
+    setLoadingPagos(true);
+    const { data } = await supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at");
+    setPagosDelTurno(data || []);
+    setLoadingPagos(false);
+  };
+
+  const cerrarTurno = () => { setTurnoSeleccionado(null); setPagosDelTurno([]); };
+
+  const accionPago = async (tipo) => {
+    setSavingPago(true);
+    const t = turnoSeleccionado;
+    if (tipo === "confirmar_sena") {
+      const pago = pagosDelTurno.find(p => p.type === "seña");
+      if (pago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pago.id);
+      const saldo = Math.round(parseFloat(t.total_price) / 2);
+      await supabase.from("payments").insert({ appointment_id: t.id, type: "saldo", amount: saldo, status: "pending" });
+      await supabase.from("appointments").update({ status: "partial" }).eq("id", t.id);
+    } else if (tipo === "confirmar_saldo") {
+      const pago = pagosDelTurno.find(p => p.type === "saldo");
+      if (pago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pago.id);
+      await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+    } else if (tipo === "pago_completo") {
+      await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", t.id).eq("type", "seña");
+      await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+    } else if (tipo === "cancelar") {
+      await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
+      await supabase.from("payments").update({ status: "cancelled" }).eq("appointment_id", t.id);
+      cerrarTurno();
+      await cargarDatos();
+      setSavingPago(false);
+      return;
+    }
+    const { data: pagosActualizados } = await supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at");
+    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
+    setPagosDelTurno(pagosActualizados || []);
+    setTurnoSeleccionado(turnoActualizado);
+    await cargarDatos();
+    setSavingPago(false);
   };
 
   const buscarCliente = async (nombre) => {
@@ -124,25 +172,33 @@ export default function Agenda() {
 
   const guardarTurno = async () => {
     setSaving(true);
+    setSavingError("");
     const srv = servicios.find(s => s.id === form.servicioId);
-    if (!srv || !form.profesional || !busquedaCliente) { setSaving(false); return; }
+    if (!srv || !form.profesional || !busquedaCliente) {
+      setSavingError("Completá todos los campos obligatorios.");
+      setSaving(false); return;
+    }
 
     let clienteId = clienteEncontrado?.id;
     if (!clienteId) {
-      const { data: nc } = await supabase.from("clients").insert({
+      const { data: nc, error: errCliente } = await supabase.from("clients").insert({
         full_name: busquedaCliente,
         phone: nuevoClienteData.phone || null,
         email: nuevoClienteData.email || null
       }).select("id").single();
+      if (errCliente) {
+        setSavingError("Error al crear el cliente: " + errCliente.message);
+        setSaving(false); return;
+      }
       clienteId = nc?.id;
     }
-    if (!clienteId) { setSaving(false); return; }
+    if (!clienteId) { setSavingError("No se pudo crear el cliente."); setSaving(false); return; }
 
     const [h, m] = form.hora.split(":").map(Number);
     const endMin = h * 60 + m + srv.duration_minutes;
     const endTime = `${String(Math.floor(endMin/60)).padStart(2,"0")}:${String(endMin%60).padStart(2,"0")}`;
 
-    const status = estadoPago === "pendiente" ? "pending" : "confirmed";
+    const status = estadoPago === "completo" ? "confirmed" : "pending";
     const { data: turno } = await supabase.from("appointments").insert({
       professional_id: form.profesional, client_id: clienteId, service_id: form.servicioId,
       date: form.fecha, start_time: form.hora, end_time: endTime,
@@ -152,10 +208,7 @@ export default function Agenda() {
     // Registrar pagos según el estado
     if (estadoPago === "sena") {
       const sena = Math.round(srv.price / 2);
-      await supabase.from("payments").insert([
-        { appointment_id: turno.id, type: "seña", amount: sena, status: "paid", paid_at: new Date().toISOString() },
-        { appointment_id: turno.id, type: "saldo", amount: sena, status: "pending" }
-      ]);
+      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: sena, status: "pending" });
     } else if (estadoPago === "completo") {
       await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: srv.price, status: "paid", paid_at: new Date().toISOString() });
     } else {
@@ -179,9 +232,10 @@ export default function Agenda() {
     const srv = servicios.find(s => s.id === form.servicioId);
     if (!srv) return null;
     const sena = Math.round(srv.price / 2);
-    if (estadoPago === "sena") return `Seña $${sena.toLocaleString("es-AR")} · Saldo $${sena.toLocaleString("es-AR")} pendiente`;
-    if (estadoPago === "completo") return `Pago completo $${srv.price.toLocaleString("es-AR")}`;
-    return `Pendiente · Seña $${sena.toLocaleString("es-AR")} a confirmar`;
+    const sym = srv.currency === "USD" ? "U$S " : srv.currency === "EUR" ? "€" : "$";
+    if (estadoPago === "sena") return `Seña ${sym}${sena.toLocaleString("es-AR")} · Saldo ${sym}${sena.toLocaleString("es-AR")} pendiente`;
+    if (estadoPago === "completo") return `Pago completo ${sym}${srv.price.toLocaleString("es-AR")}`;
+    return `Pendiente · Seña ${sym}${sena.toLocaleString("es-AR")} a confirmar`;
   };
 
   return (
@@ -209,7 +263,7 @@ export default function Agenda() {
               <option value="virtual">Virtual</option>
               <option value="presencial">Presencial</option>
             </select>
-            <button style={s.btnNuevo} onClick={() => setPanelAbierto(true)}>+ Nuevo turno</button>
+            <button style={s.btnNuevo} onClick={() => { setPanelAbierto(true); cerrarTurno(); }}>+ Nuevo turno</button>
           </div>
         </div>
 
@@ -223,13 +277,20 @@ export default function Agenda() {
                     <div style={{ position: "relative", borderLeft: "0.5px solid #F0E8F8", height: `${HORAS.length * 64}px` }}>
                       {HORAS.map(h => <div key={h} style={{ height: "64px", borderBottom: "0.5px solid #F8F0FC" }}></div>)}
                       {turnos.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: "13px", color: "#C4A8D8" }}>No hay turnos para este día</div>}
-                      {turnos.map((t, i) => (
-                        <div key={i} style={{ position: "absolute", left: "6px", right: "6px", top: `${getTop(t.start_time)}px`, height: `${getHeight(t.start_time, t.end_time)}px`, borderRadius: "8px", padding: "6px 10px", background: t.status === "pending" ? "#FFF8E8" : t.modality === "virtual" ? "#EDE8FA" : "#FDE8F0", borderLeft: `3px solid ${t.status === "pending" ? "#F0A800" : t.modality === "virtual" ? "#9B72C0" : "#E88BB0"}` }}>
-                          <div style={{ fontSize: "12px", fontWeight: "500", color: "#2A1845" }}>{t.clients?.full_name}</div>
-                          <div style={{ fontSize: "11px", color: "#9B72C0" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
-                          {t.status === "pending" && <span style={{ fontSize: "10px", color: "#854F0B" }}>⏳ Pendiente</span>}
-                        </div>
-                      ))}
+                      {turnos.map((t, i) => {
+                        const isPending = t.status === "pending" || t.status === "partial";
+                        const isVirtual = t.modality === "virtual";
+                        const bg = isPending ? "#FFF8E8" : isVirtual ? "#DDD5F7" : "#FAD4E5";
+                        const border = isPending ? "#F0A800" : isVirtual ? "#7C52B8" : "#D4609A";
+                        const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                        return (
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "6px", right: "6px", top: `${getTop(t.start_time)}px`, height: `${getHeight(t.start_time, t.end_time)}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `3px solid ${border}`, cursor: "pointer" }}>
+                            <div style={{ fontSize: "12px", fontWeight: "600", color: "#2A1845" }}>{t.clients?.full_name}</div>
+                            <div style={{ fontSize: "11px", color: "#5C3F99" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
+                            <div style={{ fontSize: "10px", color: isPending ? "#854F0B" : isVirtual ? "#5C3F99" : "#A0407A", marginTop: "2px" }}>{emoji} {isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial"}</div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -248,11 +309,18 @@ export default function Agenda() {
                           const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.slice(0,2) === h.slice(0,2));
                           return (
                             <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative" }}>
-                              {turnosDia.map((t, ti) => (
-                                <div key={ti} style={{ position: "absolute", left: "2px", right: "2px", top: "2px", borderRadius: "6px", padding: "3px 6px", background: t.modality === "virtual" ? "#EDE8FA" : "#FDE8F0", borderLeft: `2px solid ${t.modality === "virtual" ? "#9B72C0" : "#E88BB0"}`, fontSize: "10px", color: "#2A1845", overflow: "hidden" }}>
-                                  {t.clients?.full_name}
-                                </div>
-                              ))}
+                              {turnosDia.map((t, ti) => {
+                                const isPending = t.status === "pending" || t.status === "partial";
+                                const isVirtual = t.modality === "virtual";
+                                const bg = isPending ? "#FFF8E8" : isVirtual ? "#DDD5F7" : "#FAD4E5";
+                                const border = isPending ? "#F0A800" : isVirtual ? "#7C52B8" : "#D4609A";
+                                const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                                return (
+                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "2px", right: "2px", top: "2px", borderRadius: "6px", padding: "3px 6px", background: bg, borderLeft: `2px solid ${border}`, fontSize: "10px", color: "#2A1845", overflow: "hidden", cursor: "pointer" }}>
+                                    {emoji} {t.clients?.full_name}
+                                  </div>
+                                );
+                              })}
                             </div>
                           );
                         })}
@@ -263,6 +331,95 @@ export default function Agenda() {
               </>
             )}
           </div>
+
+          {turnoSeleccionado && (() => {
+            const t = turnoSeleccionado;
+            const sena = pagosDelTurno.find(p => p.type === "seña");
+            const saldo = pagosDelTurno.find(p => p.type === "saldo");
+            const isPending = t.status === "pending";
+            const isPartial = t.status === "partial";
+            const isConfirmed = t.status === "confirmed";
+            const isCancelled = t.status === "cancelled";
+            const isVirtual = t.modality === "virtual";
+            return (
+              <div style={s.panel}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>
+                    {isVirtual ? "📹" : "📍"} {t.clients?.full_name}
+                  </div>
+                  <button onClick={cerrarTurno} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+                </div>
+
+                <div style={{ background: "#F8F4FC", borderRadius: "10px", padding: "12px" }}>
+                  <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "6px" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
+                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{t.date} · {t.start_time?.slice(0,5)} hs</div>
+                  <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "4px" }}>{t.profiles?.full_name}</div>
+                </div>
+
+                <div style={{ borderRadius: "10px", border: "0.5px solid #E0D0F0", overflow: "hidden" }}>
+                  <div style={{ padding: "10px 14px", background: "#fff", borderBottom: "0.5px solid #F0E8F8", fontSize: "12px", fontWeight: "500", color: "#2A1845" }}>Estado del pago</div>
+                  {loadingPagos ? (
+                    <div style={{ padding: "12px 14px", fontSize: "12px", color: "#B89FD0" }}>Cargando...</div>
+                  ) : (
+                    <>
+                      <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "0.5px solid #F0E8F8" }}>
+                        <span style={{ fontSize: "12px", color: "#9B72C0" }}>Seña ${(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</span>
+                        <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: sena?.status === "paid" ? "#EAF3DE" : "#FAEEDA", color: sena?.status === "paid" ? "#3B6D11" : "#854F0B" }}>
+                          {sena?.status === "paid" ? "✓ Pagado" : "⏳ Pendiente"}
+                        </span>
+                      </div>
+                      {saldo && (
+                        <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "0.5px solid #F0E8F8" }}>
+                          <span style={{ fontSize: "12px", color: "#9B72C0" }}>Saldo ${parseFloat(saldo.amount || 0).toLocaleString("es-AR")}</span>
+                          <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: saldo.status === "paid" ? "#EAF3DE" : "#EDE8FA", color: saldo.status === "paid" ? "#3B6D11" : "#5C3F99" }}>
+                            {saldo.status === "paid" ? "✓ Pagado" : "Pendiente"}
+                          </span>
+                        </div>
+                      )}
+                      <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between" }}>
+                        <span style={{ fontSize: "12px", color: "#9B72C0" }}>Total</span>
+                        <span style={{ fontSize: "13px", fontWeight: "600", color: "#2A1845" }}>${parseFloat(t.total_price || 0).toLocaleString("es-AR")}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {!isCancelled && !isConfirmed && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {isPending && (
+                      <>
+                        <button disabled={savingPago} onClick={() => accionPago("confirmar_sena")} style={{ padding: "10px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {savingPago ? "..." : "✓ Confirmar seña"}
+                        </button>
+                        <button disabled={savingPago} onClick={() => accionPago("pago_completo")} style={{ padding: "10px", background: "#3B6D11", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {savingPago ? "..." : "💰 Pagó todo"}
+                        </button>
+                      </>
+                    )}
+                    {isPartial && (
+                      <button disabled={savingPago} onClick={() => accionPago("confirmar_saldo")} style={{ padding: "10px", background: "#5C3F99", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        {savingPago ? "..." : "✓ Cobrar saldo"}
+                      </button>
+                    )}
+                    <button disabled={savingPago} onClick={() => accionPago("cancelar")} style={{ padding: "10px", background: "#FCEBEB", color: "#A32D2D", border: "0.5px solid #F4C4C4", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      ✗ Cancelar turno
+                    </button>
+                  </div>
+                )}
+
+                {isConfirmed && (
+                  <div style={{ background: "#EAF3DE", borderRadius: "10px", padding: "12px", textAlign: "center", fontSize: "13px", color: "#3B6D11", fontWeight: "500" }}>
+                    ✓ Pago completo
+                  </div>
+                )}
+                {isCancelled && (
+                  <div style={{ background: "#FCEBEB", borderRadius: "10px", padding: "12px", textAlign: "center", fontSize: "13px", color: "#A32D2D" }}>
+                    Turno cancelado
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {panelAbierto && (
             <div style={s.panel}>
@@ -301,7 +458,7 @@ export default function Agenda() {
               <div style={s.field}><label style={s.label}>Servicio</label>
                 <select style={s.input} value={form.servicioId} onChange={e => setForm({...form, servicioId: e.target.value})}>
                   <option value="">Seleccioná un servicio</option>
-                  {serviciosFiltrados.map(sv => <option key={sv.id} value={sv.id}>{sv.name} · {sv.duration_minutes}min · ${sv.price?.toLocaleString("es-AR")}</option>)}
+                  {serviciosFiltrados.map(sv => { const sym = sv.currency === "USD" ? "U$S " : sv.currency === "EUR" ? "€" : "$"; return <option key={sv.id} value={sv.id}>{sv.name} · {sv.duration_minutes}min · {sym}{sv.price?.toLocaleString("es-AR")}</option>; })}
                 </select>
               </div>
 
@@ -334,6 +491,7 @@ export default function Agenda() {
                 <textarea value={form.notas} onChange={e => setForm({...form, notas: e.target.value})} placeholder="Aclaraciones..." style={{...s.input, height: "64px", resize: "none"}} />
               </div>
 
+              {savingError && <div style={{ fontSize: "12px", color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: "8px" }}>{savingError}</div>}
               <button style={s.saveBtn} onClick={guardarTurno} disabled={saving}>{saving ? "Guardando..." : "✓ Guardar turno"}</button>
               <button style={s.cancelBtn} onClick={() => setPanelAbierto(false)}>Cancelar</button>
             </div>

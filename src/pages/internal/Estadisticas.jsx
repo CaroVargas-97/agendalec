@@ -33,6 +33,7 @@ export default function Estadisticas({ setPage }) {
   const [stats, setStats] = useState({
     totalSesiones: 0,
     ingresoTotal: 0,
+    ingresoByCurrency: {},
     clientesUnicos: 0,
     promedioSesion: 0,
     servicios: [],
@@ -62,17 +63,25 @@ export default function Estadisticas({ setPage }) {
 
     const { data: appts } = await supabase
       .from("appointments")
-      .select("*, clients(full_name), services(name, price)")
+      .select("*, clients(full_name), services(name, price, currency)")
       .eq("professional_id", uid)
       .gte("date", desdeISO)
       .neq("status", "cancelled");
 
     const sesiones = appts || [];
     const totalSesiones = sesiones.length;
-    const ingresoTotal = sesiones.reduce((sum, a) => sum + parseFloat(a.total_price || 0), 0);
     const clientesSet = new Set(sesiones.map(a => a.client_id));
     const clientesUnicos = clientesSet.size;
-    const promedioSesion = totalSesiones > 0 ? Math.round(ingresoTotal / totalSesiones) : 0;
+
+    // Group income by currency
+    const ingresoByCurrency = {};
+    sesiones.forEach(a => {
+      const cur = a.services?.currency || "ARS";
+      ingresoByCurrency[cur] = (ingresoByCurrency[cur] || 0) + parseFloat(a.total_price || 0);
+    });
+    const ingresoARS = ingresoByCurrency["ARS"] || 0;
+    const ingresoTotal = ingresoARS;
+    const promedioSesion = totalSesiones > 0 ? Math.round(ingresoARS / Math.max(sesiones.filter(a => !a.services?.currency || a.services?.currency === "ARS").length, 1)) : 0;
 
     const servMap = {};
     sesiones.forEach(a => {
@@ -107,7 +116,7 @@ export default function Estadisticas({ setPage }) {
     const diasPopulares = Object.entries(diaMap).map(([dia, count]) => ({ dia, count }))
       .sort((a, b) => b.count - a.count);
 
-    setStats({ totalSesiones, ingresoTotal, clientesUnicos, promedioSesion, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares });
+    setStats({ totalSesiones, ingresoTotal, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares });
     setLoading(false);
   };
 
@@ -147,7 +156,12 @@ export default function Estadisticas({ setPage }) {
             </div>
             <div style={s.metricCard}>
               <div style={s.metricLabel}>Ingresos</div>
-              <div style={s.metricValue}>${stats.ingresoTotal.toLocaleString("es-AR")}</div>
+              {Object.entries(stats.ingresoByCurrency || {}).length === 0 ? (
+                <div style={s.metricValue}>$0</div>
+              ) : Object.entries(stats.ingresoByCurrency).map(([cur, val]) => {
+                const sym = cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+                return <div key={cur} style={s.metricValue}>{sym}{val.toLocaleString("es-AR")}</div>;
+              })}
               <div style={s.metricSub}>total facturado</div>
             </div>
             <div style={s.metricCard}>

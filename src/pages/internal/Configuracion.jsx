@@ -51,7 +51,7 @@ const getUid = async () => {
 export default function Configuracion() {
   const [tab, setTab] = useState("disponibilidad");
   const [dias, setDias] = useState(defaultDias);
-  const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas" }]);
+  const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS" }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
   const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", mp_enabled: false });
   const [loading, setLoading] = useState(true);
@@ -64,7 +64,7 @@ export default function Configuracion() {
       if (!uid) { setLoading(false); return; }
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid);
-      if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality })));
+      if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS" })));
 
       const { data: avail } = await supabase.from("availability").select("*").eq("professional_id", uid).order("day_of_week");
       if (avail && avail.length > 0) {
@@ -90,9 +90,29 @@ export default function Configuracion() {
     setSaving(true);
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    await supabase.from("services").delete().eq("professional_id", uid);
-    const rows = servicios.filter(sv => sv.nombre).map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, active: true }));
-    if (rows.length > 0) await supabase.from("services").insert(rows);
+
+    const validos = servicios.filter(sv => sv.nombre.trim());
+    const existentes = validos.filter(sv => sv.id);
+    const nuevos = validos.filter(sv => !sv.id);
+    const idsEnForm = new Set(existentes.map(sv => sv.id));
+
+    // Fetch current active services before making changes
+    const { data: dbSvs } = await supabase.from("services").select("id").eq("professional_id", uid).eq("active", true);
+
+    // Update existing services
+    for (const sv of existentes) {
+      await supabase.from("services").update({ name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS" }).eq("id", sv.id);
+    }
+
+    // Insert new services
+    if (nuevos.length > 0) {
+      await supabase.from("services").insert(nuevos.map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", active: true })));
+    }
+
+    // Soft-delete services removed from the form
+    const toDeactivate = (dbSvs || []).filter(s => !idsEnForm.has(s.id)).map(s => s.id);
+    if (toDeactivate.length > 0) await supabase.from("services").update({ active: false }).in("id", toDeactivate);
+
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
@@ -126,7 +146,7 @@ export default function Configuracion() {
   const updateDia = (i, key, val) => { const d = [...dias]; d[i][key] = val; setDias(d); };
   const updateServicio = (i, key, val) => { const sv = [...servicios]; sv[i][key] = val; setServicios(sv); };
   const removeServicio = (i) => setServicios(servicios.filter((_, idx) => idx !== i));
-  const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas" }]);
+  const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS" }]);
 
   const getModStyle = (mod) => mod === "presencial" ? s.modPillP : mod === "virtual" ? s.modPillV : mod === "ambas" ? s.modPillPV : s.modPill;
   const getModLabel = (mod) => mod === "presencial" ? "Solo presencial" : mod === "virtual" ? "Solo virtual" : "Virtual y presencial";
@@ -189,6 +209,11 @@ export default function Configuracion() {
                     <span style={{ fontSize: "12px", color: "#C4A8D8" }}>min</span>
                     <span style={{ fontSize: "12px", color: "#9B72C0" }}>Precio</span>
                     <input type="number" value={sv.precio} onChange={e => updateServicio(i,"precio",e.target.value)} style={{ ...s.input, width: "90px" }} />
+                    <div style={{ display: "flex", gap: "3px" }}>
+                      {["ARS","USD","EUR"].map(cur => (
+                        <button key={cur} onClick={() => updateServicio(i,"currency",cur)} style={{ padding: "4px 7px", borderRadius: "6px", fontSize: "11px", cursor: "pointer", border: `0.5px solid ${sv.currency===cur?"#9B72C0":"#E0D0F0"}`, background: sv.currency===cur?"#EDE8FA":"#fff", color: sv.currency===cur?"#5C3F99":"#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{cur}</button>
+                      ))}
+                    </div>
                     <button style={getModStyle(sv.modalidad)} onClick={() => cycleServicioMod(i)}>{getModLabel(sv.modalidad)}</button>
                     <button style={s.trashBtn} onClick={() => removeServicio(i)}>🗑</button>
                   </div>

@@ -40,6 +40,7 @@ export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
   const [precioTipo, setPrecioTipo] = useState("normal");
+  const [customPrice, setCustomPrice] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -58,11 +59,13 @@ export default function Clientes() {
   const abrirCliente = (c) => {
     setClienteSeleccionado(c);
     setPrecioTipo(c.price_type || "normal");
+    setCustomPrice(c.custom_price != null ? String(c.custom_price) : "");
   };
 
   const guardarCliente = async () => {
     setSaving(true);
-    await supabase.from("clients").update({ price_type: precioTipo }).eq("id", clienteSeleccionado.id);
+    const updates = { price_type: precioTipo, custom_price: (precioTipo === "especial" || precioTipo === "cortesia") && customPrice ? parseFloat(customPrice) : null };
+    await supabase.from("clients").update(updates).eq("id", clienteSeleccionado.id);
     await cargar();
     setSaving(false);
     setClienteSeleccionado(null);
@@ -181,9 +184,13 @@ export default function Clientes() {
                   </button>
                 ))}
               </div>
-              {precioTipo === "cortesia" && (
-                <div style={{ background: "#FDE8F0", borderRadius: "8px", padding: "10px 12px", fontSize: "12px", color: "#A0407A" }}>
-                  Todas las sesiones serán $0. No se cobra seña.
+              {(precioTipo === "especial" || precioTipo === "cortesia") && (
+                <div style={{ marginTop: "6px" }}>
+                  <label style={s.label}>{precioTipo === "cortesia" ? "Precio de cortesía (dejá en 0 si es gratis)" : "Precio especial"}</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+                    <span style={{ fontSize: "13px", color: "#9B72C0" }}>$</span>
+                    <input type="number" min="0" value={customPrice} onChange={e => setCustomPrice(e.target.value)} placeholder="0" style={{ ...s.input, width: "100%" }} />
+                  </div>
                 </div>
               )}
             </div>
