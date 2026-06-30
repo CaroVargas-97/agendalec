@@ -119,10 +119,13 @@ export default function Agenda() {
 
   const abrirTurno = async (t) => {
     setPanelAbierto(false);
-    setTurnoSeleccionado(t);
     setLoadingPagos(true);
-    const { data } = await supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at");
-    setPagosDelTurno(data || []);
+    const [{ data: pagos }, { data: turnoCompleto }] = await Promise.all([
+      supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at"),
+      supabase.from("appointments").select("*, clients(full_name, phone), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single(),
+    ]);
+    setTurnoSeleccionado(turnoCompleto || t);
+    setPagosDelTurno(pagos || []);
     setLoadingPagos(false);
   };
 
@@ -153,7 +156,7 @@ export default function Agenda() {
       return;
     }
     const { data: pagosActualizados } = await supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at");
-    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
+    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name, phone), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
     setPagosDelTurno(pagosActualizados || []);
     setTurnoSeleccionado(turnoActualizado);
     await cargarDatos();
@@ -349,6 +352,13 @@ export default function Agenda() {
                   </div>
                   <button onClick={cerrarTurno} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
                 </div>
+                {t.clients?.phone && (
+                  <a href={`https://wa.me/54${t.clients.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                    <button style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", background: "#25D366", color: "#fff", border: "none", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" }}>
+                      💬 WhatsApp · {t.clients.phone}
+                    </button>
+                  </a>
+                )}
 
                 <div style={{ background: "#F8F4FC", borderRadius: "10px", padding: "12px" }}>
                   <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "6px" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
