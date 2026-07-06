@@ -17,6 +17,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState("dashboard");
   const [authPage, setAuthPage] = useState("login");
+  const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,7 +41,26 @@ function App() {
 
   if (!session) {
     if (authPage === "registro") return <Registro onLogin={() => setAuthPage("login")} />;
-    return <Login onRegistro={() => setAuthPage("registro")} />;
+    if (showLogin) return <Login onRegistro={() => setAuthPage("registro")} />;
+    return (
+      <div style={{ minHeight: "100vh", background: "#F8F4FC", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>
+          <div>
+            <div style={{ fontSize: "32px", marginBottom: "8px" }}>🗓</div>
+            <div style={{ fontSize: "22px", fontWeight: "600", color: "#2A1845" }}>AgendaLec</div>
+            <div style={{ fontSize: "14px", color: "#B89FD0", marginTop: "4px" }}>Gestión de turnos</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px", width: "260px" }}>
+            <a href="/reservar" style={{ display: "block", padding: "14px", background: "#9B72C0", color: "#fff", borderRadius: "12px", fontSize: "15px", fontWeight: "500", textDecoration: "none", textAlign: "center" }}>
+              Reservar un turno
+            </a>
+            <button onClick={() => setShowLogin(true)} style={{ padding: "14px", background: "#fff", color: "#9B72C0", border: "0.5px solid #D0B8E8", borderRadius: "12px", fontSize: "15px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              Soy profesional
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const renderPage = () => {
