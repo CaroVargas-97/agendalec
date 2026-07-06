@@ -88,6 +88,8 @@ export default function Reserva() {
   const [copiado, setCopiado] = useState(false);
   const [aceptaTyC, setAceptaTyC] = useState(false);
   const [horariosOcupados, setHorariosOcupados] = useState([]);
+  const [loadingServicios, setLoadingServicios] = useState(false);
+  const [comprobante, setComprobante] = useState(null);
 
   useEffect(() => {
     supabase.from("profiles").select("id, full_name, email").eq("role", "professional")
@@ -96,13 +98,15 @@ export default function Reserva() {
 
   useEffect(() => {
     if (!prof) return;
+    setLoadingServicios(true);
+    setServicios([]);
     const cargar = async () => {
       const pd = profesionales.find(p => p.full_name === prof);
-      if (!pd) return;
+      if (!pd) { setLoadingServicios(false); return; }
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
       ]);
@@ -110,12 +114,13 @@ export default function Reserva() {
       setProfSettings(cfg);
       setDisponibilidad(avail || []);
       setProfPausa(settings?.break_minutes || 0);
+      setLoadingServicios(false);
     };
     cargar();
-  }, [prof]);
+  }, [prof]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!dia || !profData) { setHorariosOcupados([]); return; }
+    if (!dia || !profData) return;
     const anio = mesActual.getFullYear();
     const mes = mesActual.getMonth() + 1;
     const fecha = `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
@@ -129,6 +134,9 @@ export default function Reserva() {
   const total = srv?.price || 0;
   const sena = Math.round(total / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
+  const esMonedaExtranjera = srv?.currency === "USD" || srv?.currency === "EUR";
+  const aliasActivo = esMonedaExtranjera ? (profSettings?.alias_usd || profSettings?.alias) : (profSettings?.alias);
+  const cbuActivo = esMonedaExtranjera ? (profSettings?.cbu_usd || profSettings?.cbu) : (profSettings?.cbu);
 
   // Calendar helpers
   const hoy = new Date();
@@ -187,7 +195,7 @@ export default function Reserva() {
     : "";
 
   const copiarAlias = () => {
-    navigator.clipboard.writeText(profSettings?.alias || "");
+    navigator.clipboard.writeText(aliasActivo || "");
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
   };
@@ -216,12 +224,23 @@ export default function Reserva() {
         modality: modalidad || srv.modality, status: "pending", total_price: total
       }).select("id").single();
 
-      await supabase.from("payments").insert({
+      const { data: pago } = await supabase.from("payments").insert({
         appointment_id: turno.id, type: "seña", amount: sena, status: "pending"
-      });
+      }).select("id").single();
+
+      if (comprobante && pago?.id) {
+        const ext = comprobante.name.split(".").pop();
+        const { data: uploadData } = await supabase.storage
+          .from("comprobantes")
+          .upload(`${turno.id}-sena.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
+        if (uploadData) {
+          const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+          await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pago.id);
+        }
+      }
 
       setStep(4);
-    } catch (e) {
+    } catch {
       setError("Hubo un error al confirmar el turno. Intentá de nuevo.");
     }
     setGuardando(false);
@@ -277,7 +296,8 @@ export default function Reserva() {
               ))}
             </div>
           )}
-          {prof && servicios.length === 0 && <div style={s.loadingText}>Cargando servicios...</div>}
+          {prof && loadingServicios && <div style={s.loadingText}>Cargando servicios...</div>}
+          {prof && !loadingServicios && servicios.length === 0 && <div style={s.loadingText}>Este profesional no tiene servicios disponibles.</div>}
           <button style={{ ...s.btnNext, background: prof && servicio ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio} onClick={() => setStep(2)}>
             Continuar
           </button>
@@ -374,15 +394,27 @@ export default function Reserva() {
             </div>
           </div>
 
-          {profSettings?.alias && (
+          {aliasActivo && (
             <div style={s.aliasBox}>
-              <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno</div>
-              <div style={s.aliasValor}>{profSettings.alias}</div>
-              {profSettings.cbu && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {profSettings.cbu}</div>}
+              <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{esMonedaExtranjera ? " (en dólares)" : ""}</div>
+              <div style={s.aliasValor}>{aliasActivo}</div>
+              {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
               <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a transferir: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>
             </div>
           )}
+
+          <div style={s.field}>
+            <label style={s.label}>Comprobante de transferencia <span style={{ color: "#A32D2D" }}>*</span></label>
+            <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobante ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobante ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
+              <span style={{ fontSize: "18px" }}>{comprobante ? "✅" : "📎"}</span>
+              <span style={{ fontSize: "13px", color: comprobante ? "#5C3F99" : "#B89FD0", flex: 1 }}>
+                {comprobante ? comprobante.name : "Adjuntar captura o PDF"}
+              </span>
+              {comprobante && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobante(null); }}>✕ quitar</span>}
+              <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobante(e.target.files[0] || null)} />
+            </label>
+          </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
             <input type="checkbox" id="tyc" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
@@ -391,8 +423,8 @@ export default function Reserva() {
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
-            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC ? 1 : 0.5 }}
-              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC}
+            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && comprobante ? 1 : 0.5 }}
+              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || !comprobante}
               onClick={confirmarReserva}>
               {guardando ? "Confirmando..." : "✓ Confirmar turno"}
             </button>
@@ -409,10 +441,11 @@ export default function Reserva() {
           <div style={s.title}>¡Reserva recibida!</div>
           <div style={s.sub}>Tu turno quedará confirmado una vez que se verifique la transferencia</div>
 
-          {profSettings?.alias && (
+          {aliasActivo && (
             <div style={s.aliasBox}>
-              <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora</div>
-              <div style={s.aliasValor}>{profSettings.alias}</div>
+              <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora{esMonedaExtranjera ? " (en dólares)" : ""}</div>
+              <div style={s.aliasValor}>{aliasActivo}</div>
+              {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
               <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>
             </div>
@@ -428,7 +461,7 @@ export default function Reserva() {
           <button style={s.btnNext} onClick={() => {
             setStep(1); setProf(null); setServicio(null); setDia(null); setHora(null);
             setModalidad(null); setForm({ nombre: "", celular: "", mail: "" });
-            setMesActual(inicioMes());
+            setMesActual(inicioMes()); setComprobante(null);
           }}>
             Volver al inicio
           </button>

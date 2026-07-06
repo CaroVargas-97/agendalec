@@ -27,7 +27,7 @@ const s = {
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "1rem 0" },
 };
 
-export default function Estadisticas({ setPage }) {
+export default function Estadisticas() {
   const [periodo, setPeriodo] = useState("mes");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
@@ -41,10 +41,6 @@ export default function Estadisticas({ setPage }) {
     topClientes: [],
     diasPopulares: [],
   });
-
-  useEffect(() => {
-    cargar();
-  }, [periodo]);
 
   const cargar = async () => {
     setLoading(true);
@@ -119,6 +115,8 @@ export default function Estadisticas({ setPage }) {
     setStats({ totalSesiones, ingresoTotal, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares });
     setLoading(false);
   };
+
+  useEffect(() => { cargar(); }, [periodo]); // eslint-disable-line react-hooks/set-state-in-effect
 
   const totalMod = stats.modalidad.virtual + stats.modalidad.presencial;
   const pctV = totalMod > 0 ? Math.round((stats.modalidad.virtual / totalMod) * 100) : 0;

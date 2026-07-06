@@ -33,22 +33,11 @@ const navItems = [
 
 export default function Layout({ children, page, setPage }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  useEffect(() => {
-    const cargar = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-      const { data } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
-      setProfile(data);
-    };
-    cargar();
   }, []);
 
   const handleLogout = async () => { await supabase.auth.signOut(); };

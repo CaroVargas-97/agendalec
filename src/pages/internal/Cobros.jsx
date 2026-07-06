@@ -35,25 +35,26 @@ export default function Cobros() {
   const [stats, setStats] = useState({ cobradoHoy: 0, saldosPendientes: 0, estesMes: 0, cancelaciones: 0 });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { cargar(); }, []);
-
   const cargar = async () => {
     setLoading(true);
     const hoy = new Date().toISOString().split("T")[0];
     const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
 
-    // Turnos pendientes de confirmar seña
+    // Turnos con seña pendiente de confirmar (filtramos por pago, no por status de appointment)
     const { data: turnos } = await supabase
       .from("appointments")
-      .select("id, date, start_time, status, total_price, modality, clients(full_name), services(name), profiles(full_name)")
-      .eq("status", "pending")
+      .select("id, date, start_time, status, total_price, modality, clients(full_name), services(name), profiles(full_name), payments(receipt_url, type, status)")
+      .in("status", ["pending", "partial"])
       .order("date", { ascending: true });
-    setPendientes(turnos || []);
+    const conSenaPendiente = (turnos || []).filter(t =>
+      t.payments?.some(p => p.type === "seña" && p.status === "pending")
+    );
+    setPendientes(conSenaPendiente);
 
     // Pagos de saldo pendientes de turnos confirmados
     const { data: pagosSaldo } = await supabase
       .from("payments")
-      .select("id, amount, appointment_id, appointments(id, date, start_time, total_price, clients(full_name), services(name), profiles(full_name))")
+      .select("id, amount, receipt_url, appointment_id, appointments(id, date, start_time, total_price, clients(full_name), services(name), profiles(full_name))")
       .eq("type", "saldo")
       .eq("status", "pending")
       .order("created_at", { ascending: true });
@@ -83,6 +84,8 @@ export default function Cobros() {
     setLoading(false);
   };
 
+  useEffect(() => { cargar(); }, []); // eslint-disable-line react-hooks/set-state-in-effect
+
   const confirmarTurno = async (id, totalPrice) => {
     await supabase.from("appointments").update({ status: "partial" }).eq("id", id);
     await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", id).eq("type", "seña");
@@ -108,8 +111,6 @@ export default function Cobros() {
     await supabase.from("payments").update({ status: "cancelled" }).eq("appointment_id", id);
     cargar();
   };
-
-  const totalPendientes = pendientes.length + saldos.length;
 
   return (
     <div style={s.main}>
@@ -157,6 +158,11 @@ export default function Cobros() {
                     <div style={s.cobroNombre}>{t.clients?.full_name}</div>
                     <div style={s.cobroDetalle}>{t.services?.name} · {t.date} {t.start_time?.slice(0,5)} · {t.profiles?.full_name}</div>
                     <div style={{ ...s.cobroDetalle, marginTop: "2px" }}>Seña: ${(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</div>
+                    {t.payments?.find(p => p.type === "seña")?.receipt_url && (
+                      <a href={t.payments.find(p => p.type === "seña").receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        📎 Ver comprobante
+                      </a>
+                    )}
                   </div>
                   <span style={s.tagPending}>Sin confirmar</span>
                   <div style={{ display: "flex", gap: "6px" }}>
@@ -176,6 +182,11 @@ export default function Cobros() {
                   <div style={{ flex: 1 }}>
                     <div style={s.cobroNombre}>{p.appointments?.clients?.full_name}</div>
                     <div style={s.cobroDetalle}>{p.appointments?.services?.name} · {p.appointments?.date} {p.appointments?.start_time?.slice(0,5)}</div>
+                    {p.receipt_url && (
+                      <a href={p.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                        📎 Ver comprobante
+                      </a>
+                    )}
                   </div>
                   <span style={s.tagSaldo}>Saldo pendiente</span>
                   <div style={s.cobroMonto}>${parseFloat(p.amount || 0).toLocaleString("es-AR")}</div>

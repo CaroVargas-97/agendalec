@@ -51,7 +51,7 @@ export default async function handler(req, res) {
           date,
           status,
           clients(full_name, phone),
-          services(name),
+          services(name, currency),
           profiles(full_name)
         )
       `)
@@ -74,13 +74,15 @@ export default async function handler(req, res) {
 
       const { data: settings } = await supabase
         .from("settings")
-        .select("alias")
+        .select("alias, alias_usd")
         .eq("professional_id", turno.professional_id)
         .maybeSingle();
 
-      const alias = settings?.alias || "consultar con el profesional";
+      const esUSD = turno.services?.currency === "USD" || turno.services?.currency === "EUR";
+      const alias = (esUSD ? settings?.alias_usd : null) || settings?.alias || "consultar con el profesional";
+      const sym = esUSD ? "U$S " : "$";
 
-      const mensaje = `Hola ${turno.clients.full_name}! 👋 Te recordamos que mañana tenés tu turno de ${turno.services.name} con ${turno.profiles.full_name} a las ${turno.start_time.slice(0,5)}. El saldo pendiente es $${parseInt(pago.amount).toLocaleString("es-AR")}. Por favor transferí al alias: *${alias}* antes del turno. ¡Gracias! 🗓`;
+      const mensaje = `Hola ${turno.clients.full_name}! 👋 Te recordamos que mañana tenés tu turno de ${turno.services.name} con ${turno.profiles.full_name} a las ${turno.start_time.slice(0,5)}. El saldo pendiente es ${sym}${parseInt(pago.amount).toLocaleString("es-AR")}. Por favor transferí al alias: *${alias}* antes del turno. ¡Gracias! 🗓`;
 
       console.log("Enviando a:", celular);
       await enviarWhatsApp(celular, mensaje);

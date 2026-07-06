@@ -44,8 +44,6 @@ export default function Clientes() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { cargar(); }, []);
-
   const cargar = async () => {
     setLoading(true);
     const { data } = await supabase
@@ -55,6 +53,8 @@ export default function Clientes() {
     setClientes(data || []);
     setLoading(false);
   };
+
+  useEffect(() => { cargar(); }, []); // eslint-disable-line react-hooks/set-state-in-effect
 
   const abrirCliente = (c) => {
     setClienteSeleccionado(c);

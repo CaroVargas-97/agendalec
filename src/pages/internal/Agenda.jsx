@@ -67,8 +67,6 @@ export default function Agenda() {
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
 
-  useEffect(() => { cargarDatos(); }, [fecha, vista, filtroProf, filtroMod]);
-
   const getSemana = (date) => {
     const lunes = new Date(date);
     const dia = date.getDay();
@@ -109,6 +107,8 @@ export default function Agenda() {
     setServicios(svs || []);
     setLoading(false);
   };
+
+  useEffect(() => { cargarDatos(); }, [fecha, vista, filtroProf, filtroMod]); // eslint-disable-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
 
   const irDia = (delta) => {
     const nueva = new Date(fecha);
