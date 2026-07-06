@@ -61,6 +61,8 @@ export default function Configuracion() {
   const [nuevoProf, setNuevoProf] = useState({ nombre: "", email: "", password: "" });
   const [savingProf, setSavingProf] = useState(false);
   const [profMsg, setProfMsg] = useState("");
+  const [passForm, setPassForm] = useState({ nueva: "", confirmar: "" });
+  const [passMsg, setPassMsg] = useState("");
 
   const cargarProfesionales = async () => {
     const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
@@ -183,7 +185,7 @@ export default function Configuracion() {
     <div style={s.main}>
       <div style={s.title}>Configuración</div>
       <div style={s.tabs}>
-        {["disponibilidad","servicios","pausas","pagos","profesionales"].map(t => (
+        {["disponibilidad","servicios","pausas","pagos","profesionales","cuenta"].map(t => (
           <button key={t} style={tab === t ? s.tabActive : s.tab} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -363,6 +365,31 @@ export default function Configuracion() {
                 </div>
               </div>
             </>
+          )}
+          {tab === "cuenta" && (
+            <div style={s.card}>
+              <div style={s.cardTitle}>Cambiar contraseña</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <div style={s.pausaSub}>Nueva contraseña</div>
+                  <input type="password" value={passForm.nueva} onChange={e => setPassForm({...passForm, nueva: e.target.value})} placeholder="mínimo 6 caracteres" style={{...s.inputFull, marginTop: "4px"}} />
+                </div>
+                <div>
+                  <div style={s.pausaSub}>Confirmar contraseña</div>
+                  <input type="password" value={passForm.confirmar} onChange={e => setPassForm({...passForm, confirmar: e.target.value})} placeholder="repetí la nueva contraseña" style={{...s.inputFull, marginTop: "4px"}} />
+                </div>
+                {passMsg && <div style={{ fontSize: "12px", color: passMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D" }}>{passMsg}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={s.saveBtn} disabled={!passForm.nueva || !passForm.confirmar} onClick={async () => {
+                    if (passForm.nueva !== passForm.confirmar) { setPassMsg("Las contraseñas no coinciden"); return; }
+                    if (passForm.nueva.length < 6) { setPassMsg("Mínimo 6 caracteres"); return; }
+                    const { error } = await supabase.auth.updateUser({ password: passForm.nueva });
+                    if (error) setPassMsg("Error: " + error.message);
+                    else { setPassMsg("✓ Contraseña actualizada"); setPassForm({ nueva: "", confirmar: "" }); }
+                  }}>Guardar contraseña</button>
+                </div>
+              </div>
+            </div>
           )}
         </>
       )}
