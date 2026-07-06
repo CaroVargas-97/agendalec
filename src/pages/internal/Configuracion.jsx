@@ -57,11 +57,37 @@ export default function Configuracion() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [profesionales, setProfesionales] = useState([]);
+  const [nuevoProf, setNuevoProf] = useState({ nombre: "", email: "", password: "" });
+  const [savingProf, setSavingProf] = useState(false);
+  const [profMsg, setProfMsg] = useState("");
+
+  const cargarProfesionales = async () => {
+    const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
+    setProfesionales(data || []);
+  };
+
+  const agregarProfesional = async () => {
+    if (!nuevoProf.nombre || !nuevoProf.email || !nuevoProf.password) return;
+    setSavingProf(true); setProfMsg("");
+    const res = await fetch("/api/professionals", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(nuevoProf) });
+    const json = await res.json();
+    if (json.ok) { setProfMsg("✓ Profesional creado"); setNuevoProf({ nombre: "", email: "", password: "" }); cargarProfesionales(); }
+    else setProfMsg("Error: " + json.error);
+    setSavingProf(false);
+  };
+
+  const eliminarProfesional = async (id, nombre) => {
+    if (!window.confirm(`¿Eliminar a ${nombre}? Se borrarán todos sus datos y turnos.`)) return;
+    await fetch("/api/professionals", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    cargarProfesionales();
+  };
 
   useEffect(() => {
     const cargar = async () => {
       const uid = await getUid();
       if (!uid) { setLoading(false); return; }
+      cargarProfesionales();
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid);
       if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS" })));
@@ -157,7 +183,7 @@ export default function Configuracion() {
     <div style={s.main}>
       <div style={s.title}>Configuración</div>
       <div style={s.tabs}>
-        {["disponibilidad","servicios","pausas","pagos"].map(t => (
+        {["disponibilidad","servicios","pausas","pagos","profesionales"].map(t => (
           <button key={t} style={tab === t ? s.tabActive : s.tab} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -290,6 +316,51 @@ export default function Configuracion() {
               </div>
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarPagos} disabled={saving}>{saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}</button>
+              </div>
+            </>
+          )}
+          {tab === "profesionales" && (
+            <>
+              <div style={s.card}>
+                <div style={s.cardTitle}>Profesionales activos</div>
+                {profesionales.length === 0 ? (
+                  <div style={{ fontSize: "13px", color: "#B89FD0", padding: "0.5rem 0" }}>No hay profesionales registrados</div>
+                ) : profesionales.map((p, i) => (
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 0", borderBottom: i === profesionales.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
+                    <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#C4A8D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#3B2460", fontWeight: "600", flexShrink: 0 }}>
+                      {p.full_name.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{p.full_name}</div>
+                      <div style={{ fontSize: "11px", color: "#B89FD0" }}>{p.email}</div>
+                    </div>
+                    <button style={s.trashBtn} onClick={() => eliminarProfesional(p.id, p.full_name)}>🗑</button>
+                  </div>
+                ))}
+              </div>
+
+              <div style={s.card}>
+                <div style={s.cardTitle}>Agregar profesional</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div>
+                    <div style={s.pausaSub}>Nombre completo</div>
+                    <input value={nuevoProf.nombre} onChange={e => setNuevoProf({...nuevoProf, nombre: e.target.value})} placeholder="María García" style={{...s.inputFull, marginTop: "4px"}} />
+                  </div>
+                  <div>
+                    <div style={s.pausaSub}>Email</div>
+                    <input type="email" value={nuevoProf.email} onChange={e => setNuevoProf({...nuevoProf, email: e.target.value})} placeholder="maru@mail.com" style={{...s.inputFull, marginTop: "4px"}} />
+                  </div>
+                  <div>
+                    <div style={s.pausaSub}>Contraseña temporal</div>
+                    <input type="password" value={nuevoProf.password} onChange={e => setNuevoProf({...nuevoProf, password: e.target.value})} placeholder="mínimo 6 caracteres" style={{...s.inputFull, marginTop: "4px"}} />
+                  </div>
+                  {profMsg && <div style={{ fontSize: "12px", color: profMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D" }}>{profMsg}</div>}
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button style={s.saveBtn} onClick={agregarProfesional} disabled={savingProf || !nuevoProf.nombre || !nuevoProf.email || !nuevoProf.password}>
+                      {savingProf ? "Creando..." : "Crear profesional"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </>
           )}
