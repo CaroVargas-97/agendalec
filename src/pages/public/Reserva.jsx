@@ -298,9 +298,12 @@ export default function Reserva() {
           )}
           {prof && loadingServicios && <div style={s.loadingText}>Cargando servicios...</div>}
           {prof && !loadingServicios && servicios.length === 0 && <div style={s.loadingText}>Este profesional no tiene servicios disponibles.</div>}
-          <button style={{ ...s.btnNext, background: prof && servicio ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio} onClick={() => setStep(2)}>
-            Continuar
-          </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <button style={{ ...s.btnNext, background: prof && servicio ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio} onClick={() => setStep(2)}>
+              Continuar
+            </button>
+            <a href="/" style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", textDecoration: "none", display: "block", textAlign: "center", boxSizing: "border-box" }}>← Volver al inicio</a>
+          </div>
         </div>
       )}
 

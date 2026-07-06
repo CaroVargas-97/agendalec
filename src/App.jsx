@@ -41,7 +41,7 @@ function App() {
 
   if (!session) {
     if (authPage === "registro") return <Registro onLogin={() => setAuthPage("login")} />;
-    if (showLogin) return <Login onRegistro={() => setAuthPage("registro")} />;
+    if (showLogin) return <Login onRegistro={() => setAuthPage("registro")} onBack={() => setShowLogin(false)} />;
     return (
       <div style={{ minHeight: "100vh", background: "#F8F4FC", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>

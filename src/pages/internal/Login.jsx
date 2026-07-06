@@ -52,7 +52,7 @@ const styles = {
   error: { fontSize: "12px", color: "#A32D2D" },
 };
 
-export default function Login({ onRegistro }) {
+export default function Login({ onRegistro, onBack }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -103,6 +103,7 @@ export default function Login({ onRegistro }) {
               {loading ? "Ingresando..." : "Ingresar"}
             </button>
           </form>
+          {onBack && <div style={{ ...styles.link, marginTop: "0" }} onClick={onBack}>← Volver al inicio</div>}
           <div style={styles.link} onClick={onRegistro}>¿No tenés cuenta? Registrate →</div>
         </div>
       </div>
