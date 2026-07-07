@@ -12,7 +12,7 @@ const s = {
   metricLabel: { fontSize: "12px", color: "#B89FD0", marginBottom: "6px" },
   metricValue: { fontSize: "24px", fontWeight: "500", color: "#2A1845" },
   metricSub: { fontSize: "12px", color: "#C4A8D8", marginTop: "4px" },
-  grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" },
   card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.25rem" },
   cardTitle: { fontSize: "14px", fontWeight: "500", color: "#2A1845", marginBottom: "1rem" },
   rowItem: { display: "flex", alignItems: "center", gap: "10px", padding: "10px 0", borderBottom: "0.5px solid #F0E8F8" },

@@ -13,9 +13,9 @@ const s = {
   select: { fontSize: "12px", padding: "6px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#5C3F99", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   btnNuevo: { display: "flex", alignItems: "center", gap: "6px", padding: "7px 16px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   arrowBtn: { width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#9B72C0", fontSize: "16px", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  dateLabel: { fontSize: "14px", fontWeight: "500", color: "#2A1845", minWidth: "200px", textAlign: "center" },
-  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", flex: 1, overflow: "auto" },
-  panel: { width: "320px", background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto" },
+  dateLabel: { fontSize: "14px", fontWeight: "500", color: "#2A1845", minWidth: "120px", textAlign: "center" },
+  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", flex: 1, overflow: "auto", minWidth: 0 },
+  panel: { width: "100%", maxWidth: "320px", background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto" },
   field: { display: "flex", flexDirection: "column", gap: "4px" },
   label: { fontSize: "12px", color: "#9B72C0" },
   input: { fontSize: "13px", padding: "8px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" },
@@ -298,7 +298,7 @@ export default function Agenda() {
                   </div>
                 )}
                 {vista === "semana" && (
-                  <div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, minWidth: "600px" }}>
+                  <div style={{ overflowX: "auto" }}><div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, minWidth: "600px" }}>
                     <div></div>
                     {semana.map((d, i) => (
                       <div key={i} style={{ textAlign: "center", padding: "4px", borderBottom: "0.5px solid #F0E8F8", fontSize: "12px", color: toISO(d) === toISO(new Date()) ? "#9B72C0" : "#B89FD0", fontWeight: toISO(d) === toISO(new Date()) ? "500" : "400" }}>
@@ -329,7 +329,7 @@ export default function Agenda() {
                         })}
                       </>
                     ))}
-                  </div>
+                  </div></div>
                 )}
               </>
             )}

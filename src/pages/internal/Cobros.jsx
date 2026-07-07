@@ -4,7 +4,7 @@ import { supabase } from "../../supabase";
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   title: { fontSize: "15px", fontWeight: "500", color: "#2A1845" },
-  metrics: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px" },
+  metrics: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" },
   metricCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem" },
   metricLabel: { fontSize: "12px", color: "#B89FD0", marginBottom: "6px" },
   metricValue: { fontSize: "22px", fontWeight: "500", color: "#2A1845" },
