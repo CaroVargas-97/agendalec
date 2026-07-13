@@ -283,14 +283,13 @@ export default function Agenda() {
                       {turnos.map((t, i) => {
                         const isPending = t.status === "pending" || t.status === "partial";
                         const isVirtual = t.modality === "virtual";
-                        const bg = isPending ? "#FFF8E8" : isVirtual ? "#DDD5F7" : "#FAD4E5";
-                        const border = isPending ? "#F0A800" : isVirtual ? "#7C52B8" : "#D4609A";
+                        const bg = isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
                         const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "6px", right: "6px", top: `${getTop(t.start_time)}px`, height: `${getHeight(t.start_time, t.end_time)}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `3px solid ${border}`, cursor: "pointer" }}>
-                            <div style={{ fontSize: "12px", fontWeight: "600", color: "#2A1845" }}>{t.clients?.full_name}</div>
-                            <div style={{ fontSize: "11px", color: "#5C3F99" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
-                            <div style={{ fontSize: "10px", color: isPending ? "#854F0B" : isVirtual ? "#5C3F99" : "#A0407A", marginTop: "2px" }}>{emoji} {isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial"}</div>
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "6px", right: "6px", top: `${getTop(t.start_time)}px`, height: `${getHeight(t.start_time, t.end_time)}px`, borderRadius: "8px", padding: "6px 10px", background: bg, cursor: "pointer", boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
+                            <div style={{ fontSize: "12px", fontWeight: "600", color: "#fff" }}>{t.clients?.full_name}</div>
+                            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
+                            <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>{emoji} {isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial"}</div>
                           </div>
                         );
                       })}
@@ -315,11 +314,10 @@ export default function Agenda() {
                               {turnosDia.map((t, ti) => {
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
-                                const bg = isPending ? "#FFF8E8" : isVirtual ? "#DDD5F7" : "#FAD4E5";
-                                const border = isPending ? "#F0A800" : isVirtual ? "#7C52B8" : "#D4609A";
+                                const bg = isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
                                 const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
-                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "2px", right: "2px", top: "2px", borderRadius: "6px", padding: "3px 6px", background: bg, borderLeft: `2px solid ${border}`, fontSize: "10px", color: "#2A1845", overflow: "hidden", cursor: "pointer" }}>
+                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "2px", right: "2px", top: "2px", borderRadius: "6px", padding: "3px 6px", background: bg, fontSize: "10px", color: "#fff", overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>
                                     {emoji} {t.clients?.full_name}
                                   </div>
                                 );
