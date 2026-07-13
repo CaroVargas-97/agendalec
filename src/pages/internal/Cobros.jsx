@@ -13,7 +13,7 @@ const s = {
   tabs: { display: "flex", gap: "6px", marginBottom: "1rem" },
   tab: { padding: "6px 14px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   tabActive: { padding: "6px 14px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#EDE8FA", color: "#3B2460", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  cobroRow: { display: "flex", alignItems: "center", gap: "12px", padding: "12px 0", borderBottom: "0.5px solid #F0E8F8" },
+  cobroRow: { display: "flex", alignItems: "flex-start", gap: "8px", padding: "12px 0", borderBottom: "0.5px solid #F0E8F8", flexWrap: "wrap" },
   cobroNombre: { fontSize: "13px", fontWeight: "500", color: "#2A1845", flex: 1 },
   cobroDetalle: { fontSize: "12px", color: "#9B72C0" },
   cobroMonto: { fontSize: "13px", fontWeight: "500", color: "#5C3F99" },
