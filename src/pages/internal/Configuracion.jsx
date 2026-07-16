@@ -63,6 +63,8 @@ export default function Configuracion() {
   const [profMsg, setProfMsg] = useState("");
   const [passForm, setPassForm] = useState({ nueva: "", confirmar: "" });
   const [passMsg, setPassMsg] = useState("");
+  const [nombreForm, setNombreForm] = useState("");
+  const [nombreMsg, setNombreMsg] = useState("");
 
   const cargarProfesionales = async () => {
     const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
@@ -90,6 +92,9 @@ export default function Configuracion() {
       const uid = await getUid();
       if (!uid) { setLoading(false); return; }
       cargarProfesionales();
+
+      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle();
+      if (prof?.full_name) setNombreForm(prof.full_name);
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid);
       if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS" })));
@@ -367,6 +372,25 @@ export default function Configuracion() {
             </>
           )}
           {tab === "cuenta" && (
+            <>
+            <div style={s.card}>
+              <div style={s.cardTitle}>Mi nombre</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <div style={s.pausaSub}>Nombre que se muestra en la app</div>
+                  <input value={nombreForm} onChange={e => setNombreForm(e.target.value)} placeholder="Tu nombre" style={{...s.inputFull, marginTop: "4px"}} />
+                </div>
+                {nombreMsg && <div style={{ fontSize: "12px", color: nombreMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D" }}>{nombreMsg}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={s.saveBtn} disabled={!nombreForm} onClick={async () => {
+                    const uid = await getUid();
+                    const { error } = await supabase.from("profiles").update({ full_name: nombreForm }).eq("id", uid);
+                    if (error) setNombreMsg("Error al guardar");
+                    else { setNombreMsg("✓ Nombre actualizado"); setTimeout(() => setNombreMsg(""), 2000); }
+                  }}>Guardar nombre</button>
+                </div>
+              </div>
+            </div>
             <div style={s.card}>
               <div style={s.cardTitle}>Cambiar contraseña</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -390,6 +414,7 @@ export default function Configuracion() {
                 </div>
               </div>
             </div>
+            </>
           )}
         </>
       )}
