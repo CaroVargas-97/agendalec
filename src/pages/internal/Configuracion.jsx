@@ -215,11 +215,11 @@ export default function Configuracion() {
                     {dias[i].activo ? (
                       <>
                         <select value={dias[i].inicio} onChange={e => updateDia(i,"inicio",e.target.value)} style={s.select}>
-                          {["08:00","09:00","10:00","11:00","12:00"].map(h => <option key={h}>{h}</option>)}
+                          {["07:00","08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"].map(h => <option key={h}>{h}</option>)}
                         </select>
                         <span style={{ fontSize: "12px", color: "#C4A8D8" }}>a</span>
                         <select value={dias[i].fin} onChange={e => updateDia(i,"fin",e.target.value)} style={s.select}>
-                          {["13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00"].map(h => <option key={h}>{h}</option>)}
+                          {["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00","20:00","21:00","22:00"].map(h => <option key={h}>{h}</option>)}
                         </select>
                         <button style={getModStyle(dias[i].modalidad)} onClick={() => cycleModalidad(i)}>{getModLabel(dias[i].modalidad)}</button>
                       </>
