@@ -283,13 +283,19 @@ export default function Agenda() {
                       {turnos.map((t, i) => {
                         const isPending = t.status === "pending" || t.status === "partial";
                         const isVirtual = t.modality === "virtual";
-                        const bg = isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
-                        const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                        const isCancelled = t.status === "cancelled";
+                        const bg = isCancelled ? "#9CA3AF" : isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
+                        const label = isCancelled ? "Cancelado" : isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial";
+                        const emoji = isCancelled ? "✗" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                        const h = getHeight(t.start_time, t.end_time);
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "6px", right: "6px", top: `${getTop(t.start_time)}px`, height: `${getHeight(t.start_time, t.end_time)}px`, borderRadius: "8px", padding: "6px 10px", background: bg, cursor: "pointer", boxShadow: "0 2px 6px rgba(0,0,0,0.15)" }}>
-                            <div style={{ fontSize: "12px", fontWeight: "600", color: "#fff" }}>{t.clients?.full_name}</div>
-                            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
-                            <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.75)", marginTop: "2px" }}>{emoji} {isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial"}</div>
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
+                            <div>
+                              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.8)", fontWeight: "500" }}>{t.start_time?.slice(0,5)} hs</div>
+                              <div style={{ fontSize: "13px", fontWeight: "700", color: "#fff", marginTop: "2px", lineHeight: "1.2" }}>{t.clients?.full_name}</div>
+                              {h > 45 && <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)", marginTop: "2px" }}>{t.services?.name}</div>}
+                            </div>
+                            {h > 55 && <div style={{ fontSize: "10px", fontWeight: "600", color: "rgba(255,255,255,0.9)", background: "rgba(0,0,0,0.15)", borderRadius: "4px", padding: "2px 6px", alignSelf: "flex-start" }}>{emoji} {label}</div>}
                           </div>
                         );
                       })}
@@ -314,11 +320,16 @@ export default function Agenda() {
                               {turnosDia.map((t, ti) => {
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
-                                const bg = isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
-                                const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                                const isCancelled = t.status === "cancelled";
+                                const bg = isCancelled ? "#9CA3AF" : isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
+                                const emoji = isCancelled ? "✗" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
-                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "2px", right: "2px", top: "2px", borderRadius: "6px", padding: "3px 6px", background: bg, fontSize: "10px", color: "#fff", overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.15)" }}>
-                                    {emoji} {t.clients?.full_name}
+                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "6px", padding: "4px 6px", background: bg, color: "#fff", overflow: "hidden", cursor: "pointer", boxShadow: "0 2px 6px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                                    <div>
+                                      <div style={{ fontSize: "9px", fontWeight: "600", opacity: 0.85 }}>{t.start_time?.slice(0,5)}</div>
+                                      <div style={{ fontSize: "10px", fontWeight: "700", lineHeight: "1.2", marginTop: "1px" }}>{t.clients?.full_name?.split(" ")[0]}</div>
+                                    </div>
+                                    <div style={{ fontSize: "9px", fontWeight: "600", opacity: 0.9 }}>{emoji}</div>
                                   </div>
                                 );
                               })}

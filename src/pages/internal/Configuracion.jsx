@@ -65,6 +65,8 @@ export default function Configuracion() {
   const [passMsg, setPassMsg] = useState("");
   const [nombreForm, setNombreForm] = useState("");
   const [nombreMsg, setNombreMsg] = useState("");
+  const [contactoForm, setContactoForm] = useState({ phone: "", address: "" });
+  const [contactoMsg, setContactoMsg] = useState("");
 
   const cargarProfesionales = async () => {
     const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
@@ -93,8 +95,9 @@ export default function Configuracion() {
       if (!uid) { setLoading(false); return; }
       cargarProfesionales();
 
-      const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", uid).maybeSingle();
+      const { data: prof } = await supabase.from("profiles").select("full_name, phone, address").eq("id", uid).maybeSingle();
       if (prof?.full_name) setNombreForm(prof.full_name);
+      if (prof) setContactoForm({ phone: prof.phone || "", address: prof.address || "" });
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid);
       if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS" })));
@@ -373,6 +376,28 @@ export default function Configuracion() {
           )}
           {tab === "cuenta" && (
             <>
+            <div style={s.card}>
+              <div style={s.cardTitle}>Datos de contacto</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <div style={s.pausaSub}>Teléfono</div>
+                  <input value={contactoForm.phone} onChange={e => setContactoForm({...contactoForm, phone: e.target.value})} placeholder="+54 9 11 1234-5678" style={{...s.inputFull, marginTop: "4px"}} />
+                </div>
+                <div>
+                  <div style={s.pausaSub}>Domicilio (para turnos presenciales)</div>
+                  <input value={contactoForm.address} onChange={e => setContactoForm({...contactoForm, address: e.target.value})} placeholder="Av. Corrientes 1234, CABA" style={{...s.inputFull, marginTop: "4px"}} />
+                </div>
+                {contactoMsg && <div style={{ fontSize: "12px", color: contactoMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D" }}>{contactoMsg}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={s.saveBtn} onClick={async () => {
+                    const uid = await getUid();
+                    const { error } = await supabase.from("profiles").update({ phone: contactoForm.phone, address: contactoForm.address }).eq("id", uid);
+                    if (error) setContactoMsg("Error al guardar");
+                    else { setContactoMsg("✓ Guardado"); setTimeout(() => setContactoMsg(""), 2000); }
+                  }}>Guardar contacto</button>
+                </div>
+              </div>
+            </div>
             <div style={s.card}>
               <div style={s.cardTitle}>Mi nombre</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
