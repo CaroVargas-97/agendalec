@@ -163,6 +163,14 @@ export default function Agenda() {
       await cargarDatos();
       setSavingPago(false);
       return;
+    } else if (tipo === "eliminar") {
+      if (!window.confirm("¿Eliminar este turno definitivamente? Esta acción no se puede deshacer.")) { setSavingPago(false); return; }
+      await supabase.from("payments").delete().eq("appointment_id", t.id);
+      await supabase.from("appointments").delete().eq("id", t.id);
+      cerrarTurno();
+      await cargarDatos();
+      setSavingPago(false);
+      return;
     }
     const { data: pagosActualizados } = await supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at");
     const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name, phone), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
@@ -433,6 +441,9 @@ export default function Agenda() {
                     </button>
                     <button disabled={savingPago} onClick={() => accionPago("cancelar_sin_devolucion")} style={{ padding: "10px", background: "#fff", color: "#A32D2D", border: "0.5px solid #F4C4C4", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       ✗ Cancelar sin devolución
+                    </button>
+                    <button disabled={savingPago} onClick={() => accionPago("eliminar")} style={{ padding: "10px", background: "#fff", color: "#9CA3AF", border: "0.5px solid #E5E7EB", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      🗑 Eliminar turno
                     </button>
                   </div>
                 )}

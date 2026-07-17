@@ -62,6 +62,20 @@ export default function Clientes() {
     setCustomPrice(c.custom_price != null ? String(c.custom_price) : "");
   };
 
+  const eliminarCliente = async () => {
+    if (!window.confirm(`¿Eliminar a ${clienteSeleccionado.full_name}? Se borrarán también sus turnos y pagos.`)) return;
+    const id = clienteSeleccionado.id;
+    const { data: turnos } = await supabase.from("appointments").select("id").eq("client_id", id);
+    if (turnos?.length) {
+      const ids = turnos.map(t => t.id);
+      await supabase.from("payments").delete().in("appointment_id", ids);
+      await supabase.from("appointments").delete().in("id", ids);
+    }
+    await supabase.from("clients").delete().eq("id", id);
+    setClienteSeleccionado(null);
+    await cargar();
+  };
+
   const guardarCliente = async () => {
     setSaving(true);
     const updates = { price_type: precioTipo, custom_price: (precioTipo === "especial" || precioTipo === "cortesia") && customPrice ? parseFloat(customPrice) : null };
@@ -197,6 +211,7 @@ export default function Clientes() {
 
             <button style={s.saveBtn} onClick={guardarCliente} disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button>
             <button style={s.cancelBtn} onClick={() => setClienteSeleccionado(null)}>Cerrar</button>
+            <button style={{ ...s.cancelBtn, color: "#A32D2D", borderColor: "#F4C4C4", marginTop: "4px" }} onClick={eliminarCliente}>🗑 Eliminar cliente</button>
           </div>
         </>
       )}
