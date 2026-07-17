@@ -152,12 +152,13 @@ export default function Reserva() {
   const esDiaSeleccionable = (d) => {
     const fecha = new Date(anioMes, mesMes, d);
     if (fecha < hoy) return false;
-    if (disponibilidad.length === 0) {
-      const dow = fecha.getDay();
-      return dow !== 0 && dow !== 6;
-    }
     const dow = fecha.getDay();
-    return disponibilidad.some(a => a.day_of_week === dow);
+    if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
+    return disponibilidad.some(a => {
+      if (a.day_of_week !== dow) return false;
+      if (!modalidad || srv?.modality !== "ambas") return true;
+      return a.modality === "ambas" || a.modality === modalidad;
+    });
   };
 
   const generarHorarios = (d) => {
@@ -289,8 +290,9 @@ export default function Reserva() {
                   </div>
                   <div style={s.srvDet}>
                     <span>{sv.duration_minutes} min</span>
-                    {(sv.modality === "ambas" || sv.modality === "virtual") && <span style={s.tagV}>Virtual</span>}
-                    {(sv.modality === "ambas" || sv.modality === "presencial") && <span style={s.tagP}>Presencial</span>}
+                    {sv.modality === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
+                    {sv.modality === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
+                    {sv.modality === "ambas" && <><span style={s.tagV}>📹 Virtual</span><span style={s.tagP}>📍 Presencial</span></>}
                   </div>
                 </div>
               ))}
@@ -313,7 +315,18 @@ export default function Reserva() {
             <div style={s.title}>¿Cuándo querés tu turno?</div>
             <div style={s.sub}>{servicio} con {prof} · {srv?.duration_minutes} min</div>
           </div>
-          <div>
+
+          {srv?.modality === "ambas" && (
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>¿Cómo preferís la sesión?</div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button style={modalidad === "presencial" ? s.modBtnP : s.modBtn} onClick={() => { setModalidad("presencial"); setDia(null); setHora(null); }}>📍 Presencial</button>
+                <button style={modalidad === "virtual" ? s.modBtnV : s.modBtn} onClick={() => { setModalidad("virtual"); setDia(null); setHora(null); }}>📹 Virtual</button>
+              </div>
+            </div>
+          )}
+
+          {(srv?.modality !== "ambas" || modalidad) && <div>
             <div style={s.calHeader}>
               <span style={{ cursor: mesAnteriorPermitido ? "pointer" : "default", color: mesAnteriorPermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(-1)}>‹</span>
               <span>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
@@ -354,19 +367,12 @@ export default function Reserva() {
               )}
             </div>
           )}
-          {dia && hora && srv?.modality === "ambas" && (
-            <div>
-              <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "8px" }}>Modalidad</div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button style={modalidad === "presencial" ? s.modBtnP : s.modBtn} onClick={() => setModalidad("presencial")}>📍 Presencial</button>
-                <button style={modalidad === "virtual" ? s.modBtnV : s.modBtn} onClick={() => setModalidad("virtual")}>📹 Virtual</button>
-              </div>
-            </div>
-          )}
+          </div>}
+
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(1)}>← Volver</button>
-            <button style={{ ...s.btnNext, background: dia && hora && (modalidad || srv?.modality !== "ambas") ? "#9B72C0" : "#E0D0F0" }}
-              disabled={!dia || !hora || (!modalidad && srv?.modality === "ambas")}
+            <button style={{ ...s.btnNext, background: dia && hora ? "#9B72C0" : "#E0D0F0" }}
+              disabled={!dia || !hora}
               onClick={() => { if (srv?.modality !== "ambas") setModalidad(srv?.modality); setStep(3); }}>
               Continuar
             </button>
