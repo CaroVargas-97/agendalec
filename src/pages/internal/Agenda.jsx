@@ -11,11 +11,12 @@ const s = {
   toggleBtn: { padding: "6px 18px", fontSize: "13px", cursor: "pointer", color: "#B89FD0", border: "none", background: "transparent", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   toggleBtnActive: { padding: "6px 18px", fontSize: "13px", cursor: "pointer", color: "#3B2460", fontWeight: "500", border: "none", background: "#EDE8FA", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   select: { fontSize: "12px", padding: "6px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#5C3F99", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  btnNuevo: { display: "flex", alignItems: "center", gap: "6px", padding: "7px 16px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  arrowBtn: { width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#9B72C0", fontSize: "16px", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  dateLabel: { fontSize: "14px", fontWeight: "500", color: "#2A1845", minWidth: "120px", textAlign: "center" },
-  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", flex: 1, overflow: "auto", minWidth: 0 },
-  panel: { width: "100%", maxWidth: "320px", background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto" },
+  btnNuevo: { display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" },
+  arrowBtn: { width: "30px", height: "30px", borderRadius: "8px", border: "0.5px solid #E0D0F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#9B72C0", fontSize: "16px", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
+  hoyBtn: { padding: "5px 12px", borderRadius: "8px", border: "0.5px solid #D0B8E8", background: "#fff", color: "#9B72C0", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  dateLabel: { fontSize: "15px", fontWeight: "500", color: "#2A1845", minWidth: "140px", textAlign: "center" },
+  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", flex: 1, overflow: "auto", minWidth: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  panel: { width: "100%", maxWidth: "320px", background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
   field: { display: "flex", flexDirection: "column", gap: "4px" },
   label: { fontSize: "12px", color: "#9B72C0" },
   input: { fontSize: "13px", padding: "8px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" },
@@ -66,6 +67,12 @@ export default function Agenda() {
   const [pagosDelTurno, setPagosDelTurno] = useState([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
+  const [horaActual, setHoraActual] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setHoraActual(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const getSemana = (date) => {
     const lunes = new Date(date);
@@ -265,9 +272,10 @@ export default function Agenda() {
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <button style={s.arrowBtn} onClick={() => irDia(-1)}>‹</button>
             <div style={s.dateLabel}>
-              {vista === "dia" ? formatFecha(fecha) : `${semana[0].toLocaleDateString("es-AR",{day:"numeric",month:"short"})} - ${semana[6].toLocaleDateString("es-AR",{day:"numeric",month:"short"})}`}
+              {vista === "dia" ? formatFecha(fecha) : `${semana[0].toLocaleDateString("es-AR",{day:"numeric",month:"short"})} – ${semana[6].toLocaleDateString("es-AR",{day:"numeric",month:"long", year:"numeric"})}`}
             </div>
             <button style={s.arrowBtn} onClick={() => irDia(1)}>›</button>
+            <button style={s.hoyBtn} onClick={() => setFecha(new Date())}>Hoy</button>
             <div style={s.toggleWrap}>
               <button style={vista === "dia" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("dia")}>Día</button>
               <button style={vista === "semana" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("semana")}>Semana</button>
@@ -296,6 +304,17 @@ export default function Agenda() {
                     <div>{HORAS.map(h => <div key={h} style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>)}</div>
                     <div style={{ position: "relative", borderLeft: "0.5px solid #F0E8F8", height: `${HORAS.length * 64}px` }}>
                       {HORAS.map(h => <div key={h} style={{ height: "64px", borderBottom: "0.5px solid #F8F0FC" }}></div>)}
+                      {toISO(fecha) === toISO(new Date()) && (() => {
+                        const mins = horaActual.getHours() * 60 + horaActual.getMinutes();
+                        const top = ((horaActual.getHours() - 8) * 64) + (horaActual.getMinutes() / 60 * 64);
+                        if (mins < 8 * 60 || mins > 19 * 60) return null;
+                        return (
+                          <div style={{ position: "absolute", left: 0, right: 0, top: `${top}px`, zIndex: 10, display: "flex", alignItems: "center", gap: "4px", pointerEvents: "none" }}>
+                            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#E24B4A", flexShrink: 0, marginLeft: "-4px" }}></div>
+                            <div style={{ flex: 1, height: "1.5px", background: "#E24B4A", opacity: 0.7 }}></div>
+                          </div>
+                        );
+                      })()}
                       {turnos.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: "13px", color: "#C4A8D8" }}>No hay turnos para este día</div>}
                       {turnos.map((t, i) => {
                         const isPending = t.status === "pending" || t.status === "partial";
@@ -321,18 +340,24 @@ export default function Agenda() {
                 {vista === "semana" && (
                   <div style={{ overflowX: "auto" }}><div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, minWidth: "600px" }}>
                     <div></div>
-                    {semana.map((d, i) => (
-                      <div key={i} style={{ textAlign: "center", padding: "4px", borderBottom: "0.5px solid #F0E8F8", fontSize: "12px", color: toISO(d) === toISO(new Date()) ? "#9B72C0" : "#B89FD0", fontWeight: toISO(d) === toISO(new Date()) ? "500" : "400" }}>
-                        {DIAS_SEMANA[i]}<br/>{d.getDate()}
-                      </div>
-                    ))}
+                    {semana.map((d, i) => {
+                      const esHoy = toISO(d) === toISO(new Date());
+                      const countDia = turnosSemana.filter(t => t.date === toISO(d)).length;
+                      return (
+                        <div key={i} style={{ textAlign: "center", padding: "6px 4px", borderBottom: "0.5px solid #F0E8F8", background: esHoy ? "#F3EEFF" : "transparent" }}>
+                          <div style={{ fontSize: "11px", color: esHoy ? "#9B72C0" : "#B89FD0", fontWeight: esHoy ? "500" : "400" }}>{DIAS_SEMANA[i]}</div>
+                          <div style={{ fontSize: "16px", fontWeight: esHoy ? "600" : "400", color: esHoy ? "#9B72C0" : "#2A1845", lineHeight: "1.4" }}>{d.getDate()}</div>
+                          {countDia > 0 && <div style={{ fontSize: "9px", color: esHoy ? "#9B72C0" : "#C4A8D8" }}>{countDia} turno{countDia > 1 ? "s" : ""}</div>}
+                        </div>
+                      );
+                    })}
                     {HORAS.map(h => (
                       <>
                         <div style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>
                         {semana.map((d, di) => {
                           const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.slice(0,2) === h.slice(0,2));
                           return (
-                            <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative" }}>
+                            <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative", background: toISO(d) === toISO(new Date()) ? "#FDFAFF" : "transparent" }}>
                               {turnosDia.map((t, ti) => {
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
