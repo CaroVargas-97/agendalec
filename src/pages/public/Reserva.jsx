@@ -92,7 +92,7 @@ export default function Reserva() {
   const [comprobante, setComprobante] = useState(null);
 
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email").eq("role", "professional")
+    supabase.from("profiles").select("id, full_name, email, address, phone").eq("role", "professional")
       .then(({ data }) => { setProfesionales(data || []); setLoading(false); });
   }, []);
 
@@ -317,12 +317,22 @@ export default function Reserva() {
           </div>
 
           {srv?.modality === "ambas" && (
-            <div>
-              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>¿Cómo preferís la sesión?</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>¿Cómo preferís la sesión?</div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button style={modalidad === "presencial" ? s.modBtnP : s.modBtn} onClick={() => { setModalidad("presencial"); setDia(null); setHora(null); }}>📍 Presencial</button>
                 <button style={modalidad === "virtual" ? s.modBtnV : s.modBtn} onClick={() => { setModalidad("virtual"); setDia(null); setHora(null); }}>📹 Virtual</button>
               </div>
+              {modalidad === "presencial" && profData?.address && (
+                <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#A0407A" }}>
+                  📍 <strong>Dirección:</strong> {profData.address}
+                </div>
+              )}
+            </div>
+          )}
+          {srv?.modality === "presencial" && profData?.address && (
+            <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#A0407A" }}>
+              📍 <strong>Dirección:</strong> {profData.address}
             </div>
           )}
 
@@ -397,8 +407,10 @@ export default function Reserva() {
             <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen</div>
             <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {srv?.duration_minutes} min</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
+            {profData?.phone && <div style={s.resRow}><span style={s.resLabel}>Teléfono</span><span style={s.resValor}>{profData.phone}</span></div>}
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Modalidad</span><span style={s.resValor}>{modalidad === "virtual" ? "📹 Virtual" : "📍 Presencial"}</span></div>
+            {modalidad === "presencial" && profData?.address && <div style={s.resRow}><span style={s.resLabel}>Dirección</span><span style={s.resValor}>{profData.address}</span></div>}
             <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "2px" }}>
               <div style={s.resRow}><span style={s.resLabel}>Precio total</span><span style={s.resValor}>{sym}{total.toLocaleString("es-AR")}</span></div>
               <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña ahora (50%)</span><span style={s.resSeña}>{sym}{sena.toLocaleString("es-AR")}</span></div>
