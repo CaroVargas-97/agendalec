@@ -116,7 +116,7 @@ export default function Reserva() {
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, alias_eur, cbu_eur").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
       ]);
@@ -146,8 +146,8 @@ export default function Reserva() {
   const sena = Math.round(total / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
   const esMonedaExtranjera = srv?.currency === "USD" || srv?.currency === "EUR";
-  const aliasActivo = esMonedaExtranjera ? (profSettings?.alias_usd || profSettings?.alias) : (profSettings?.alias);
-  const cbuActivo = esMonedaExtranjera ? (profSettings?.cbu_usd || profSettings?.cbu) : (profSettings?.cbu);
+  const aliasActivo = srv?.currency === "EUR" ? (profSettings?.alias_eur || profSettings?.alias) : srv?.currency === "USD" ? (profSettings?.alias_usd || profSettings?.alias) : profSettings?.alias;
+  const cbuActivo = srv?.currency === "EUR" ? (profSettings?.cbu_eur || profSettings?.cbu) : srv?.currency === "USD" ? (profSettings?.cbu_usd || profSettings?.cbu) : profSettings?.cbu;
 
   // Calendar helpers
   const hoy = new Date();

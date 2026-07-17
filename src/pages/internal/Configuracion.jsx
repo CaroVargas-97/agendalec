@@ -53,7 +53,7 @@ export default function Configuracion() {
   const [dias, setDias] = useState(defaultDias);
   const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
-  const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", mp_enabled: false });
+  const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", alias_eur: "", cbu_eur: "", mp_enabled: false });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -118,7 +118,7 @@ export default function Configuracion() {
       const { data: cfg } = await supabase.from("settings").select("*").eq("professional_id", uid).maybeSingle();
       if (cfg) {
         setPausas({ pausa: cfg.break_minutes || 15, anticipacion: cfg.min_advance_hours || 24, cancelacion: cfg.cancellation_hours || 24 });
-        setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", mp_enabled: cfg.mp_enabled || false });
+        setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", alias_eur: cfg.alias_eur || "", cbu_eur: cfg.cbu_eur || "", mp_enabled: cfg.mp_enabled || false });
       }
       setLoading(false);
     };
@@ -177,7 +177,7 @@ export default function Configuracion() {
     setSaving(true);
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, mp_enabled: pagos.mp_enabled }, { onConflict: "professional_id" });
+    await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, alias_eur: pagos.alias_eur, cbu_eur: pagos.cbu_eur, mp_enabled: pagos.mp_enabled }, { onConflict: "professional_id" });
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
@@ -320,6 +320,17 @@ export default function Configuracion() {
                       <div style={{ marginBottom: "10px" }}>
                         <div style={s.pausaSub}>CBU USD (opcional)</div>
                         <input type="text" value={pagos.cbu_usd} onChange={e => setPagos({...pagos,cbu_usd:e.target.value})} placeholder="0000000000000000000000" style={{...s.inputFull, marginTop: "4px"}} />
+                      </div>
+                    </div>
+                    <div style={{ borderTop: "0.5px solid #F0E8F8", paddingTop: "16px", marginBottom: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px" }}>Euros (EUR)</div>
+                      <div style={{ marginBottom: "10px" }}>
+                        <div style={s.pausaSub}>Alias EUR</div>
+                        <input type="text" value={pagos.alias_eur} onChange={e => setPagos({...pagos,alias_eur:e.target.value})} placeholder="tu.alias.eur" style={{...s.inputFull, marginTop: "4px"}} />
+                      </div>
+                      <div style={{ marginBottom: "10px" }}>
+                        <div style={s.pausaSub}>CBU EUR (opcional)</div>
+                        <input type="text" value={pagos.cbu_eur} onChange={e => setPagos({...pagos,cbu_eur:e.target.value})} placeholder="0000000000000000000000" style={{...s.inputFull, marginTop: "4px"}} />
                       </div>
                     </div>
                     <div style={s.infoBox}>💡 El cliente verá el alias que corresponda según la moneda del servicio.</div>
