@@ -3,13 +3,15 @@ import { supabase } from "../../supabase";
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  title: { fontSize: "15px", fontWeight: "500", color: "#2A1845" },
+  topbar: { display: "flex", alignItems: "flex-start", justifyContent: "space-between" },
+  title: { fontSize: "18px", fontWeight: "500", color: "#2A1845" },
+  titleSub: { fontSize: "13px", color: "#9B72C0", marginTop: "3px" },
   tabs: { display: "flex", gap: "6px", flexWrap: "wrap" },
   tab: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   tabActive: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#EDE8FA", color: "#3B2460", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.25rem" },
-  cardTitle: { fontSize: "14px", fontWeight: "500", color: "#2A1845", marginBottom: "1rem" },
-  diaRow: { display: "flex", alignItems: "center", gap: "8px", padding: "10px 0", borderBottom: "0.5px solid #F0E8F8", flexWrap: "wrap" },
+  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.25rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  cardTitle: { fontSize: "11px", fontWeight: "500", color: "#B89FD0", marginBottom: "1rem", textTransform: "uppercase", letterSpacing: "0.5px" },
+  diaRow: { display: "flex", alignItems: "center", gap: "8px", padding: "9px 8px", borderRadius: "8px", flexWrap: "wrap", transition: "background 0.15s" },
   diaNombre: { fontSize: "13px", fontWeight: "500", color: "#2A1845", minWidth: "90px" },
   diaNombreOff: { fontSize: "13px", fontWeight: "500", color: "#C4A8D8", minWidth: "90px" },
   select: { fontSize: "12px", padding: "5px 8px", border: "0.5px solid #E0D0F0", borderRadius: "7px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -22,14 +24,16 @@ const s = {
   inputFull: { fontSize: "13px", padding: "10px 12px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" },
   trashBtn: { width: "26px", height: "26px", borderRadius: "6px", border: "0.5px solid #F0D0D8", background: "#FEF0F3", cursor: "pointer", color: "#C06080", fontSize: "13px" },
   addBtn: { display: "inline-flex", alignItems: "center", gap: "6px", padding: "7px 14px", background: "#fff", color: "#9B72C0", border: "0.5px solid #C4A8D8", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", marginTop: "10px" },
-  saveBtn: { padding: "9px 24px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  saveBtnOk: { padding: "9px 24px", background: "#3B6D11", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  saveBtn: { padding: "9px 24px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" },
+  saveBtnOk: { padding: "9px 24px", background: "#3B6D11", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(59,109,17,0.3)" },
+  label: { fontSize: "11px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" },
   pausaSub: { fontSize: "12px", color: "#9B72C0" },
   inputSm: { fontSize: "13px", padding: "6px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "70px" },
   loadingText: { fontSize: "13px", color: "#B89FD0", padding: "1rem 0" },
   metodoBtn: { flex: 1, padding: "12px", borderRadius: "10px", border: "0.5px solid #E0D0F0", fontSize: "13px", cursor: "pointer", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif", textAlign: "center" },
   metodoBtnActive: { flex: 1, padding: "12px", borderRadius: "10px", border: "2px solid #9B72C0", fontSize: "13px", cursor: "pointer", background: "#EDE8FA", color: "#3B2460", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif", textAlign: "center" },
   infoBox: { background: "#F8F4FC", borderRadius: "8px", padding: "10px 12px", fontSize: "12px", color: "#5C3F99", borderLeft: "3px solid #C4A8D8" },
+  pausaCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)", display: "flex", alignItems: "center", gap: "12px" },
 };
 
 const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -198,9 +202,16 @@ export default function Configuracion() {
   const cycleModalidad = (i) => { const order = ["presencial","virtual","ambas"]; const d = [...dias]; d[i].modalidad = order[(order.indexOf(d[i].modalidad)+1)%order.length]; setDias(d); };
   const cycleServicioMod = (i) => { const order = ["presencial","virtual","ambas"]; const sv = [...servicios]; sv[i].modalidad = order[(order.indexOf(sv[i].modalidad)+1)%order.length]; setServicios(sv); };
 
+  const tabLabels = { disponibilidad: "Disponibilidad", servicios: "Servicios", pausas: "Pausas", pagos: "Pagos", profesionales: "Profesionales", cuenta: "Cuenta" };
+
   return (
     <div style={s.main}>
-      <div style={s.title}>Configuración</div>
+      <div style={s.topbar}>
+        <div>
+          <div style={s.title}>Configuración</div>
+          <div style={s.titleSub}>{tabLabels[tab]}</div>
+        </div>
+      </div>
       <div style={s.tabs}>
         {["disponibilidad","servicios","pausas","pagos","profesionales","cuenta"].map(t => (
           <button key={t} style={tab === t ? s.tabActive : s.tab} onClick={() => setTab(t)}>
@@ -216,7 +227,7 @@ export default function Configuracion() {
               <div style={s.card}>
                 <div style={s.cardTitle}>Días y horarios de atención</div>
                 {diasSemana.map((dia, i) => (
-                  <div key={dia} style={{ ...s.diaRow, borderBottom: i === 6 ? "none" : "0.5px solid #F0E8F8" }}>
+                  <div key={dia} style={s.diaRow} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <div onClick={() => toggleDia(i)} style={{ width: "36px", height: "20px", borderRadius: "20px", background: dias[i].activo ? "#9B72C0" : "#E0D0F0", position: "relative", cursor: "pointer", flexShrink: 0 }}>
                       <div style={{ position: "absolute", width: "14px", height: "14px", borderRadius: "50%", background: "#fff", top: "3px", left: dias[i].activo ? "19px" : "3px", transition: "0.2s" }}></div>
                     </div>
@@ -278,17 +289,17 @@ export default function Configuracion() {
           {tab === "pausas" && (
             <>
               {[
-                { key: "pausa", label: "Pausa entre sesiones", sub: "Tiempo bloqueado entre turno y turno", unit: "min" },
-                { key: "anticipacion", label: "Anticipación mínima", sub: "Horas antes en que puede reservar un cliente", unit: "hs" },
-                { key: "cancelacion", label: "Plazo de cancelación", sub: "Horas antes del turno para cancelar con reembolso", unit: "hs" },
+                { key: "pausa", label: "Pausa entre sesiones", sub: "Tiempo bloqueado entre turno y turno", unit: "min", color: "#9B72C0" },
+                { key: "anticipacion", label: "Anticipación mínima", sub: "Horas antes en que puede reservar un cliente", unit: "hs", color: "#F59E0B" },
+                { key: "cancelacion", label: "Plazo de cancelación", sub: "Horas antes del turno para cancelar con reembolso", unit: "hs", color: "#63B522" },
               ].map(f => (
-                <div key={f.key} style={s.card}>
-                  <div style={s.cardTitle}>{f.label}</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <div style={{ flex: 1 }}><div style={s.pausaSub}>{f.sub}</div></div>
-                    <input type="number" value={pausas[f.key]} onChange={e => setPausas({...pausas,[f.key]:e.target.value})} style={s.inputSm} />
-                    <span style={{ fontSize: "13px", color: "#9B72C0" }}>{f.unit}</span>
+                <div key={f.key} style={s.pausaCard}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ ...s.label, color: f.color }}>{f.label}</div>
+                    <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "3px" }}>{f.sub}</div>
                   </div>
+                  <input type="number" value={pausas[f.key]} onChange={e => setPausas({...pausas,[f.key]:e.target.value})} style={s.inputSm} />
+                  <span style={{ fontSize: "13px", color: f.color, fontWeight: "500", minWidth: "24px" }}>{f.unit}</span>
                 </div>
               ))}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -308,7 +319,8 @@ export default function Configuracion() {
                 </div>
                 {(pagos.metodo === "transferencia" || pagos.metodo === "ambos") && (
                   <>
-                    <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px" }}>Pesos (ARS)</div>
+                    <div style={s.label}>Pesos (ARS)</div>
+                  <div style={{ marginBottom: "6px" }}></div>
                     <div style={{ marginBottom: "10px" }}>
                       <div style={s.pausaSub}>Alias</div>
                       <input type="text" value={pagos.alias} onChange={e => setPagos({...pagos,alias:e.target.value})} placeholder="tu.alias.banco" style={{...s.inputFull, marginTop: "4px"}} />
@@ -318,7 +330,8 @@ export default function Configuracion() {
                       <input type="text" value={pagos.cbu} onChange={e => setPagos({...pagos,cbu:e.target.value})} placeholder="0000000000000000000000" style={{...s.inputFull, marginTop: "4px"}} />
                     </div>
                     <div style={{ borderTop: "0.5px solid #F0E8F8", paddingTop: "16px", marginBottom: "10px" }}>
-                      <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px" }}>Dólares (USD)</div>
+                      <div style={s.label}>Dólares (USD)</div>
+                      <div style={{ marginBottom: "6px" }}></div>
                       <div style={{ marginBottom: "10px" }}>
                         <div style={s.pausaSub}>Alias USD</div>
                         <input type="text" value={pagos.alias_usd} onChange={e => setPagos({...pagos,alias_usd:e.target.value})} placeholder="tu.alias.usd" style={{...s.inputFull, marginTop: "4px"}} />
@@ -329,7 +342,8 @@ export default function Configuracion() {
                       </div>
                     </div>
                     <div style={{ borderTop: "0.5px solid #F0E8F8", paddingTop: "16px", marginBottom: "10px" }}>
-                      <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px" }}>Euros (EUR)</div>
+                      <div style={s.label}>Euros (EUR)</div>
+                      <div style={{ marginBottom: "6px" }}></div>
                       <div style={{ marginBottom: "10px" }}>
                         <div style={s.pausaSub}>Alias EUR</div>
                         <input type="text" value={pagos.alias_eur} onChange={e => setPagos({...pagos,alias_eur:e.target.value})} placeholder="tu.alias.eur" style={{...s.inputFull, marginTop: "4px"}} />
@@ -360,7 +374,7 @@ export default function Configuracion() {
                 {profesionales.length === 0 ? (
                   <div style={{ fontSize: "13px", color: "#B89FD0", padding: "0.5rem 0" }}>No hay profesionales registrados</div>
                 ) : profesionales.map((p, i) => (
-                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 0", borderBottom: i === profesionales.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
+                  <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", transition: "background 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                     <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#C4A8D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#3B2460", fontWeight: "600", flexShrink: 0 }}>
                       {p.full_name.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
                     </div>
