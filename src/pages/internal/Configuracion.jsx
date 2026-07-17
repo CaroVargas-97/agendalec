@@ -69,6 +69,8 @@ export default function Configuracion() {
   const [contactoMsg, setContactoMsg] = useState("");
   const [reservasForm, setReservasForm] = useState({ desde: "", hasta: "" });
   const [reservasMsg, setReservasMsg] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [inviteMsg, setInviteMsg] = useState("");
 
   const cargarProfesionales = async () => {
     const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
@@ -101,6 +103,8 @@ export default function Configuracion() {
       if (prof?.full_name) setNombreForm(prof.full_name);
       if (prof) setContactoForm({ phone: prof.phone || "", address: prof.address || "" });
       if (prof) setReservasForm({ desde: prof.reservas_desde || "", hasta: prof.reservas_hasta || "" });
+      const { data: cfg } = await supabase.from("app_config").select("value").eq("key", "invite_code").maybeSingle();
+      if (cfg) setInviteCode(cfg.value || "");
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid).eq("active", true);
       if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS", requiresSlot: sv.requires_slot !== false })));
@@ -431,6 +435,23 @@ export default function Configuracion() {
                     if (error) setNombreMsg("Error al guardar");
                     else { setNombreMsg("✓ Nombre actualizado"); setTimeout(() => setNombreMsg(""), 2000); }
                   }}>Guardar nombre</button>
+                </div>
+              </div>
+            </div>
+            <div style={s.card}>
+              <div style={s.cardTitle}>Código de acceso</div>
+              <div style={{ fontSize: "12px", color: "#B89FD0", marginBottom: "8px" }}>Solo quien tenga este código puede crear una cuenta de profesional.</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div>
+                  <div style={s.pausaSub}>Código</div>
+                  <input value={inviteCode} onChange={e => setInviteCode(e.target.value)} placeholder="ej: CocinasPRO2025" style={{...s.inputFull, marginTop: "4px"}} />
+                </div>
+                {inviteMsg && <div style={{ fontSize: "12px", color: inviteMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D" }}>{inviteMsg}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={s.saveBtn} onClick={async () => {
+                    await supabase.from("app_config").update({ value: inviteCode }).eq("key", "invite_code");
+                    setInviteMsg("✓ Código actualizado"); setTimeout(() => setInviteMsg(""), 2000);
+                  }}>Guardar código</button>
                 </div>
               </div>
             </div>

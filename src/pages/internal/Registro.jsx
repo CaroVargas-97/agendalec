@@ -57,6 +57,7 @@ export default function Registro({ onLogin }) {
   const [nombre, setNombre] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [codigo, setCodigo] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -65,6 +66,13 @@ export default function Registro({ onLogin }) {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    const { data: cfg } = await supabase.from("app_config").select("value").eq("key", "invite_code").maybeSingle();
+    if (!cfg?.value || codigo.trim() !== cfg.value.trim()) {
+      setError("Código de acceso incorrecto.");
+      setLoading(false);
+      return;
+    }
 
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
@@ -149,6 +157,17 @@ export default function Registro({ onLogin }) {
                 style={styles.input}
                 required
                 minLength={6}
+              />
+            </div>
+            <div style={styles.field}>
+              <label style={styles.label}>Código de acceso</label>
+              <input
+                type="text"
+                value={codigo}
+                onChange={(e) => setCodigo(e.target.value)}
+                placeholder="Ingresá el código"
+                style={styles.input}
+                required
               />
             </div>
             {error && <div style={styles.error}>{error}</div>}
