@@ -1,45 +1,54 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 
+const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
+
 const s = {
-  main: { padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  title: { fontSize: "15px", fontWeight: "500", color: "#2A1845" },
+  main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  topbar: { display: "flex", alignItems: "flex-start", justifyContent: "space-between" },
+  title: { fontSize: "18px", fontWeight: "500", color: "#2A1845" },
+  titleSub: { fontSize: "13px", color: "#9B72C0", marginTop: "3px" },
   tabs: { display: "flex", gap: "6px" },
   tab: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   tabActive: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#EDE8FA", color: "#3B2460", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  metrics: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px" },
-  metricCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem" },
-  metricLabel: { fontSize: "12px", color: "#B89FD0", marginBottom: "6px" },
-  metricValue: { fontSize: "24px", fontWeight: "500", color: "#2A1845" },
-  metricSub: { fontSize: "12px", color: "#C4A8D8", marginTop: "4px" },
+  metrics: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" },
+  metricCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.1rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  metricSub: { fontSize: "11px", color: "#B89FD0", marginTop: "4px" },
   grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" },
-  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.25rem" },
-  cardTitle: { fontSize: "14px", fontWeight: "500", color: "#2A1845", marginBottom: "1rem" },
-  rowItem: { display: "flex", alignItems: "center", gap: "10px", padding: "10px 0", borderBottom: "0.5px solid #F0E8F8" },
+  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.25rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  cardTitle: { fontSize: "11px", fontWeight: "500", color: "#B89FD0", marginBottom: "1rem", textTransform: "uppercase", letterSpacing: "0.5px" },
+  rowItem: { display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", marginBottom: "2px", transition: "background 0.15s" },
   rowName: { fontSize: "13px", fontWeight: "500", color: "#2A1845", flex: 1 },
   rowValue: { fontSize: "13px", color: "#5C3F99", fontWeight: "500" },
   rowSub: { fontSize: "11px", color: "#B89FD0" },
-  bar: { height: "6px", borderRadius: "3px", background: "#EDE8FA", overflow: "hidden", marginTop: "4px" },
-  barFill: { height: "100%", background: "#9B72C0" },
-  modBar: { height: "20px", borderRadius: "10px", display: "flex", overflow: "hidden", marginTop: "8px" },
+  bar: { height: "5px", borderRadius: "3px", background: "#F0E8F8", overflow: "hidden", marginTop: "5px" },
+  modBar: { height: "22px", borderRadius: "11px", display: "flex", overflow: "hidden", marginTop: "8px" },
   modV: { background: "#9B72C0", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", fontWeight: "500" },
   modP: { background: "#E88BB0", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", fontWeight: "500" },
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "1rem 0" },
 };
 
+const metricsDef = [
+  { key: "totalSesiones", label: "Sesiones", color: "#9B72C0", sub: "realizadas" },
+  { key: "ingresos",      label: "Ingresos",  color: "#63B522", sub: "total facturado" },
+  { key: "clientesUnicos",label: "Clientes únicos", color: "#F59E0B", sub: "distintos" },
+  { key: "promedioSesion",label: "Precio promedio", color: "#EC4899", sub: "por sesión" },
+];
+
+const periodos = [
+  { key: "semana", label: "Semana" },
+  { key: "mes",    label: "Mes" },
+  { key: "trimestre", label: "3 meses" },
+  { key: "año",    label: "Año" },
+];
+
 export default function Estadisticas() {
   const [periodo, setPeriodo] = useState("mes");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalSesiones: 0,
-    ingresoTotal: 0,
-    ingresoByCurrency: {},
-    clientesUnicos: 0,
-    promedioSesion: 0,
-    servicios: [],
-    modalidad: { virtual: 0, presencial: 0 },
-    topClientes: [],
-    diasPopulares: [],
+    totalSesiones: 0, ingresoTotal: 0, ingresoByCurrency: {},
+    clientesUnicos: 0, promedioSesion: 0, servicios: [],
+    modalidad: { virtual: 0, presencial: 0 }, topClientes: [], diasPopulares: [],
   });
 
   const cargar = async () => {
@@ -54,7 +63,6 @@ export default function Estadisticas() {
     else if (periodo === "mes") desde.setMonth(hoy.getMonth() - 1);
     else if (periodo === "trimestre") desde.setMonth(hoy.getMonth() - 3);
     else if (periodo === "año") desde.setFullYear(hoy.getFullYear() - 1);
-
     const desdeISO = desde.toISOString().split("T")[0];
 
     const { data: appts } = await supabase
@@ -69,15 +77,14 @@ export default function Estadisticas() {
     const clientesSet = new Set(sesiones.map(a => a.client_id));
     const clientesUnicos = clientesSet.size;
 
-    // Group income by currency
     const ingresoByCurrency = {};
     sesiones.forEach(a => {
       const cur = a.services?.currency || "ARS";
       ingresoByCurrency[cur] = (ingresoByCurrency[cur] || 0) + parseFloat(a.total_price || 0);
     });
     const ingresoARS = ingresoByCurrency["ARS"] || 0;
-    const ingresoTotal = ingresoARS;
-    const promedioSesion = totalSesiones > 0 ? Math.round(ingresoARS / Math.max(sesiones.filter(a => !a.services?.currency || a.services?.currency === "ARS").length, 1)) : 0;
+    const arsCount = sesiones.filter(a => !a.services?.currency || a.services?.currency === "ARS").length;
+    const promedioSesion = arsCount > 0 ? Math.round(ingresoARS / arsCount) : 0;
 
     const servMap = {};
     sesiones.forEach(a => {
@@ -86,8 +93,7 @@ export default function Estadisticas() {
       servMap[n].count++;
       servMap[n].total += parseFloat(a.total_price || 0);
     });
-    const servicios = Object.entries(servMap).map(([nombre, v]) => ({ nombre, ...v }))
-      .sort((a, b) => b.count - a.count);
+    const servicios = Object.entries(servMap).map(([nombre, v]) => ({ nombre, ...v })).sort((a, b) => b.count - a.count);
 
     const virtual = sesiones.filter(a => a.modality === "virtual").length;
     const presencial = sesiones.filter(a => a.modality === "presencial").length;
@@ -105,37 +111,50 @@ export default function Estadisticas() {
     const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
     const diaMap = {};
     sesiones.forEach(a => {
-      const d = new Date(a.date).getDay();
-      const n = dias[d];
+      const n = dias[new Date(a.date).getDay()];
       diaMap[n] = (diaMap[n] || 0) + 1;
     });
-    const diasPopulares = Object.entries(diaMap).map(([dia, count]) => ({ dia, count }))
-      .sort((a, b) => b.count - a.count);
+    const diasPopulares = Object.entries(diaMap).map(([dia, count]) => ({ dia, count })).sort((a, b) => b.count - a.count);
 
-    setStats({ totalSesiones, ingresoTotal, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares });
+    setStats({ totalSesiones, ingresoTotal: ingresoARS, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares });
     setLoading(false);
   };
 
-  useEffect(() => { cargar(); }, [periodo]); // eslint-disable-line react-hooks/set-state-in-effect
+  useEffect(() => { cargar(); }, [periodo]);
 
   const totalMod = stats.modalidad.virtual + stats.modalidad.presencial;
   const pctV = totalMod > 0 ? Math.round((stats.modalidad.virtual / totalMod) * 100) : 0;
   const pctP = totalMod > 0 ? Math.round((stats.modalidad.presencial / totalMod) * 100) : 0;
-
   const maxServ = Math.max(...stats.servicios.map(s => s.count), 1);
   const maxDia = Math.max(...stats.diasPopulares.map(d => d.count), 1);
 
+  const periodoLabel = { semana: "última semana", mes: "último mes", trimestre: "últimos 3 meses", año: "último año" }[periodo];
+
+  const metricValues = {
+    totalSesiones: stats.totalSesiones,
+    ingresos: Object.entries(stats.ingresoByCurrency || {}).length === 0
+      ? "$0"
+      : Object.entries(stats.ingresoByCurrency).map(([cur, val]) => {
+          const sym = cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+          return `${sym}${val.toLocaleString("es-AR")}`;
+        }).join(" · "),
+    clientesUnicos: stats.clientesUnicos,
+    promedioSesion: `$${stats.promedioSesion.toLocaleString("es-AR")}`,
+  };
+
+  const barColors = ["#9B72C0", "#C4A8D8", "#D8B8E8", "#EDE8FA"];
+
   return (
     <div style={s.main}>
-      <div style={s.title}>Estadísticas</div>
+      <div style={s.topbar}>
+        <div>
+          <div style={s.title}>Estadísticas</div>
+          <div style={s.titleSub}>{periodoLabel} · {stats.totalSesiones} sesiones</div>
+        </div>
+      </div>
 
       <div style={s.tabs}>
-        {[
-          { key: "semana", label: "Última semana" },
-          { key: "mes", label: "Último mes" },
-          { key: "trimestre", label: "3 meses" },
-          { key: "año", label: "Año" },
-        ].map(p => (
+        {periodos.map(p => (
           <button key={p.key} style={periodo === p.key ? s.tabActive : s.tab} onClick={() => setPeriodo(p.key)}>
             {p.label}
           </button>
@@ -147,44 +166,29 @@ export default function Estadisticas() {
       ) : (
         <>
           <div style={s.metrics}>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>Sesiones</div>
-              <div style={s.metricValue}>{stats.totalSesiones}</div>
-              <div style={s.metricSub}>realizadas</div>
-            </div>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>Ingresos</div>
-              {Object.entries(stats.ingresoByCurrency || {}).length === 0 ? (
-                <div style={s.metricValue}>$0</div>
-              ) : Object.entries(stats.ingresoByCurrency).map(([cur, val]) => {
-                const sym = cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
-                return <div key={cur} style={s.metricValue}>{sym}{val.toLocaleString("es-AR")}</div>;
-              })}
-              <div style={s.metricSub}>total facturado</div>
-            </div>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>Clientes únicos</div>
-              <div style={s.metricValue}>{stats.clientesUnicos}</div>
-              <div style={s.metricSub}>distintos</div>
-            </div>
-            <div style={s.metricCard}>
-              <div style={s.metricLabel}>Precio promedio</div>
-              <div style={s.metricValue}>${stats.promedioSesion.toLocaleString("es-AR")}</div>
-              <div style={s.metricSub}>por sesión</div>
-            </div>
+            {metricsDef.map(m => (
+              <div key={m.key} style={s.metricCard}>
+                <div style={{ fontSize: "11px", color: m.color, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</div>
+                <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
+                <div style={s.metricSub}>{m.sub}</div>
+                <div style={{ width: "28px", height: "3px", background: m.color, borderRadius: "2px", marginTop: "10px" }}></div>
+              </div>
+            ))}
           </div>
 
           <div style={s.grid}>
             <div style={s.card}>
               <div style={s.cardTitle}>Servicios más solicitados</div>
               {stats.servicios.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.servicios.map((sv, i) => (
-                <div key={i} style={{ ...s.rowItem, borderBottom: i === stats.servicios.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
+                <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <div style={{ flex: 1 }}>
                     <div style={s.rowName}>{sv.nombre}</div>
-                    <div style={s.bar}><div style={{ ...s.barFill, width: `${(sv.count / maxServ) * 100}%` }}></div></div>
+                    <div style={s.bar}>
+                      <div style={{ height: "100%", width: `${(sv.count / maxServ) * 100}%`, background: barColors[i % barColors.length], borderRadius: "3px" }}></div>
+                    </div>
                   </div>
                   <div style={{ textAlign: "right", minWidth: "80px" }}>
-                    <div style={s.rowValue}>{sv.count} sesiones</div>
+                    <div style={s.rowValue}>{sv.count} ses.</div>
                     <div style={s.rowSub}>${sv.total.toLocaleString("es-AR")}</div>
                   </div>
                 </div>
@@ -199,9 +203,15 @@ export default function Estadisticas() {
                     {pctV > 0 && <div style={{ ...s.modV, width: `${pctV}%` }}>{pctV}%</div>}
                     {pctP > 0 && <div style={{ ...s.modP, width: `${pctP}%` }}>{pctP}%</div>}
                   </div>
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "12px", fontSize: "12px" }}>
-                    <div><span style={{ color: "#5C3F99", fontWeight: "500" }}>Virtual</span><br /><span style={{ color: "#B89FD0" }}>{stats.modalidad.virtual} sesiones</span></div>
-                    <div style={{ textAlign: "right" }}><span style={{ color: "#A0407A", fontWeight: "500" }}>Presencial</span><br /><span style={{ color: "#B89FD0" }}>{stats.modalidad.presencial} sesiones</span></div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: "16px" }}>
+                    <div style={{ background: "#F3EEFF", borderRadius: "10px", padding: "10px 14px", flex: 1, marginRight: "6px" }}>
+                      <div style={{ fontSize: "22px", fontWeight: "500", color: "#5C3F99" }}>{stats.modalidad.virtual}</div>
+                      <div style={{ fontSize: "11px", color: "#9B72C0", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Virtual</div>
+                    </div>
+                    <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", flex: 1, marginLeft: "6px" }}>
+                      <div style={{ fontSize: "22px", fontWeight: "500", color: "#A0407A" }}>{stats.modalidad.presencial}</div>
+                      <div style={{ fontSize: "11px", color: "#E88BB0", marginTop: "2px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Presencial</div>
+                    </div>
                   </div>
                 </>
               )}
@@ -210,13 +220,13 @@ export default function Estadisticas() {
             <div style={s.card}>
               <div style={s.cardTitle}>Top clientes</div>
               {stats.topClientes.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.topClientes.map((c, i) => (
-                <div key={i} style={{ ...s.rowItem, borderBottom: i === stats.topClientes.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
-                  <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#C4A8D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "#3B2460", fontWeight: "500" }}>
+                <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "#3B2460", fontWeight: "500", flexShrink: 0 }}>
                     {c.nombre.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
                   </div>
                   <div style={s.rowName}>{c.nombre}</div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={s.rowValue}>{c.count} sesiones</div>
+                    <div style={s.rowValue}>{c.count} ses.</div>
                     <div style={s.rowSub}>${c.total.toLocaleString("es-AR")}</div>
                   </div>
                 </div>
@@ -226,12 +236,14 @@ export default function Estadisticas() {
             <div style={s.card}>
               <div style={s.cardTitle}>Días más activos</div>
               {stats.diasPopulares.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.diasPopulares.map((d, i) => (
-                <div key={i} style={{ ...s.rowItem, borderBottom: i === stats.diasPopulares.length - 1 ? "none" : "0.5px solid #F0E8F8" }}>
+                <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <div style={{ flex: 1 }}>
                     <div style={s.rowName}>{d.dia}</div>
-                    <div style={s.bar}><div style={{ ...s.barFill, width: `${(d.count / maxDia) * 100}%` }}></div></div>
+                    <div style={s.bar}>
+                      <div style={{ height: "100%", width: `${(d.count / maxDia) * 100}%`, background: barColors[i % barColors.length], borderRadius: "3px" }}></div>
+                    </div>
                   </div>
-                  <div style={s.rowValue}>{d.count}</div>
+                  <div style={{ ...s.rowValue, minWidth: "36px", textAlign: "right" }}>{d.count}</div>
                 </div>
               ))}
             </div>
