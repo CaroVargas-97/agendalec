@@ -132,6 +132,7 @@ export default function Reserva() {
   }, [dia, profData, mesActual]);
 
   const srv = servicios.find(s => s.id === servicio);
+  const esACoorinar = srv?.requires_slot === false;
   const total = srv?.price || 0;
   const sena = Math.round(total / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
@@ -215,14 +216,19 @@ export default function Reserva() {
         clienteId = nuevoCliente.id;
       }
 
-      const [h, m] = hora.split(":").map(Number);
-      const endH = h + Math.floor((m + srv.duration_minutes) / 60);
-      const endM = (m + srv.duration_minutes) % 60;
-      const endTime = `${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}`;
+      let endTime = null;
+      if (!esACoorinar && hora) {
+        const [h, m] = hora.split(":").map(Number);
+        const endH = h + Math.floor((m + srv.duration_minutes) / 60);
+        const endM = (m + srv.duration_minutes) % 60;
+        endTime = `${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}`;
+      }
 
       const { data: turno } = await supabase.from("appointments").insert({
         professional_id: profData.id, client_id: clienteId, service_id: srv.id,
-        date: fechaStr, start_time: hora, end_time: endTime,
+        date: esACoorinar ? null : fechaStr,
+        start_time: esACoorinar ? null : hora,
+        end_time: endTime,
         modality: modalidad || srv.modality, status: "pending", total_price: total
       }).select("id").single();
 
@@ -319,7 +325,7 @@ export default function Reserva() {
           {prof && loadingServicios && <div style={s.loadingText}>Cargando servicios...</div>}
           {prof && !loadingServicios && servicios.length === 0 && <div style={s.loadingText}>Este profesional no tiene servicios disponibles.</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <button style={{ ...s.btnNext, background: prof && servicio ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio} onClick={() => setStep(2)}>
+            <button style={{ ...s.btnNext, background: prof && servicio ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio} onClick={() => esACoorinar ? setStep(3) : setStep(2)}>
               Continuar
             </button>
             <a href="/" style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", textDecoration: "none", display: "block", textAlign: "center", boxSizing: "border-box" }}>← Volver al inicio</a>
@@ -426,9 +432,17 @@ export default function Reserva() {
             <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{srv?.name} · {srv?.duration_minutes} min</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
             {profData?.phone && <div style={s.resRow}><span style={s.resLabel}>Teléfono</span><span style={s.resValor}>{profData.phone}</span></div>}
-            <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Modalidad</span><span style={s.resValor}>{modalidad === "virtual" ? "📹 Virtual" : "📍 Presencial"}</span></div>
-            {modalidad === "presencial" && profData?.address && <div style={s.resRow}><span style={s.resLabel}>Dirección</span><span style={s.resValor}>{profData.address}</span></div>}
+            {esACoorinar ? (
+              <div style={{ background: "#EDE8FA", borderRadius: "8px", padding: "10px 12px", fontSize: "12px", color: "#5C3F99" }}>
+                📅 El equipo de {prof} se comunicará a la brevedad para coordinar el horario.
+              </div>
+            ) : (
+              <>
+                <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
+                <div style={s.resRow}><span style={s.resLabel}>Modalidad</span><span style={s.resValor}>{modalidad === "virtual" ? "📹 Virtual" : "📍 Presencial"}</span></div>
+                {modalidad === "presencial" && profData?.address && <div style={s.resRow}><span style={s.resLabel}>Dirección</span><span style={s.resValor}>{profData.address}</span></div>}
+              </>
+            )}
             <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "2px" }}>
               <div style={s.resRow}><span style={s.resLabel}>Precio total</span><span style={s.resValor}>{sym}{total.toLocaleString("es-AR")}</span></div>
               <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña ahora (50%)</span><span style={s.resSeña}>{sym}{sena.toLocaleString("es-AR")}</span></div>
