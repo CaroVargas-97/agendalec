@@ -292,7 +292,7 @@ export default function Reserva() {
                     <span>{sv.duration_minutes} min</span>
                     {sv.modality === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
                     {sv.modality === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
-                    {sv.modality === "ambas" && <><span style={s.tagV}>📹 Virtual</span><span style={s.tagP}>📍 Presencial</span></>}
+                    {sv.modality === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
                   </div>
                 </div>
               ))}
