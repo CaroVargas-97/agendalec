@@ -99,7 +99,7 @@ export default function Configuracion() {
       if (prof?.full_name) setNombreForm(prof.full_name);
       if (prof) setContactoForm({ phone: prof.phone || "", address: prof.address || "" });
 
-      const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid);
+      const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid).eq("active", true);
       if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS" })));
 
       const { data: avail } = await supabase.from("availability").select("*").eq("professional_id", uid).order("day_of_week");
