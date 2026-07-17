@@ -2,58 +2,58 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 
 const s = {
-  wrap: { minHeight: "100vh", background: "#F8F4FC", fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "1.5rem 1rem" },
+  wrap: { minHeight: "100vh", background: "#F3EEFF", fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "1.5rem 1rem" },
   header: { width: "100%", maxWidth: "480px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" },
   logo: { fontSize: "17px", fontWeight: "500", color: "#3B2460" },
-  stepIndicator: { display: "flex", alignItems: "center", gap: "4px" },
-  stepDot: { width: "6px", height: "6px", borderRadius: "50%", background: "#E0D0F0" },
-  stepDotActive: { width: "18px", height: "6px", borderRadius: "3px", background: "#9B72C0" },
-  stepDotDone: { width: "6px", height: "6px", borderRadius: "50%", background: "#C4A8D8" },
-  card: { background: "#fff", borderRadius: "16px", border: "0.5px solid #E0D0F0", padding: "1.5rem", width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", gap: "1rem" },
-  title: { fontSize: "16px", fontWeight: "500", color: "#2A1845" },
+  logoSub: { fontSize: "10px", color: "#9B72C0", marginTop: "1px" },
+  stepIndicator: { display: "flex", alignItems: "center", gap: "5px" },
+  stepDot: { width: "7px", height: "7px", borderRadius: "50%", background: "#D8C8EE" },
+  stepDotActive: { width: "22px", height: "7px", borderRadius: "4px", background: "#9B72C0" },
+  stepDotDone: { width: "7px", height: "7px", borderRadius: "50%", background: "#C4A8D8" },
+  card: { background: "#fff", borderRadius: "20px", border: "0.5px solid #E0D0F0", padding: "1.5rem", width: "100%", maxWidth: "480px", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: "0 8px 32px rgba(42,24,69,0.10)" },
+  title: { fontSize: "17px", fontWeight: "500", color: "#2A1845" },
   sub: { fontSize: "13px", color: "#9B72C0", marginTop: "2px" },
-  profCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "12px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
-  profCardSelected: { background: "#F3EEFA", borderRadius: "12px", border: "0.5px solid #9B72C0", padding: "12px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" },
+  profCard: { background: "#FDFAFF", borderRadius: "12px", border: "0.5px solid #E8D8F8", padding: "12px 14px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", transition: "all 0.15s" },
+  profCardSelected: { background: "#EDE8FA", borderRadius: "12px", border: "1.5px solid #9B72C0", padding: "12px 14px", display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", boxShadow: "0 2px 10px rgba(155,114,192,0.15)" },
   avatar: { width: "40px", height: "40px", borderRadius: "50%", background: "#C4A8D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "500", color: "#3B2460", flexShrink: 0 },
-  servicioCard: { background: "#fff", borderRadius: "10px", border: "0.5px solid #E0D0F0", padding: "10px 12px", cursor: "pointer", marginBottom: "6px" },
-  servicioCardSelected: { background: "#F3EEFA", borderRadius: "10px", border: "0.5px solid #9B72C0", padding: "10px 12px", cursor: "pointer", marginBottom: "6px" },
+  servicioCard: { background: "#FDFAFF", borderRadius: "10px", border: "0.5px solid #E8D8F8", padding: "11px 14px", cursor: "pointer", marginBottom: "6px", transition: "all 0.15s" },
+  servicioCardSelected: { background: "#EDE8FA", borderRadius: "10px", border: "1.5px solid #9B72C0", padding: "11px 14px", cursor: "pointer", marginBottom: "6px", boxShadow: "0 2px 10px rgba(155,114,192,0.15)" },
   srvTop: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   srvNombre: { fontSize: "13px", fontWeight: "500", color: "#2A1845" },
-  srvPrecio: { fontSize: "13px", fontWeight: "500", color: "#7B5EA7" },
-  srvDet: { fontSize: "11px", color: "#9B72C0", marginTop: "3px", display: "flex", gap: "8px" },
+  srvPrecio: { fontSize: "14px", fontWeight: "500", color: "#7B5EA7" },
+  srvDet: { fontSize: "11px", color: "#9B72C0", marginTop: "4px", display: "flex", gap: "8px" },
   tagV: { fontSize: "10px", padding: "2px 7px", borderRadius: "10px", background: "#EDE8FA", color: "#5C3F99" },
   tagP: { fontSize: "10px", padding: "2px 7px", borderRadius: "10px", background: "#FDE8F0", color: "#A0407A" },
-  calHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" },
+  calHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "10px" },
   calGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px" },
-  calDayName: { fontSize: "10px", color: "#C4A8D8", textAlign: "center", padding: "2px 0" },
-  calDay: { height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#2A1845", cursor: "pointer", background: "#fff", border: "0.5px solid #F0E8F8" },
-  calDayOff: { height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#E0D0F0", background: "transparent", border: "none" },
-  calDaySelected: { height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#fff", background: "#9B72C0", border: "0.5px solid #9B72C0", cursor: "pointer" },
-  calDayToday: { height: "36px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#7B5EA7", fontWeight: "500", background: "#fff", border: "0.5px solid #9B72C0", cursor: "pointer" },
+  calDayName: { fontSize: "10px", color: "#C4A8D8", textAlign: "center", padding: "3px 0", textTransform: "uppercase", letterSpacing: "0.3px" },
+  calDay: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#2A1845", cursor: "pointer", background: "#FDFAFF", border: "0.5px solid #F0E8F8" },
+  calDayOff: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#E0D0F0", background: "transparent", border: "none" },
+  calDaySelected: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#fff", background: "#9B72C0", border: "none", cursor: "pointer", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" },
+  calDayToday: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#7B5EA7", fontWeight: "600", background: "#fff", border: "1.5px solid #9B72C0", cursor: "pointer" },
   horaGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" },
-  horaBtn: { padding: "9px 4px", borderRadius: "8px", border: "0.5px solid #E0D0F0", fontSize: "13px", textAlign: "center", cursor: "pointer", background: "#fff", color: "#2A1845", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  horaBtnSelected: { padding: "9px 4px", borderRadius: "8px", border: "0.5px solid #9B72C0", fontSize: "13px", textAlign: "center", cursor: "pointer", background: "#9B72C0", color: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  horaBtnOff: { padding: "9px 4px", borderRadius: "8px", border: "0.5px solid #F0E8F8", fontSize: "13px", textAlign: "center", cursor: "not-allowed", background: "#F8F4FC", color: "#D0C0E0", fontFamily: "'Plus Jakarta Sans', sans-serif", textDecoration: "line-through" },
-  modBtn: { flex: 1, padding: "10px", borderRadius: "8px", border: "0.5px solid #E0D0F0", fontSize: "13px", cursor: "pointer", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  modBtnP: { flex: 1, padding: "10px", borderRadius: "8px", border: "2px solid #E88BB0", fontSize: "13px", cursor: "pointer", background: "#FDE8F0", color: "#A0407A", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  modBtnV: { flex: 1, padding: "10px", borderRadius: "8px", border: "2px solid #9B72C0", fontSize: "13px", cursor: "pointer", background: "#EDE8FA", color: "#5C3F99", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  horaBtn: { padding: "10px 4px", borderRadius: "8px", border: "0.5px solid #E8D8F8", fontSize: "13px", textAlign: "center", cursor: "pointer", background: "#FDFAFF", color: "#2A1845", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  horaBtnSelected: { padding: "10px 4px", borderRadius: "8px", border: "none", fontSize: "13px", textAlign: "center", cursor: "pointer", background: "#9B72C0", color: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.3)" },
+  horaBtnOff: { padding: "10px 4px", borderRadius: "8px", border: "0.5px solid #F0E8F8", fontSize: "13px", textAlign: "center", cursor: "not-allowed", background: "#F8F4FC", color: "#D0C0E0", fontFamily: "'Plus Jakarta Sans', sans-serif", textDecoration: "line-through" },
+  modBtn: { flex: 1, padding: "11px", borderRadius: "8px", border: "0.5px solid #E0D0F0", fontSize: "13px", cursor: "pointer", background: "#FDFAFF", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  modBtnP: { flex: 1, padding: "11px", borderRadius: "8px", border: "1.5px solid #E88BB0", fontSize: "13px", cursor: "pointer", background: "#FDE8F0", color: "#A0407A", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  modBtnV: { flex: 1, padding: "11px", borderRadius: "8px", border: "1.5px solid #9B72C0", fontSize: "13px", cursor: "pointer", background: "#EDE8FA", color: "#5C3F99", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   field: { display: "flex", flexDirection: "column", gap: "5px" },
-  label: { fontSize: "12px", color: "#9B72C0" },
-  input: { fontSize: "14px", padding: "10px 12px", border: "0.5px solid #E0D0F0", borderRadius: "10px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" },
-  resumenBox: { background: "#F8F4FC", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "7px" },
+  label: { fontSize: "11px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" },
+  input: { fontSize: "14px", padding: "11px 12px", border: "0.5px solid #E0D0F0", borderRadius: "10px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" },
+  resumenBox: { background: "#F8F4FC", borderRadius: "12px", padding: "14px", display: "flex", flexDirection: "column", gap: "8px", border: "0.5px solid #EDE8FA" },
   resRow: { display: "flex", justifyContent: "space-between", fontSize: "13px" },
   resLabel: { color: "#9B72C0" },
   resValor: { color: "#2A1845", fontWeight: "500" },
   resSeña: { color: "#7B5EA7", fontWeight: "500" },
-  btnNext: { width: "100%", padding: "13px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  btnConfirmar: { width: "100%", padding: "13px", background: "#3B2460", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  aliasBox: { background: "#EDE8FA", borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center", textAlign: "center" },
-  aliasTitulo: { fontSize: "13px", color: "#5C3F99", fontWeight: "500" },
-  aliasValor: { fontSize: "22px", fontWeight: "500", color: "#3B2460", letterSpacing: "0.5px" },
+  btnNext: { width: "100%", padding: "13px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 4px 14px rgba(155,114,192,0.35)" },
+  btnConfirmar: { width: "100%", padding: "13px", background: "#3B2460", color: "#fff", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 4px 14px rgba(59,36,96,0.3)" },
+  aliasBox: { background: "linear-gradient(135deg, #EDE8FA 0%, #F3EEFF 100%)", borderRadius: "14px", padding: "18px 16px", display: "flex", flexDirection: "column", gap: "8px", alignItems: "center", textAlign: "center", border: "0.5px solid #D8C8EE" },
+  aliasTitulo: { fontSize: "12px", color: "#5C3F99", fontWeight: "500", textTransform: "uppercase", letterSpacing: "0.4px" },
+  aliasValor: { fontSize: "24px", fontWeight: "500", color: "#3B2460", letterSpacing: "0.5px" },
   aliasCopy: { fontSize: "12px", color: "#9B72C0", cursor: "pointer", textDecoration: "underline" },
-  avisoBox: { background: "#FDE8F0", borderRadius: "10px", padding: "10px 12px", fontSize: "12px", color: "#A0407A" },
-  confirmCircle: { width: "64px", height: "64px", borderRadius: "50%", background: "#EAF3DE", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontSize: "28px" },
-  pendienteCircle: { width: "64px", height: "64px", borderRadius: "50%", background: "#FAEEDA", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontSize: "28px" },
+  avisoBox: { background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A0407A" },
+  pendienteCircle: { width: "72px", height: "72px", borderRadius: "50%", background: "linear-gradient(135deg, #EDE8FA, #F8E8D0)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", fontSize: "30px", boxShadow: "0 4px 16px rgba(155,114,192,0.2)" },
   loadingText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
 };
 
@@ -284,12 +284,17 @@ export default function Reserva() {
   if (reservasCerradas) return (
     <div style={s.wrap}>
       <div style={s.header}>
-        <div style={s.logo}>🗓 AgendaLec</div>
+        <div>
+          <div style={s.logo}>🗓 AgendaLec</div>
+          <div style={s.logoSub}>Gestión de turnos</div>
+        </div>
       </div>
-      <div style={{ background: "#fff", borderRadius: "16px", border: "0.5px solid #E0D0F0", padding: "2rem", textAlign: "center", display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
-        <div style={{ fontSize: "32px" }}>🗓</div>
-        <div style={{ fontSize: "16px", fontWeight: "600", color: "#2A1845" }}>Las reservas están cerradas</div>
-        <div style={{ fontSize: "13px", color: "#B89FD0", lineHeight: "1.6" }}>Por el momento no hay turnos disponibles para reservar. El equipo se comunicará a la brevedad para coordinar tu turno.</div>
+      <div style={{ ...s.card, alignItems: "center", textAlign: "center", gap: "14px" }}>
+        <div style={{ width: "72px", height: "72px", borderRadius: "50%", background: "linear-gradient(135deg, #EDE8FA, #F3EEFF)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px", boxShadow: "0 4px 16px rgba(155,114,192,0.2)" }}>🗓</div>
+        <div>
+          <div style={{ fontSize: "17px", fontWeight: "500", color: "#2A1845" }}>Las reservas están cerradas</div>
+          <div style={{ fontSize: "13px", color: "#B89FD0", lineHeight: "1.7", marginTop: "6px" }}>Por el momento no hay turnos disponibles para reservar.<br/>El equipo se comunicará a la brevedad para coordinar tu turno.</div>
+        </div>
       </div>
     </div>
   );
@@ -297,7 +302,10 @@ export default function Reserva() {
   return (
     <div style={s.wrap}>
       <div style={s.header}>
-        <div style={s.logo}>🗓 AgendaLec</div>
+        <div>
+          <div style={s.logo}>🗓 AgendaLec</div>
+          <div style={s.logoSub}>Gestión de turnos</div>
+        </div>
         <StepDots step={step} />
       </div>
 
@@ -535,9 +543,11 @@ export default function Reserva() {
 
       {step === 4 && (
         <div style={{ ...s.card, alignItems: "center", textAlign: "center" }}>
-          <div style={s.pendienteCircle}>⏳</div>
-          <div style={s.title}>¡Reserva recibida!</div>
-          <div style={s.sub}>Tu turno quedará confirmado una vez que se verifique la transferencia</div>
+          <div style={s.pendienteCircle}>✓</div>
+          <div>
+            <div style={s.title}>¡Reserva recibida!</div>
+            <div style={s.sub}>Tu turno quedará confirmado una vez que se verifique la transferencia</div>
+          </div>
 
           {aliasActivo && (
             <div style={s.aliasBox}>
