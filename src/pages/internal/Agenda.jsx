@@ -293,15 +293,17 @@ export default function Agenda() {
                         const isPending = t.status === "pending" || t.status === "partial";
                         const isVirtual = t.modality === "virtual";
                         const isCancelled = t.status === "cancelled";
-                        const bg = isCancelled ? "#9CA3AF" : isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
+                        const accent = isCancelled ? "#9CA3AF" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
+                        const bg = isCancelled ? "#F3F4F6" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
+                        const textColor = isCancelled ? "#6B7280" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
                         const label = isCancelled ? "Cancelado" : isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial";
                         const emoji = isCancelled ? "✗" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         const h = getHeight(t.start_time, t.end_time);
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
-                            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)", fontWeight: "500" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}</div>
-                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#fff", lineHeight: "1.2" }}>{t.clients?.full_name}</div>
-                            {h > 45 && <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)" }}>{t.services?.name}</div>}
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
+                            <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}</div>
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: textColor, lineHeight: "1.2" }}>{t.clients?.full_name}</div>
+                            {h > 45 && <div style={{ fontSize: "11px", color: textColor, opacity: 0.75 }}>{t.services?.name}</div>}
                           </div>
                         );
                       })}
@@ -327,15 +329,15 @@ export default function Agenda() {
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
                                 const isCancelled = t.status === "cancelled";
-                                const bg = isCancelled ? "#9CA3AF" : isPending ? "#F59E0B" : isVirtual ? "#7C3AED" : "#DB2777";
+                                const accent = isCancelled ? "#9CA3AF" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
+                                const bg = isCancelled ? "#F3F4F6" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
+                                const textColor = isCancelled ? "#6B7280" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
                                 const emoji = isCancelled ? "✗" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
-                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "6px", padding: "4px 6px", background: bg, color: "#fff", overflow: "hidden", cursor: "pointer", boxShadow: "0 2px 6px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-                                    <div>
-                                      <div style={{ fontSize: "9px", fontWeight: "600", opacity: 0.85 }}>{t.start_time?.slice(0,5)}</div>
-                                      <div style={{ fontSize: "10px", fontWeight: "700", lineHeight: "1.2", marginTop: "1px" }}>{t.clients?.full_name?.split(" ")[0]}</div>
-                                    </div>
-                                    <div style={{ fontSize: "9px", fontWeight: "600", opacity: 0.9 }}>{emoji}</div>
+                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "6px", padding: "4px 6px", background: bg, borderLeft: `3px solid ${accent}`, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: "1px" }}>
+                                    <div style={{ fontSize: "9px", fontWeight: "600", color: accent }}>{t.start_time?.slice(0,5)} {emoji}</div>
+                                    <div style={{ fontSize: "10px", fontWeight: "700", lineHeight: "1.2", color: textColor }}>{t.clients?.full_name?.split(" ")[0]}</div>
+                                    <div style={{ fontSize: "9px", color: textColor, opacity: 0.75, lineHeight: "1.1" }}>{t.services?.name}</div>
                                   </div>
                                 );
                               })}
