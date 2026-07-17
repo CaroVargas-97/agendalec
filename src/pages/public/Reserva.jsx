@@ -130,7 +130,7 @@ export default function Reserva() {
       .then(({ data }) => setHorariosOcupados((data || []).map(t => t.start_time.slice(0, 5))));
   }, [dia, profData, mesActual]);
 
-  const srv = servicios.find(s => s.name === servicio);
+  const srv = servicios.find(s => s.id === servicio);
   const total = srv?.price || 0;
   const sena = Math.round(total / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
@@ -279,25 +279,50 @@ export default function Reserva() {
               {prof === p.full_name && <span style={{ color: "#9B72C0", fontSize: "18px" }}>✓</span>}
             </div>
           ))}
-          {prof && servicios.length > 0 && (
-            <div>
-              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
-              {servicios.map((sv, i) => (
-                <div key={i} style={servicio === sv.name ? s.servicioCardSelected : s.servicioCard} onClick={() => setServicio(sv.name)}>
-                  <div style={s.srvTop}>
-                    <span style={s.srvNombre}>{sv.name}</span>
-                    <span style={s.srvPrecio}>{sv.currency === "USD" ? "U$S " : sv.currency === "EUR" ? "€" : "$"}{sv.price.toLocaleString("es-AR")}</span>
-                  </div>
-                  <div style={s.srvDet}>
-                    <span>{sv.duration_minutes} min</span>
-                    {sv.modality === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
-                    {sv.modality === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
-                    {sv.modality === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {prof && servicios.length > 0 && (() => {
+            // Agrupar servicios por nombre
+            const grupos = servicios.reduce((acc, sv) => {
+              const key = sv.name;
+              if (!acc[key]) acc[key] = [];
+              acc[key].push(sv);
+              return acc;
+            }, {});
+            return (
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
+                {Object.entries(grupos).map(([nombre, opciones]) => {
+                  const seleccionado = opciones.some(sv => sv.id === servicio);
+                  const opcionActiva = opciones.find(sv => sv.id === servicio);
+                  const mod = opciones[0].modality;
+                  return (
+                    <div key={nombre} style={seleccionado ? s.servicioCardSelected : s.servicioCard}>
+                      <div style={s.srvTop}>
+                        <span style={s.srvNombre}>{nombre}</span>
+                      </div>
+                      <div style={{ ...s.srvDet, marginBottom: "8px" }}>
+                        <span>{opciones[0].duration_minutes} min</span>
+                        {mod === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
+                        {mod === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
+                        {mod === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
+                      </div>
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                        {opciones.map(sv => {
+                          const sym = sv.currency === "USD" ? "U$S " : sv.currency === "EUR" ? "€" : "$";
+                          const activo = sv.id === servicio;
+                          return (
+                            <button key={sv.id} onClick={() => setServicio(sv.id)}
+                              style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: activo ? "1.5px solid #9B72C0" : "0.5px solid #E0D0F0", background: activo ? "#EDE8FA" : "#fff", color: activo ? "#5C3F99" : "#9B72C0" }}>
+                              {sym}{sv.price.toLocaleString("es-AR")}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
           {prof && loadingServicios && <div style={s.loadingText}>Cargando servicios...</div>}
           {prof && !loadingServicios && servicios.length === 0 && <div style={s.loadingText}>Este profesional no tiene servicios disponibles.</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -313,7 +338,7 @@ export default function Reserva() {
         <div style={s.card}>
           <div>
             <div style={s.title}>¿Cuándo querés tu turno?</div>
-            <div style={s.sub}>{servicio} con {prof} · {srv?.duration_minutes} min</div>
+            <div style={s.sub}>{srv?.name} con {prof} · {srv?.duration_minutes} min</div>
           </div>
 
           {srv?.modality === "ambas" && (
@@ -405,7 +430,7 @@ export default function Reserva() {
 
           <div style={s.resumenBox}>
             <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen</div>
-            <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {srv?.duration_minutes} min</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{srv?.name} · {srv?.duration_minutes} min</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
             {profData?.phone && <div style={s.resRow}><span style={s.resLabel}>Teléfono</span><span style={s.resValor}>{profData.phone}</span></div>}
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
@@ -477,7 +502,7 @@ export default function Reserva() {
 
           <div style={{ ...s.resumenBox, width: "100%", textAlign: "left" }}>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{servicio} · {modalidad}</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{srv?.name} · {modalidad}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
           </div>
