@@ -147,9 +147,18 @@ export default function Agenda() {
     } else if (tipo === "pago_completo") {
       await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", t.id).eq("type", "seña");
       await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
-    } else if (tipo === "cancelar") {
+    } else if (tipo === "cancelar_sin_devolucion") {
+      if (!window.confirm("¿Cancelar el turno sin devolver la seña?")) { setSavingPago(false); return; }
       await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
       await supabase.from("payments").update({ status: "cancelled" }).eq("appointment_id", t.id);
+      cerrarTurno();
+      await cargarDatos();
+      setSavingPago(false);
+      return;
+    } else if (tipo === "cancelar_con_devolucion") {
+      if (!window.confirm("¿Cancelar el turno y marcar la seña como devuelta?")) { setSavingPago(false); return; }
+      await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
+      await supabase.from("payments").update({ status: "refunded" }).eq("appointment_id", t.id);
       cerrarTurno();
       await cargarDatos();
       setSavingPago(false);
@@ -400,7 +409,7 @@ export default function Agenda() {
                   )}
                 </div>
 
-                {!isCancelled && !isConfirmed && (
+                {!isCancelled && (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {isPending && (
                       <>
@@ -417,8 +426,11 @@ export default function Agenda() {
                         {savingPago ? "..." : "✓ Cobrar saldo"}
                       </button>
                     )}
-                    <button disabled={savingPago} onClick={() => accionPago("cancelar")} style={{ padding: "10px", background: "#FCEBEB", color: "#A32D2D", border: "0.5px solid #F4C4C4", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      ✗ Cancelar turno
+                    <button disabled={savingPago} onClick={() => accionPago("cancelar_con_devolucion")} style={{ padding: "10px", background: "#FCEBEB", color: "#A32D2D", border: "0.5px solid #F4C4C4", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      ↩ Cancelar con devolución
+                    </button>
+                    <button disabled={savingPago} onClick={() => accionPago("cancelar_sin_devolucion")} style={{ padding: "10px", background: "#fff", color: "#A32D2D", border: "0.5px solid #F4C4C4", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      ✗ Cancelar sin devolución
                     </button>
                   </div>
                 )}
