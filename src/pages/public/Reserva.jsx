@@ -326,48 +326,51 @@ export default function Reserva() {
             </div>
           )}
 
-          {(srv?.modality !== "ambas" || modalidad) && <div>
-            <div style={s.calHeader}>
-              <span style={{ cursor: mesAnteriorPermitido ? "pointer" : "default", color: mesAnteriorPermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(-1)}>‹</span>
-              <span>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
-              <span style={{ cursor: "pointer", color: "#9B72C0" }} onClick={() => cambiarMes(1)}>›</span>
-            </div>
-            <div style={s.calGrid}>
-              {["L","M","X","J","V","S","D"].map(d => <div key={d} style={s.calDayName}>{d}</div>)}
-              {Array(offsetLunes).fill(null).map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
-              {Array.from({length: diasEnMes}, (_, i) => i + 1).map(d => {
-                const seleccionable = esDiaSeleccionable(d);
-                const esHoy = anioMes === hoy.getFullYear() && mesMes === hoy.getMonth() && d === hoy.getDate();
-                return (
-                  <div key={d} onClick={() => seleccionable && setDia(d)}
-                    style={!seleccionable ? s.calDayOff : dia === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
-                    {d}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          {dia && (
-            <div>
-              <div style={{ fontSize: "12px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Horarios disponibles</div>
-              {horariosDia.length === 0 ? (
-                <div style={s.loadingText}>No hay horarios disponibles este día.</div>
-              ) : (
-                <div style={s.horaGrid}>
-                  {horariosDia.map(h => {
-                    const ocupado = horariosOcupados.includes(h);
+          {(srv?.modality !== "ambas" || modalidad) && (
+            <>
+              <div>
+                <div style={s.calHeader}>
+                  <span style={{ cursor: mesAnteriorPermitido ? "pointer" : "default", color: mesAnteriorPermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(-1)}>‹</span>
+                  <span>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
+                  <span style={{ cursor: "pointer", color: "#9B72C0" }} onClick={() => cambiarMes(1)}>›</span>
+                </div>
+                <div style={s.calGrid}>
+                  {["L","M","X","J","V","S","D"].map(d => <div key={d} style={s.calDayName}>{d}</div>)}
+                  {Array(offsetLunes).fill(null).map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
+                  {Array.from({length: diasEnMes}, (_, i) => i + 1).map(d => {
+                    const seleccionable = esDiaSeleccionable(d);
+                    const esHoy = anioMes === hoy.getFullYear() && mesMes === hoy.getMonth() && d === hoy.getDate();
                     return (
-                      <button key={h}
-                        style={ocupado ? s.horaBtnOff : hora === h ? s.horaBtnSelected : s.horaBtn}
-                        disabled={ocupado}
-                        onClick={() => !ocupado && setHora(h)}>{h}</button>
+                      <div key={d} onClick={() => seleccionable && setDia(d)}
+                        style={!seleccionable ? s.calDayOff : dia === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
+                        {d}
+                      </div>
                     );
                   })}
                 </div>
+              </div>
+              {dia && (
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Horarios disponibles</div>
+                  {horariosDia.length === 0 ? (
+                    <div style={s.loadingText}>No hay horarios disponibles este día.</div>
+                  ) : (
+                    <div style={s.horaGrid}>
+                      {horariosDia.map(h => {
+                        const ocupado = horariosOcupados.includes(h);
+                        return (
+                          <button key={h}
+                            style={ocupado ? s.horaBtnOff : hora === h ? s.horaBtnSelected : s.horaBtn}
+                            disabled={ocupado}
+                            onClick={() => !ocupado && setHora(h)}>{h}</button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               )}
-            </div>
+            </>
           )}
-          </div>}
 
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(1)}>← Volver</button>
