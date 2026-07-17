@@ -289,13 +289,10 @@ export default function Agenda() {
                         const emoji = isCancelled ? "✗" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         const h = getHeight(t.start_time, t.end_time);
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
-                            <div>
-                              <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.8)", fontWeight: "500" }}>{t.start_time?.slice(0,5)} hs</div>
-                              <div style={{ fontSize: "13px", fontWeight: "700", color: "#fff", marginTop: "2px", lineHeight: "1.2" }}>{t.clients?.full_name}</div>
-                              {h > 45 && <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)", marginTop: "2px" }}>{t.services?.name}</div>}
-                            </div>
-                            {h > 55 && <div style={{ fontSize: "10px", fontWeight: "600", color: "rgba(255,255,255,0.9)", background: "rgba(0,0,0,0.15)", borderRadius: "4px", padding: "2px 6px", alignSelf: "flex-start" }}>{emoji} {label}</div>}
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,0.2)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
+                            <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)", fontWeight: "500" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}</div>
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#fff", lineHeight: "1.2" }}>{t.clients?.full_name}</div>
+                            {h > 45 && <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.85)" }}>{t.services?.name}</div>}
                           </div>
                         );
                       })}
