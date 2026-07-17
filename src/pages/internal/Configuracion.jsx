@@ -103,8 +103,10 @@ export default function Configuracion() {
       if (prof?.full_name) setNombreForm(prof.full_name);
       if (prof) setContactoForm({ phone: prof.phone || "", address: prof.address || "" });
       if (prof) setReservasForm({ desde: prof.reservas_desde || "", hasta: prof.reservas_hasta || "" });
-      const { data: cfg } = await supabase.from("app_config").select("value").eq("key", "invite_code").maybeSingle();
-      if (cfg) setInviteCode(cfg.value || "");
+      try {
+        const { data: cfg } = await supabase.from("app_config").select("value").eq("key", "invite_code").maybeSingle();
+        if (cfg) setInviteCode(cfg.value || "");
+      } catch (_) {}
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid).eq("active", true);
       if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS", requiresSlot: sv.requires_slot !== false })));
