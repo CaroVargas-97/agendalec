@@ -77,6 +77,7 @@ export default function Reserva() {
   const [disponibilidad, setDisponibilidad] = useState([]);
   const [profPausa, setProfPausa] = useState(0);
   const [servicio, setServicio] = useState(null);
+  const [moneda, setMoneda] = useState(null);
   const [mesActual, setMesActual] = useState(inicioMes);
   const [dia, setDia] = useState(null);
   const [hora, setHora] = useState(null);
@@ -279,50 +280,42 @@ export default function Reserva() {
               {prof === p.full_name && <span style={{ color: "#9B72C0", fontSize: "18px" }}>✓</span>}
             </div>
           ))}
-          {prof && servicios.length > 0 && (() => {
-            // Agrupar servicios por nombre
-            const grupos = servicios.reduce((acc, sv) => {
-              const key = sv.name;
-              if (!acc[key]) acc[key] = [];
-              acc[key].push(sv);
-              return acc;
-            }, {});
-            return (
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
-                {Object.entries(grupos).map(([nombre, opciones]) => {
-                  const seleccionado = opciones.some(sv => sv.id === servicio);
-                  const opcionActiva = opciones.find(sv => sv.id === servicio);
-                  const mod = opciones[0].modality;
+          {prof && servicios.length > 0 && (
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>¿En qué moneda querés pagar?</div>
+              <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                {[...new Set(servicios.map(sv => sv.currency))].map(cur => {
+                  const label = cur === "USD" ? "🇺🇸 Dólares" : cur === "EUR" ? "🇪🇺 Euros" : "🇦🇷 Pesos";
+                  const activo = moneda === cur;
                   return (
-                    <div key={nombre} style={seleccionado ? s.servicioCardSelected : s.servicioCard}>
-                      <div style={s.srvTop}>
-                        <span style={s.srvNombre}>{nombre}</span>
-                      </div>
-                      <div style={{ ...s.srvDet, marginBottom: "8px" }}>
-                        <span>{opciones[0].duration_minutes} min</span>
-                        {mod === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
-                        {mod === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
-                        {mod === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
-                      </div>
-                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                        {opciones.map(sv => {
-                          const sym = sv.currency === "USD" ? "U$S " : sv.currency === "EUR" ? "€" : "$";
-                          const activo = sv.id === servicio;
-                          return (
-                            <button key={sv.id} onClick={() => setServicio(sv.id)}
-                              style={{ padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: activo ? "1.5px solid #9B72C0" : "0.5px solid #E0D0F0", background: activo ? "#EDE8FA" : "#fff", color: activo ? "#5C3F99" : "#9B72C0" }}>
-                              {sym}{sv.price.toLocaleString("es-AR")}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <button key={cur} onClick={() => { setMoneda(cur); setServicio(null); }}
+                      style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: activo ? "500" : "400", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: activo ? "2px solid #9B72C0" : "0.5px solid #E0D0F0", background: activo ? "#EDE8FA" : "#fff", color: activo ? "#5C3F99" : "#B89FD0" }}>
+                      {label}
+                    </button>
                   );
                 })}
               </div>
-            );
-          })()}
+              {moneda && (
+                <>
+                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
+                  {servicios.filter(sv => sv.currency === moneda).map((sv, i) => (
+                    <div key={sv.id} style={servicio === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => setServicio(sv.id)}>
+                      <div style={s.srvTop}>
+                        <span style={s.srvNombre}>{sv.name}</span>
+                        <span style={s.srvPrecio}>{moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{sv.price.toLocaleString("es-AR")}</span>
+                      </div>
+                      <div style={s.srvDet}>
+                        <span>{sv.duration_minutes} min</span>
+                        {sv.modality === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
+                        {sv.modality === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
+                        {sv.modality === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
           {prof && loadingServicios && <div style={s.loadingText}>Cargando servicios...</div>}
           {prof && !loadingServicios && servicios.length === 0 && <div style={s.loadingText}>Este profesional no tiene servicios disponibles.</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -508,7 +501,7 @@ export default function Reserva() {
           </div>
           <div style={s.avisoBox}>🔔 Recibirás una confirmación por WhatsApp cuando se verifique el pago.</div>
           <button style={s.btnNext} onClick={() => {
-            setStep(1); setProf(null); setServicio(null); setDia(null); setHora(null);
+            setStep(1); setProf(null); setServicio(null); setMoneda(null); setDia(null); setHora(null);
             setModalidad(null); setForm({ nombre: "", celular: "", mail: "" });
             setMesActual(inicioMes()); setComprobante(null);
           }}>
