@@ -92,9 +92,18 @@ export default function Reserva() {
   const [loadingServicios, setLoadingServicios] = useState(false);
   const [comprobante, setComprobante] = useState(null);
 
+  const [reservasCerradas, setReservasCerradas] = useState(false);
+
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email, address, phone").eq("role", "professional")
-      .then(({ data }) => { setProfesionales(data || []); setLoading(false); });
+    supabase.from("profiles").select("id, full_name, email, address, phone, reservas_desde, reservas_hasta").eq("role", "professional")
+      .then(({ data }) => {
+        const profs = data || [];
+        setProfesionales(profs);
+        const hoy = new Date().toISOString().slice(0, 10);
+        const abierta = profs.some(p => p.reservas_desde && p.reservas_hasta && hoy >= p.reservas_desde && hoy <= p.reservas_hasta);
+        setReservasCerradas(!abierta);
+        setLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -258,6 +267,19 @@ export default function Reserva() {
 
   if (loading) return (
     <div style={s.wrap}><div style={s.loadingText}>Cargando...</div></div>
+  );
+
+  if (reservasCerradas) return (
+    <div style={s.wrap}>
+      <div style={s.header}>
+        <div style={s.logo}>🗓 AgendaLec</div>
+      </div>
+      <div style={{ background: "#fff", borderRadius: "16px", border: "0.5px solid #E0D0F0", padding: "2rem", textAlign: "center", display: "flex", flexDirection: "column", gap: "12px", alignItems: "center" }}>
+        <div style={{ fontSize: "32px" }}>🗓</div>
+        <div style={{ fontSize: "16px", fontWeight: "600", color: "#2A1845" }}>Las reservas están cerradas</div>
+        <div style={{ fontSize: "13px", color: "#B89FD0", lineHeight: "1.6" }}>Por el momento no hay turnos disponibles para reservar. El equipo se comunicará a la brevedad para coordinar tu turno.</div>
+      </div>
+    </div>
   );
 
   return (
