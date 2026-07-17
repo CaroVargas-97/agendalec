@@ -83,6 +83,7 @@ export default function Reserva() {
   const [hora, setHora] = useState(null);
   const [modalidad, setModalidad] = useState(null);
   const [form, setForm] = useState({ nombre: "", celular: "", mail: "" });
+  const [clienteReconocido, setClienteReconocido] = useState(false);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -210,6 +211,17 @@ export default function Reserva() {
     navigator.clipboard.writeText(aliasActivo || "");
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
+  };
+
+  const buscarClientePorMail = async (mail) => {
+    if (!mail || !mail.includes("@")) return;
+    const { data } = await supabase.from("clients").select("full_name, phone").eq("email", mail).maybeSingle();
+    if (data) {
+      setForm(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
+      setClienteReconocido(true);
+    } else {
+      setClienteReconocido(false);
+    }
   };
 
   const confirmarReserva = async () => {
@@ -443,11 +455,19 @@ export default function Reserva() {
         <div style={s.card}>
           <div>
             <div style={s.title}>Tus datos</div>
-            <div style={s.sub}>Solo la primera vez</div>
+            <div style={s.sub}>{clienteReconocido ? "¡Ya te conocemos! Verificá que todo esté bien." : "Ingresá tu mail para empezar"}</div>
           </div>
+          <div style={s.field}>
+            <label style={s.label}>Mail</label>
+            <input type="email" value={form.mail} onChange={e => { setForm({...form, mail: e.target.value}); setClienteReconocido(false); }} onBlur={e => buscarClientePorMail(e.target.value)} placeholder="tu@mail.com" style={s.input} />
+          </div>
+          {clienteReconocido && (
+            <div style={{ background: "#EAF3DE", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#3B6D11" }}>
+              ✓ Encontramos tus datos. Podés editarlos si cambiaron.
+            </div>
+          )}
           <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
           <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
-          <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} placeholder="tu@mail.com" style={s.input} /></div>
 
           <div style={s.resumenBox}>
             <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen</div>
@@ -538,7 +558,7 @@ export default function Reserva() {
           <div style={s.avisoBox}>🔔 Recibirás una confirmación por WhatsApp cuando se verifique el pago.</div>
           <button style={s.btnNext} onClick={() => {
             setStep(1); setProf(null); setServicio(null); setMoneda(null); setDia(null); setHora(null);
-            setModalidad(null); setForm({ nombre: "", celular: "", mail: "" });
+            setModalidad(null); setForm({ nombre: "", celular: "", mail: "" }); setClienteReconocido(false);
             setMesActual(inicioMes()); setComprobante(null);
           }}>
             Volver al inicio
