@@ -68,6 +68,11 @@ export default function Agenda() {
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
   const [horaActual, setHoraActual] = useState(new Date());
+  const [uid, setUid] = useState(null);
+  const [blockedDates, setBlockedDates] = useState([]);
+  const [blockModal, setBlockModal] = useState(false);
+  const [blockReason, setBlockReason] = useState("");
+  const [savingBlock, setSavingBlock] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setHoraActual(new Date()), 60000);
@@ -88,6 +93,13 @@ export default function Agenda() {
 
   const cargarDatos = async () => {
     setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUid = session?.user?.id;
+    if (currentUid && !uid) setUid(currentUid);
+    if (currentUid) {
+      const { data: blocked } = await supabase.from("blocked_dates").select("id, date, reason").eq("professional_id", currentUid);
+      setBlockedDates(blocked || []);
+    }
     if (vista === "dia") {
       let query = supabase.from("appointments")
         .select("*, clients(full_name), services(name, duration_minutes, price), profiles(full_name)")
@@ -252,6 +264,25 @@ export default function Agenda() {
     setNuevoClienteData({ phone: "", email: "" });
   };
 
+  const fechaActualStr = toISO(fecha);
+  const bloqueadoHoy = blockedDates.find(b => b.date === fechaActualStr);
+
+  const bloquearDia = async () => {
+    if (!uid) return;
+    setSavingBlock(true);
+    await supabase.from("blocked_dates").insert({ professional_id: uid, date: fechaActualStr, reason: blockReason || null });
+    setBlockModal(false);
+    setBlockReason("");
+    setSavingBlock(false);
+    await cargarDatos();
+  };
+
+  const desbloquearDia = async () => {
+    if (!bloqueadoHoy) return;
+    await supabase.from("blocked_dates").delete().eq("id", bloqueadoHoy.id);
+    await cargarDatos();
+  };
+
   const serviciosFiltrados = servicios.filter(sv => !form.profesional || sv.professional_id === form.profesional);
   const semana = getSemana(fecha);
 
@@ -291,6 +322,17 @@ export default function Agenda() {
               <option value="virtual">Virtual</option>
               <option value="presencial">Presencial</option>
             </select>
+            {vista === "dia" && (
+              bloqueadoHoy ? (
+                <button onClick={desbloquearDia} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#F3F4F6", color: "#6B7280", border: "0.5px solid #E5E7EB", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  🔓 Desbloquear día
+                </button>
+              ) : (
+                <button onClick={() => setBlockModal(true)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#FEF0F3", color: "#C06080", border: "0.5px solid #F0D0D8", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  🔒 Bloquear día
+                </button>
+              )
+            )}
             <button style={s.btnNuevo} onClick={() => { setPanelAbierto(true); cerrarTurno(); }}>+ Nuevo turno</button>
           </div>
         </div>
@@ -303,6 +345,14 @@ export default function Agenda() {
                   <div style={{ display: "grid", gridTemplateColumns: "52px 1fr" }}>
                     <div>{HORAS.map(h => <div key={h} style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>)}</div>
                     <div style={{ position: "relative", borderLeft: "0.5px solid #F0E8F8", height: `${HORAS.length * 64}px` }}>
+                      {bloqueadoHoy && (
+                        <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 8px, #F9FAFB 8px, #F9FAFB 16px)", zIndex: 5, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px", borderRadius: "6px" }}>
+                          <div style={{ fontSize: "28px" }}>🔒</div>
+                          <div style={{ fontSize: "14px", fontWeight: "500", color: "#6B7280" }}>Día bloqueado</div>
+                          {bloqueadoHoy.reason && <div style={{ fontSize: "12px", color: "#9CA3AF", maxWidth: "200px", textAlign: "center" }}>{bloqueadoHoy.reason}</div>}
+                          <button onClick={desbloquearDia} style={{ marginTop: "4px", padding: "6px 16px", background: "#fff", color: "#6B7280", border: "0.5px solid #D1D5DB", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Desbloquear</button>
+                        </div>
+                      )}
                       {HORAS.map(h => <div key={h} style={{ height: "64px", borderBottom: "0.5px solid #F8F0FC" }}></div>)}
                       {toISO(fecha) === toISO(new Date()) && (() => {
                         const mins = horaActual.getHours() * 60 + horaActual.getMinutes();
@@ -343,11 +393,12 @@ export default function Agenda() {
                     {semana.map((d, i) => {
                       const esHoy = toISO(d) === toISO(new Date());
                       const countDia = turnosSemana.filter(t => t.date === toISO(d)).length;
+                      const esBloqueado = blockedDates.some(b => b.date === toISO(d));
                       return (
-                        <div key={i} style={{ textAlign: "center", padding: "6px 4px", borderBottom: "0.5px solid #F0E8F8", background: esHoy ? "#F3EEFF" : "transparent" }}>
-                          <div style={{ fontSize: "11px", color: esHoy ? "#9B72C0" : "#B89FD0", fontWeight: esHoy ? "500" : "400" }}>{DIAS_SEMANA[i]}</div>
-                          <div style={{ fontSize: "16px", fontWeight: esHoy ? "600" : "400", color: esHoy ? "#9B72C0" : "#2A1845", lineHeight: "1.4" }}>{d.getDate()}</div>
-                          {countDia > 0 && <div style={{ fontSize: "9px", color: esHoy ? "#9B72C0" : "#C4A8D8" }}>{countDia} turno{countDia > 1 ? "s" : ""}</div>}
+                        <div key={i} style={{ textAlign: "center", padding: "6px 4px", borderBottom: "0.5px solid #F0E8F8", background: esBloqueado ? "#F3F4F6" : esHoy ? "#F3EEFF" : "transparent" }}>
+                          <div style={{ fontSize: "11px", color: esBloqueado ? "#9CA3AF" : esHoy ? "#9B72C0" : "#B89FD0", fontWeight: esHoy ? "500" : "400" }}>{DIAS_SEMANA[i]}</div>
+                          <div style={{ fontSize: "16px", fontWeight: esHoy ? "600" : "400", color: esBloqueado ? "#9CA3AF" : esHoy ? "#9B72C0" : "#2A1845", lineHeight: "1.4" }}>{d.getDate()}</div>
+                          {esBloqueado ? <div style={{ fontSize: "10px", color: "#9CA3AF" }}>🔒 bloqueado</div> : countDia > 0 && <div style={{ fontSize: "9px", color: esHoy ? "#9B72C0" : "#C4A8D8" }}>{countDia} turno{countDia > 1 ? "s" : ""}</div>}
                         </div>
                       );
                     })}
@@ -357,7 +408,7 @@ export default function Agenda() {
                         {semana.map((d, di) => {
                           const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.slice(0,2) === h.slice(0,2));
                           return (
-                            <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative", background: toISO(d) === toISO(new Date()) ? "#FDFAFF" : "transparent" }}>
+                            <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative", background: blockedDates.some(b => b.date === toISO(d)) ? "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 6px, #F9FAFB 6px, #F9FAFB 12px)" : toISO(d) === toISO(new Date()) ? "#FDFAFF" : "transparent" }}>
                               {turnosDia.map((t, ti) => {
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
@@ -563,6 +614,29 @@ export default function Agenda() {
             </div>
           )}
         </div>
+
+        {blockModal && (
+          <>
+            <div style={{ position: "fixed", inset: 0, background: "rgba(42,24,69,0.2)", zIndex: 200 }} onClick={() => setBlockModal(false)} />
+            <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.5rem", width: "320px", zIndex: 201, boxShadow: "0 8px 32px rgba(42,24,69,0.15)", display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>🔒 Bloquear día</div>
+                <button onClick={() => setBlockModal(false)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+              </div>
+              <div style={{ fontSize: "13px", color: "#9B72C0" }}>{formatFecha(fecha)}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <label style={{ fontSize: "11px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Motivo (opcional)</label>
+                <textarea value={blockReason} onChange={e => setBlockReason(e.target.value)} placeholder="Ej: Vacaciones, evento personal..." style={{ fontSize: "13px", padding: "8px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%", height: "72px", resize: "none", boxSizing: "border-box" }} />
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => setBlockModal(false)} style={{ flex: 1, padding: "10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Cancelar</button>
+                <button onClick={bloquearDia} disabled={savingBlock} style={{ flex: 1, padding: "10px", background: "#C06080", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                  {savingBlock ? "Bloqueando..." : "🔒 Bloquear"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
 
         <div style={{ display: "flex", gap: "12px" }}>
           {[["#EDE8FA","#9B72C0","Virtual"],["#FDE8F0","#E88BB0","Presencial"],["#FFF8E8","#F0A800","Pendiente"]].map(([bg,border,label]) => (

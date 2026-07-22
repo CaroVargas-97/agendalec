@@ -94,6 +94,7 @@ export default function Reserva() {
   const [comprobante, setComprobante] = useState(null);
 
   const [reservasCerradas, setReservasCerradas] = useState(false);
+  const [blockedDatesProf, setBlockedDatesProf] = useState([]);
 
   useEffect(() => {
     supabase.from("profiles").select("id, full_name, email, address, phone, reservas_desde, reservas_hasta").eq("role", "professional")
@@ -115,12 +116,14 @@ export default function Reserva() {
       const pd = profesionales.find(p => p.full_name === prof);
       if (!pd) { setLoadingServicios(false); return; }
       setProfData(pd);
-      const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }] = await Promise.all([
+      const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, alias_eur, cbu_eur").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("blocked_dates").select("date").eq("professional_id", pd.id),
       ]);
+      setBlockedDatesProf((blocked || []).map(b => b.date));
       setServicios(svs || []);
       setProfSettings(cfg);
       setDisponibilidad(avail || []);
@@ -162,9 +165,11 @@ export default function Reserva() {
   const mesAnteriorPermitido = new Date(anioMes, mesMes, 1) > new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
   const esDiaSeleccionable = (d) => {
-    const fecha = new Date(anioMes, mesMes, d);
-    if (fecha < hoy) return false;
-    const dow = fecha.getDay();
+    const fechaObj = new Date(anioMes, mesMes, d);
+    if (fechaObj < hoy) return false;
+    const fechaStr = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    if (blockedDatesProf.includes(fechaStr)) return false;
+    const dow = fechaObj.getDay();
     if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
     return disponibilidad.some(a => {
       if (a.day_of_week !== dow) return false;
