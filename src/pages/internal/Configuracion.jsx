@@ -76,8 +76,11 @@ export default function Configuracion() {
   const [inviteCode, setInviteCode] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
   const [bloqueosDB, setBloqueosDB] = useState([]);
-  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [diasSeleccionados, setDiasSeleccionados] = useState(new Set());
   const [mesBloqueos, setMesBloqueos] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; });
+  const [bloqueoTodoDia, setBloqueoTodoDia] = useState(true);
+  const [bloqueoHoraInicio, setBloqueoHoraInicio] = useState("09:00");
+  const [bloqueoHoraFin, setBloqueoHoraFin] = useState("13:00");
   const [savingBloqueos, setSavingBloqueos] = useState(false);
   const [bloqueosMsg, setBloqueosMsg] = useState("");
 
@@ -136,41 +139,46 @@ export default function Configuracion() {
         setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", alias_eur: cfg.alias_eur || "", cbu_eur: cfg.cbu_eur || "", mp_enabled: cfg.mp_enabled || false });
       }
 
-      const { data: blocked } = await supabase.from("blocked_dates").select("id, date, reason").eq("professional_id", uid).order("date");
-      const bl = blocked || [];
-      setBloqueosDB(bl);
-      setSeleccionados(new Set(bl.map(b => b.date)));
+      const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
+      setBloqueosDB(blocked || []);
 
       setLoading(false);
     };
     cargar();
   }, []);
 
-  const toggleDiaBloqueo = (fechaStr) => {
-    setSeleccionados(prev => {
+  const toggleDiaSeleccion = (fechaStr) => {
+    setDiasSeleccionados(prev => {
       const next = new Set(prev);
-      if (next.has(fechaStr)) next.delete(fechaStr);
-      else next.add(fechaStr);
+      if (next.has(fechaStr)) next.delete(fechaStr); else next.add(fechaStr);
       return next;
     });
   };
 
   const guardarBloqueos = async () => {
+    if (diasSeleccionados.size === 0) return;
     setSavingBloqueos(true);
     const uid = await getUid();
     if (!uid) { setSavingBloqueos(false); return; }
-    const dbSet = new Set(bloqueosDB.map(b => b.date));
-    const toDelete = bloqueosDB.filter(b => !seleccionados.has(b.date)).map(b => b.id);
-    const toInsert = [...seleccionados].filter(d => !dbSet.has(d)).map(d => ({ professional_id: uid, date: d }));
-    if (toDelete.length) await supabase.from("blocked_dates").delete().in("id", toDelete);
-    if (toInsert.length) await supabase.from("blocked_dates").insert(toInsert);
-    const { data: blocked } = await supabase.from("blocked_dates").select("id, date, reason").eq("professional_id", uid).order("date");
-    const bl = blocked || [];
-    setBloqueosDB(bl);
-    setSeleccionados(new Set(bl.map(b => b.date)));
+    const toInsert = [...diasSeleccionados].map(d => ({
+      professional_id: uid, date: d,
+      start_time: bloqueoTodoDia ? null : bloqueoHoraInicio,
+      end_time: bloqueoTodoDia ? null : bloqueoHoraFin,
+    }));
+    await supabase.from("blocked_dates").insert(toInsert);
+    const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
+    setBloqueosDB(blocked || []);
+    setDiasSeleccionados(new Set());
     setSavingBloqueos(false);
-    setBloqueosMsg("✓ Días bloqueados guardados");
+    setBloqueosMsg("✓ Bloqueos guardados");
     setTimeout(() => setBloqueosMsg(""), 2500);
+  };
+
+  const eliminarBloqueo = async (id) => {
+    const uid = await getUid();
+    await supabase.from("blocked_dates").delete().eq("id", id);
+    const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
+    setBloqueosDB(blocked || []);
   };
 
   const guardarServicios = async () => {
@@ -415,7 +423,8 @@ export default function Configuracion() {
             const nombreMes = mesBloqueos.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
             const cambiarMes = (delta) => { const d = new Date(anio, mes + delta, 1); setMesBloqueos(d); };
             const toStr = (d) => `${anio}-${String(mes+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-            const bloqueadosCount = seleccionados.size;
+            const fmtHora = (t) => t ? t.slice(0,5) : "";
+            const fmtFecha = (str) => new Date(str + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
             return (
               <>
                 <div style={s.card}>
@@ -434,36 +443,86 @@ export default function Configuracion() {
                     {Array(offset).fill(null).map((_, i) => <div key={`e${i}`} />)}
                     {Array.from({ length: diasEnMes }, (_, i) => i + 1).map(d => {
                       const str = toStr(d);
-                      const fechaD = new Date(anio, mes, d);
-                      const pasado = fechaD < hoy;
-                      const selec = seleccionados.has(str);
+                      const pasado = new Date(anio, mes, d) < hoy;
+                      const selec = diasSeleccionados.has(str);
+                      const bloqueoDB = bloqueosDB.find(b => b.date === str);
                       const esHoy = str === hoy.toISOString().slice(0,10);
+                      let bg = "#FDFAFF", border = "0.5px solid #F0E8F8", color = "#2A1845", label = String(d);
+                      if (pasado) { color = "#D0C0E0"; border = "0.5px solid #F0E8F8"; }
+                      else if (selec) { bg = "#EDE8FA"; border = "1.5px solid #9B72C0"; color = "#5C3F99"; label = "✓"; }
+                      else if (bloqueoDB) {
+                        bg = bloqueoDB.start_time ? "#FEF3E8" : "#FCEBEB";
+                        border = bloqueoDB.start_time ? "1.5px solid #D97706" : "1.5px solid #C06080";
+                        color = bloqueoDB.start_time ? "#92400E" : "#A32D2D";
+                        label = bloqueoDB.start_time ? "⏰" : "🔒";
+                      }
+                      else if (esHoy) { border = "1.5px solid #9B72C0"; color = "#7B5EA7"; }
                       return (
-                        <div key={d} onClick={() => !pasado && toggleDiaBloqueo(str)}
-                          style={{
-                            height: "40px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "13px", cursor: pasado ? "default" : "pointer", fontWeight: esHoy ? "600" : "400",
-                            background: selec ? "#FCEBEB" : esHoy ? "#F3EEFF" : "#FDFAFF",
-                            border: selec ? "1.5px solid #C06080" : esHoy ? "1.5px solid #9B72C0" : "0.5px solid #F0E8F8",
-                            color: pasado ? "#D0C0E0" : selec ? "#A32D2D" : esHoy ? "#7B5EA7" : "#2A1845",
-                          }}>
-                          {selec ? "🔒" : d}
+                        <div key={d} onClick={() => !pasado && !bloqueoDB && toggleDiaSeleccion(str)}
+                          style={{ height: "40px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: selec || bloqueoDB ? "14px" : "13px", cursor: pasado || bloqueoDB ? "default" : "pointer", fontWeight: esHoy ? "600" : "400", background: bg, border, color }}>
+                          {label}
                         </div>
                       );
                     })}
                   </div>
-                  {bloqueadosCount > 0 && (
-                    <div style={{ marginTop: "14px", padding: "10px 12px", background: "#FCEBEB", borderRadius: "8px", fontSize: "12px", color: "#A32D2D" }}>
-                      🔒 {bloqueadosCount} día{bloqueadosCount > 1 ? "s" : ""} bloqueado{bloqueadosCount > 1 ? "s" : ""} en total
+                  <div style={{ marginTop: "10px", display: "flex", gap: "10px", fontSize: "11px", color: "#B89FD0", flexWrap: "wrap" }}>
+                    <span><span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "3px", background: "#FCEBEB", border: "1px solid #C06080", marginRight: "4px", verticalAlign: "middle" }}></span>Todo el día</span>
+                    <span><span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "3px", background: "#FEF3E8", border: "1px solid #D97706", marginRight: "4px", verticalAlign: "middle" }}></span>Horario parcial</span>
+                    <span><span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "3px", background: "#EDE8FA", border: "1px solid #9B72C0", marginRight: "4px", verticalAlign: "middle" }}></span>Seleccionado</span>
+                  </div>
+                </div>
+
+                {diasSeleccionados.size > 0 && (
+                  <div style={s.card}>
+                    <div style={s.cardTitle}>Configurar bloqueo — {diasSeleccionados.size} día{diasSeleccionados.size > 1 ? "s" : ""} seleccionado{diasSeleccionados.size > 1 ? "s" : ""}</div>
+                    <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                      <button onClick={() => setBloqueoTodoDia(true)} style={{ flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: bloqueoTodoDia ? "1.5px solid #C06080" : "0.5px solid #E0D0F0", background: bloqueoTodoDia ? "#FCEBEB" : "#fff", color: bloqueoTodoDia ? "#A32D2D" : "#B89FD0" }}>
+                        🔒 Todo el día
+                      </button>
+                      <button onClick={() => setBloqueoTodoDia(false)} style={{ flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: !bloqueoTodoDia ? "1.5px solid #D97706" : "0.5px solid #E0D0F0", background: !bloqueoTodoDia ? "#FEF3E8" : "#fff", color: !bloqueoTodoDia ? "#92400E" : "#B89FD0" }}>
+                        ⏰ Rango de horas
+                      </button>
                     </div>
-                  )}
-                </div>
+                    {!bloqueoTodoDia && (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div>
+                          <div style={s.label}>Desde</div>
+                          <input type="time" value={bloqueoHoraInicio} onChange={e => setBloqueoHoraInicio(e.target.value)} style={{ ...s.inputFull, marginTop: "4px" }} />
+                        </div>
+                        <div>
+                          <div style={s.label}>Hasta</div>
+                          <input type="time" value={bloqueoHoraFin} onChange={e => setBloqueoHoraFin(e.target.value)} style={{ ...s.inputFull, marginTop: "4px" }} />
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                      <button onClick={() => setDiasSeleccionados(new Set())} style={{ flex: 1, padding: "10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Cancelar</button>
+                      <button onClick={guardarBloqueos} disabled={savingBloqueos} style={{ flex: 1, padding: "10px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" }}>
+                        {savingBloqueos ? "Guardando..." : `Bloquear ${diasSeleccionados.size} día${diasSeleccionados.size > 1 ? "s" : ""}`}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {bloqueosDB.length > 0 && (
+                  <div style={s.card}>
+                    <div style={s.cardTitle}>Bloqueos guardados</div>
+                    {bloqueosDB.map((b, i) => (
+                      <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", borderBottom: i < bloqueosDB.length - 1 ? "0.5px solid #F0E8F8" : "none" }}>
+                        <div style={{ fontSize: "16px" }}>{b.start_time ? "⏰" : "🔒"}</div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{fmtFecha(b.date)}</div>
+                          <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>
+                            {b.start_time ? `${fmtHora(b.start_time)} – ${fmtHora(b.end_time)}` : "Todo el día"}
+                          </div>
+                        </div>
+                        <button onClick={() => eliminarBloqueo(b.id)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #F0D0D8", background: "#FEF0F3", cursor: "pointer", color: "#C06080", fontSize: "14px" }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {bloqueosMsg && <div style={{ fontSize: "12px", color: "#3B6D11", background: "#EAF3DE", padding: "10px 14px", borderRadius: "8px" }}>{bloqueosMsg}</div>}
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button style={s.saveBtn} onClick={guardarBloqueos} disabled={savingBloqueos}>
-                    {savingBloqueos ? "Guardando..." : "Guardar bloqueos"}
-                  </button>
-                </div>
               </>
             );
           })()}

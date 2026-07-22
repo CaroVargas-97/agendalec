@@ -121,9 +121,9 @@ export default function Reserva() {
         supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, alias_eur, cbu_eur").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
-        supabase.from("blocked_dates").select("date").eq("professional_id", pd.id),
+        supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
       ]);
-      setBlockedDatesProf((blocked || []).map(b => b.date));
+      setBlockedDatesProf(blocked || []);
       setServicios(svs || []);
       setProfSettings(cfg);
       setDisponibilidad(avail || []);
@@ -168,7 +168,7 @@ export default function Reserva() {
     const fechaObj = new Date(anioMes, mesMes, d);
     if (fechaObj < hoy) return false;
     const fechaStr = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    if (blockedDatesProf.includes(fechaStr)) return false;
+    if (blockedDatesProf.some(b => b.date === fechaStr && !b.start_time)) return false;
     const dow = fechaObj.getDay();
     if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
     return disponibilidad.some(a => {
@@ -180,8 +180,9 @@ export default function Reserva() {
 
   const generarHorarios = (d) => {
     if (!d || !srv) return [];
-    const fecha = new Date(anioMes, mesMes, d);
-    const dow = fecha.getDay();
+    const fechaStr = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const fechaObj = new Date(anioMes, mesMes, d);
+    const dow = fechaObj.getDay();
     const avail = disponibilidad.find(a => a.day_of_week === dow);
     if (!avail) return [];
     const [sH, sM] = avail.start_time.slice(0, 5).split(":").map(Number);
@@ -189,9 +190,17 @@ export default function Reserva() {
     const startMins = sH * 60 + sM;
     const endMins = eH * 60 + eM;
     const slotStep = srv.duration_minutes + profPausa;
+    const bloquesParciales = blockedDatesProf.filter(b => b.date === fechaStr && b.start_time);
     const slots = [];
     for (let t = startMins; t + srv.duration_minutes <= endMins; t += slotStep) {
-      slots.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+      const slotFin = t + srv.duration_minutes;
+      const bloqueado = bloquesParciales.some(b => {
+        const [bH, bM] = b.start_time.slice(0,5).split(":").map(Number);
+        const [eH2, eM2] = b.end_time.slice(0,5).split(":").map(Number);
+        const bStart = bH * 60 + bM, bEnd = eH2 * 60 + eM2;
+        return t < bEnd && slotFin > bStart;
+      });
+      if (!bloqueado) slots.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
     }
     return slots;
   };
