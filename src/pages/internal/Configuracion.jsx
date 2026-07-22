@@ -75,6 +75,11 @@ export default function Configuracion() {
   const [reservasMsg, setReservasMsg] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
+  const [bloqueosDB, setBloqueosDB] = useState([]);
+  const [seleccionados, setSeleccionados] = useState(new Set());
+  const [mesBloqueos, setMesBloqueos] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; });
+  const [savingBloqueos, setSavingBloqueos] = useState(false);
+  const [bloqueosMsg, setBloqueosMsg] = useState("");
 
   const cargarProfesionales = async () => {
     const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
@@ -130,10 +135,43 @@ export default function Configuracion() {
         setPausas({ pausa: cfg.break_minutes || 15, anticipacion: cfg.min_advance_hours || 24, cancelacion: cfg.cancellation_hours || 24 });
         setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", alias_eur: cfg.alias_eur || "", cbu_eur: cfg.cbu_eur || "", mp_enabled: cfg.mp_enabled || false });
       }
+
+      const { data: blocked } = await supabase.from("blocked_dates").select("id, date, reason").eq("professional_id", uid).order("date");
+      const bl = blocked || [];
+      setBloqueosDB(bl);
+      setSeleccionados(new Set(bl.map(b => b.date)));
+
       setLoading(false);
     };
     cargar();
   }, []);
+
+  const toggleDiaBloqueo = (fechaStr) => {
+    setSeleccionados(prev => {
+      const next = new Set(prev);
+      if (next.has(fechaStr)) next.delete(fechaStr);
+      else next.add(fechaStr);
+      return next;
+    });
+  };
+
+  const guardarBloqueos = async () => {
+    setSavingBloqueos(true);
+    const uid = await getUid();
+    if (!uid) { setSavingBloqueos(false); return; }
+    const dbSet = new Set(bloqueosDB.map(b => b.date));
+    const toDelete = bloqueosDB.filter(b => !seleccionados.has(b.date)).map(b => b.id);
+    const toInsert = [...seleccionados].filter(d => !dbSet.has(d)).map(d => ({ professional_id: uid, date: d }));
+    if (toDelete.length) await supabase.from("blocked_dates").delete().in("id", toDelete);
+    if (toInsert.length) await supabase.from("blocked_dates").insert(toInsert);
+    const { data: blocked } = await supabase.from("blocked_dates").select("id, date, reason").eq("professional_id", uid).order("date");
+    const bl = blocked || [];
+    setBloqueosDB(bl);
+    setSeleccionados(new Set(bl.map(b => b.date)));
+    setSavingBloqueos(false);
+    setBloqueosMsg("✓ Días bloqueados guardados");
+    setTimeout(() => setBloqueosMsg(""), 2500);
+  };
 
   const guardarServicios = async () => {
     setSaving(true);
@@ -202,7 +240,7 @@ export default function Configuracion() {
   const cycleModalidad = (i) => { const order = ["presencial","virtual","ambas"]; const d = [...dias]; d[i].modalidad = order[(order.indexOf(d[i].modalidad)+1)%order.length]; setDias(d); };
   const cycleServicioMod = (i) => { const order = ["presencial","virtual","ambas"]; const sv = [...servicios]; sv[i].modalidad = order[(order.indexOf(sv[i].modalidad)+1)%order.length]; setServicios(sv); };
 
-  const tabLabels = { disponibilidad: "Disponibilidad", servicios: "Servicios", pausas: "Pausas", pagos: "Pagos", profesionales: "Profesionales", cuenta: "Cuenta" };
+  const tabLabels = { disponibilidad: "Disponibilidad", servicios: "Servicios", pausas: "Pausas", pagos: "Pagos", profesionales: "Profesionales", bloqueos: "Días bloqueados", cuenta: "Cuenta" };
 
   return (
     <div style={s.main}>
@@ -213,7 +251,7 @@ export default function Configuracion() {
         </div>
       </div>
       <div style={s.tabs}>
-        {["disponibilidad","servicios","pausas","pagos","profesionales","cuenta"].map(t => (
+        {["disponibilidad","servicios","pausas","pagos","profesionales","bloqueos","cuenta"].map(t => (
           <button key={t} style={tab === t ? s.tabActive : s.tab} onClick={() => setTab(t)}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -367,6 +405,69 @@ export default function Configuracion() {
               </div>
             </>
           )}
+          {tab === "bloqueos" && (() => {
+            const hoy = new Date(); hoy.setHours(0,0,0,0);
+            const anio = mesBloqueos.getFullYear();
+            const mes = mesBloqueos.getMonth();
+            const diasEnMes = new Date(anio, mes + 1, 0).getDate();
+            const primerDow = new Date(anio, mes, 1).getDay();
+            const offset = primerDow === 0 ? 6 : primerDow - 1;
+            const nombreMes = mesBloqueos.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+            const cambiarMes = (delta) => { const d = new Date(anio, mes + delta, 1); setMesBloqueos(d); };
+            const toStr = (d) => `${anio}-${String(mes+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+            const bloqueadosCount = seleccionados.size;
+            return (
+              <>
+                <div style={s.card}>
+                  <div style={s.cardTitle}>Seleccioná los días a bloquear</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <button onClick={() => cambiarMes(-1)} style={{ width: "30px", height: "30px", borderRadius: "8px", border: "0.5px solid #E0D0F0", background: "#fff", cursor: "pointer", color: "#9B72C0", fontSize: "16px" }}>‹</button>
+                    <span style={{ fontSize: "14px", fontWeight: "500", color: "#2A1845" }}>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
+                    <button onClick={() => cambiarMes(1)} style={{ width: "30px", height: "30px", borderRadius: "8px", border: "0.5px solid #E0D0F0", background: "#fff", cursor: "pointer", color: "#9B72C0", fontSize: "16px" }}>›</button>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px", marginBottom: "4px" }}>
+                    {["L","M","X","J","V","S","D"].map(d => (
+                      <div key={d} style={{ textAlign: "center", fontSize: "11px", color: "#B89FD0", padding: "4px 0", textTransform: "uppercase", letterSpacing: "0.3px" }}>{d}</div>
+                    ))}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "4px" }}>
+                    {Array(offset).fill(null).map((_, i) => <div key={`e${i}`} />)}
+                    {Array.from({ length: diasEnMes }, (_, i) => i + 1).map(d => {
+                      const str = toStr(d);
+                      const fechaD = new Date(anio, mes, d);
+                      const pasado = fechaD < hoy;
+                      const selec = seleccionados.has(str);
+                      const esHoy = str === hoy.toISOString().slice(0,10);
+                      return (
+                        <div key={d} onClick={() => !pasado && toggleDiaBloqueo(str)}
+                          style={{
+                            height: "40px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "13px", cursor: pasado ? "default" : "pointer", fontWeight: esHoy ? "600" : "400",
+                            background: selec ? "#FCEBEB" : esHoy ? "#F3EEFF" : "#FDFAFF",
+                            border: selec ? "1.5px solid #C06080" : esHoy ? "1.5px solid #9B72C0" : "0.5px solid #F0E8F8",
+                            color: pasado ? "#D0C0E0" : selec ? "#A32D2D" : esHoy ? "#7B5EA7" : "#2A1845",
+                          }}>
+                          {selec ? "🔒" : d}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {bloqueadosCount > 0 && (
+                    <div style={{ marginTop: "14px", padding: "10px 12px", background: "#FCEBEB", borderRadius: "8px", fontSize: "12px", color: "#A32D2D" }}>
+                      🔒 {bloqueadosCount} día{bloqueadosCount > 1 ? "s" : ""} bloqueado{bloqueadosCount > 1 ? "s" : ""} en total
+                    </div>
+                  )}
+                </div>
+                {bloqueosMsg && <div style={{ fontSize: "12px", color: "#3B6D11", background: "#EAF3DE", padding: "10px 14px", borderRadius: "8px" }}>{bloqueosMsg}</div>}
+                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <button style={s.saveBtn} onClick={guardarBloqueos} disabled={savingBloqueos}>
+                    {savingBloqueos ? "Guardando..." : "Guardar bloqueos"}
+                  </button>
+                </div>
+              </>
+            );
+          })()}
+
           {tab === "profesionales" && (
             <>
               <div style={s.card}>
