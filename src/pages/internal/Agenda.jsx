@@ -108,7 +108,7 @@ export default function Agenda() {
     const currentUid = session?.user?.id;
     if (currentUid && !uid) setUid(currentUid);
     if (currentUid) {
-      const { data: blocked } = await supabase.from("blocked_dates").select("id, date, reason").eq("professional_id", currentUid);
+      const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", currentUid);
       setBlockedDates(blocked || []);
     }
     if (vista === "dia") {
@@ -279,7 +279,8 @@ export default function Agenda() {
   };
 
   const fechaActualStr = toISO(fecha);
-  const bloqueadoHoy = blockedDates.find(b => b.date === fechaActualStr);
+  const bloqueadoHoy = blockedDates.find(b => b.date === fechaActualStr && !b.start_time);
+  const bloqueosParcialesHoy = blockedDates.filter(b => b.date === fechaActualStr && b.start_time);
 
   const bloquearDia = async () => {
     if (!uid) return;
@@ -381,6 +382,12 @@ export default function Agenda() {
                           <button onClick={desbloquearDia} style={{ marginTop: "4px", padding: "6px 16px", background: "#fff", color: "#6B7280", border: "0.5px solid #D1D5DB", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Desbloquear</button>
                         </div>
                       )}
+                      {bloqueosParcialesHoy.map((b, i) => (
+                        <div key={i} style={{ position: "absolute", left: 0, right: 0, top: `${getTop(b.start_time.slice(0,5))}px`, height: `${getHeight(b.start_time.slice(0,5), b.end_time.slice(0,5))}px`, background: "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 8px, #F9FAFB 8px, #F9FAFB 16px)", zIndex: 4, border: "0.5px solid #D1D5DB", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", gap: "8px" }}>
+                          <div style={{ fontSize: "11px", color: "#6B7280" }}>🔒 {b.start_time.slice(0,5)}–{b.end_time.slice(0,5)} bloqueado{b.reason ? ` · ${b.reason}` : ""}</div>
+                          <button onClick={async () => { await supabase.from("blocked_dates").delete().eq("id", b.id); await cargarDatos(); }} style={{ padding: "3px 8px", background: "#fff", color: "#6B7280", border: "0.5px solid #D1D5DB", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", flexShrink: 0 }}>✕</button>
+                        </div>
+                      ))}
                       {HORAS.map(h => <div key={h} style={{ height: "64px", borderBottom: "0.5px solid #F8F0FC" }}></div>)}
                       {toISO(fecha) === toISO(new Date()) && (() => {
                         const mins = horaActual.getHours() * 60 + horaActual.getMinutes();
@@ -421,12 +428,13 @@ export default function Agenda() {
                     {semana.map((d, i) => {
                       const esHoy = toISO(d) === toISO(new Date());
                       const countDia = turnosSemana.filter(t => t.date === toISO(d)).length;
-                      const esBloqueado = blockedDates.some(b => b.date === toISO(d));
+                      const esBloqueado = blockedDates.some(b => b.date === toISO(d) && !b.start_time);
+                      const tieneBloqueoParcial = blockedDates.some(b => b.date === toISO(d) && b.start_time);
                       return (
                         <div key={i} style={{ textAlign: "center", padding: "6px 4px", borderBottom: "0.5px solid #F0E8F8", background: esBloqueado ? "#F3F4F6" : esHoy ? "#F3EEFF" : "transparent" }}>
                           <div style={{ fontSize: "11px", color: esBloqueado ? "#9CA3AF" : esHoy ? "#9B72C0" : "#B89FD0", fontWeight: esHoy ? "500" : "400" }}>{DIAS_SEMANA[i]}</div>
                           <div style={{ fontSize: "16px", fontWeight: esHoy ? "600" : "400", color: esBloqueado ? "#9CA3AF" : esHoy ? "#9B72C0" : "#2A1845", lineHeight: "1.4" }}>{d.getDate()}</div>
-                          {esBloqueado ? <div style={{ fontSize: "10px", color: "#9CA3AF" }}>🔒 bloqueado</div> : countDia > 0 && <div style={{ fontSize: "9px", color: esHoy ? "#9B72C0" : "#C4A8D8" }}>{countDia} turno{countDia > 1 ? "s" : ""}</div>}
+                          {esBloqueado ? <div style={{ fontSize: "10px", color: "#9CA3AF" }}>🔒 bloqueado</div> : tieneBloqueoParcial ? <div style={{ fontSize: "10px", color: "#D97706" }}>⏰ parcial</div> : countDia > 0 && <div style={{ fontSize: "9px", color: esHoy ? "#9B72C0" : "#C4A8D8" }}>{countDia} turno{countDia > 1 ? "s" : ""}</div>}
                         </div>
                       );
                     })}
@@ -435,8 +443,10 @@ export default function Agenda() {
                         <div style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>
                         {semana.map((d, di) => {
                           const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.slice(0,2) === h.slice(0,2));
+                          const celdaBloqueadaTotal = blockedDates.some(b => b.date === toISO(d) && !b.start_time);
+                          const celdaBloqueadaParcial = blockedDates.some(b => b.date === toISO(d) && b.start_time && b.start_time.slice(0,5) <= h && h < b.end_time.slice(0,5));
                           return (
-                            <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative", background: blockedDates.some(b => b.date === toISO(d)) ? "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 6px, #F9FAFB 6px, #F9FAFB 12px)" : toISO(d) === toISO(new Date()) ? "#FDFAFF" : "transparent" }}>
+                            <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative", background: (celdaBloqueadaTotal || celdaBloqueadaParcial) ? "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 6px, #F9FAFB 6px, #F9FAFB 12px)" : toISO(d) === toISO(new Date()) ? "#FDFAFF" : "transparent" }}>
                               {turnosDia.map((t, ti) => {
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
