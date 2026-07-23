@@ -1,0 +1,13 @@
+{
+  "name": "AgendaLec",
+  "short_name": "AgendaLec",
+  "description": "Gestión de turnos - Espacio Lec",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F8F4FC",
+  "theme_color": "#2A1845",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
