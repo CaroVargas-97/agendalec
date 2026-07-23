@@ -135,7 +135,7 @@ export default function Configuracion() {
 
       const { data: cfg } = await supabase.from("settings").select("*").eq("professional_id", uid).maybeSingle();
       if (cfg) {
-        setPausas({ pausa: cfg.break_minutes || 15, anticipacion: cfg.min_advance_hours || 24, cancelacion: cfg.cancellation_hours || 24 });
+        setPausas({ pausa: cfg.break_minutes ?? 15, anticipacion: cfg.min_advance_hours ?? 24, cancelacion: cfg.cancellation_hours ?? 24 });
         setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", alias_eur: cfg.alias_eur || "", cbu_eur: cfg.cbu_eur || "", mp_enabled: cfg.mp_enabled || false });
       }
 
