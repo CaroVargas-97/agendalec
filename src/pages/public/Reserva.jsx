@@ -84,6 +84,7 @@ export default function Reserva() {
   const [modalidad, setModalidad] = useState(null);
   const [form, setForm] = useState({ nombre: "", celular: "", mail: "" });
   const [clienteReconocido, setClienteReconocido] = useState(false);
+  const [clientePrecio, setClientePrecio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -146,7 +147,9 @@ export default function Reserva() {
 
   const srv = servicios.find(s => s.id === servicio);
   const esACoorinar = srv?.requires_slot === false;
-  const total = srv?.price || 0;
+  const esCortesia = clientePrecio?.tipo === "cortesia";
+  const esPrecioEspecial = clientePrecio?.tipo === "especial" && clientePrecio.monto != null;
+  const total = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : (srv?.price || 0);
   const sena = Math.round(total / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
   const esMonedaExtranjera = srv?.currency === "USD" || srv?.currency === "EUR";
@@ -234,8 +237,10 @@ export default function Reserva() {
     if (data) {
       setForm(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
       setClienteReconocido(true);
+      setClientePrecio(data.price_type && data.price_type !== "normal" ? { tipo: data.price_type, monto: data.custom_price } : null);
     } else {
       setClienteReconocido(false);
+      setClientePrecio(null);
     }
   };
 
@@ -268,9 +273,11 @@ export default function Reserva() {
       if (errTurno) throw errTurno;
 
       const pagoId = crypto.randomUUID();
-      const { error: errPago } = await supabase.from("payments").insert({
-        id: pagoId, appointment_id: turnoId, type: "seña", amount: sena, status: "pending"
-      });
+      const { error: errPago } = await supabase.from("payments").insert(
+        esCortesia
+          ? { id: pagoId, appointment_id: turnoId, type: "seña", amount: total, status: "paid", paid_at: new Date().toISOString() }
+          : { id: pagoId, appointment_id: turnoId, type: "seña", amount: sena, status: "pending" }
+      );
       if (errPago) throw errPago;
 
       if (comprobante) {
@@ -496,6 +503,16 @@ export default function Reserva() {
               ✓ Encontramos tus datos. Podés editarlos si cambiaron.
             </div>
           )}
+          {esCortesia && (
+            <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A0407A" }}>
+              🎁 Tenés un turno de cortesía. No necesitás transferir nada.
+            </div>
+          )}
+          {esPrecioEspecial && (
+            <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99" }}>
+              ✨ Tenés un precio especial aplicado.
+            </div>
+          )}
           <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
           <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
 
@@ -516,13 +533,17 @@ export default function Reserva() {
               </>
             )}
             <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "2px" }}>
-              <div style={s.resRow}><span style={s.resLabel}>Precio total</span><span style={s.resValor}>{sym}{total.toLocaleString("es-AR")}</span></div>
-              <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña ahora (50%)</span><span style={s.resSeña}>{sym}{sena.toLocaleString("es-AR")}</span></div>
-              <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>{sym}{sena.toLocaleString("es-AR")}</span></div>
+              <div style={s.resRow}><span style={s.resLabel}>Precio total</span><span style={s.resValor}>{esCortesia ? "🎁 Cortesía" : `${sym}${total.toLocaleString("es-AR")}`}</span></div>
+              {!esCortesia && (
+                <>
+                  <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña ahora (50%)</span><span style={s.resSeña}>{sym}{sena.toLocaleString("es-AR")}</span></div>
+                  <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>{sym}{sena.toLocaleString("es-AR")}</span></div>
+                </>
+              )}
             </div>
           </div>
 
-          {aliasActivo && (
+          {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{esMonedaExtranjera ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
@@ -532,17 +553,19 @@ export default function Reserva() {
             </div>
           )}
 
-          <div style={s.field}>
-            <label style={s.label}>Comprobante de transferencia <span style={{ color: "#A32D2D" }}>*</span></label>
-            <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobante ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobante ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
-              <span style={{ fontSize: "18px" }}>{comprobante ? "✅" : "📎"}</span>
-              <span style={{ fontSize: "13px", color: comprobante ? "#5C3F99" : "#B89FD0", flex: 1 }}>
-                {comprobante ? comprobante.name : "Adjuntar captura o PDF"}
-              </span>
-              {comprobante && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobante(null); }}>✕ quitar</span>}
-              <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobante(e.target.files[0] || null)} />
-            </label>
-          </div>
+          {!esCortesia && (
+            <div style={s.field}>
+              <label style={s.label}>Comprobante de transferencia <span style={{ color: "#A32D2D" }}>*</span></label>
+              <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobante ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobante ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
+                <span style={{ fontSize: "18px" }}>{comprobante ? "✅" : "📎"}</span>
+                <span style={{ fontSize: "13px", color: comprobante ? "#5C3F99" : "#B89FD0", flex: 1 }}>
+                  {comprobante ? comprobante.name : "Adjuntar captura o PDF"}
+                </span>
+                {comprobante && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobante(null); }}>✕ quitar</span>}
+                <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobante(e.target.files[0] || null)} />
+              </label>
+            </div>
+          )}
 
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
             <input type="checkbox" id="tyc" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
@@ -551,14 +574,14 @@ export default function Reserva() {
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
-            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && comprobante ? 1 : 0.5 }}
-              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || !comprobante}
+            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && (comprobante || esCortesia) ? 1 : 0.5 }}
+              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || (!comprobante && !esCortesia)}
               onClick={confirmarReserva}>
               {guardando ? "Confirmando..." : "✓ Confirmar turno"}
             </button>
           </div>
           <div style={{ fontSize: "11px", color: "#B89FD0", textAlign: "center" }}>
-            Tu turno quedará pendiente hasta que se confirme la transferencia
+            {esCortesia ? "Tu turno quedará a la espera de confirmación del equipo" : "Tu turno quedará pendiente hasta que se confirme la transferencia"}
           </div>
         </div>
       )}
