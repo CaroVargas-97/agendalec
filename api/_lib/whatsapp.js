@@ -1,3 +1,11 @@
+function normalizarCelularAR(raw) {
+  let d = String(raw).replace(/\D/g, "");
+  if (d.startsWith("54")) d = d.slice(2);
+  if (d.startsWith("9")) d = d.slice(1);
+  if (d.startsWith("0")) d = d.slice(1);
+  return `549${d}`;
+}
+
 export async function enviarWhatsApp(telefono, mensaje) {
   const url = `https://graph.facebook.com/v20.0/${process.env.META_PHONE_ID}/messages`;
   const response = await fetch(url, {
@@ -8,7 +16,7 @@ export async function enviarWhatsApp(telefono, mensaje) {
     },
     body: JSON.stringify({
       messaging_product: "whatsapp",
-      to: `54${telefono}`,
+      to: normalizarCelularAR(telefono),
       type: "text",
       text: { body: mensaje }
     })
