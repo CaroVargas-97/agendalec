@@ -39,6 +39,7 @@ const getPrecioTag = (precio) => {
 };
 
 export default function Clientes() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [busqueda, setBusqueda] = useState("");
   const [clientes, setClientes] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
@@ -55,6 +56,12 @@ export default function Clientes() {
   };
 
   useEffect(() => { cargar(); }, []);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const abrirCliente = (c) => {
     setClienteSeleccionado(c);
@@ -91,70 +98,101 @@ export default function Clientes() {
   );
 
   return (
-    <div style={s.main}>
-      <div style={s.topbar}>
+    <div style={{ ...s.main, padding: isMobile ? "1rem" : "1.5rem" }}>
+      <div style={{ ...s.topbar, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-start", gap: isMobile ? "10px" : 0 }}>
         <div>
           <div style={s.title}>Clientes</div>
           <div style={s.titleSub}>{clientes.length} clientes registrados</div>
         </div>
-        <input type="text" placeholder="🔍 Buscar por nombre o mail..." value={busqueda} onChange={e => setBusqueda(e.target.value)} style={s.searchInput} />
+        <input type="text" placeholder="🔍 Buscar por nombre o mail..." value={busqueda} onChange={e => setBusqueda(e.target.value)} style={{ ...s.searchInput, width: isMobile ? "100%" : "260px", boxSizing: "border-box" }} />
       </div>
 
-      <div style={s.card}>
-        {loading ? <div style={s.emptyText}>Cargando...</div> : (
-          <table style={s.tabla}>
-            <thead>
-              <tr>
-                <th style={s.th}>Cliente</th>
-                <th style={s.th}>Contacto</th>
-                <th style={s.th}>Sesiones</th>
-                <th style={s.th}>Precio</th>
-                <th style={s.th}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {clientesFiltrados.length === 0 ? (
-                <tr><td colSpan={5} style={{ ...s.td, textAlign: "center", color: "#B89FD0" }}>No hay clientes aún</td></tr>
-              ) : clientesFiltrados.map((c, i) => (
-                <tr key={i} style={{ transition: "background 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <td style={s.td}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ ...s.avatar, background: avatarColors[i % avatarColors.length] }}>
-                        {c.full_name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
-                      </div>
-                      <div>
-                        <div style={{ fontWeight: "500", color: "#2A1845" }}>{c.full_name}</div>
-                        <div style={{ fontSize: "12px", color: "#B89FD0" }}>{c.email}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={s.td}>
-                    <div style={{ fontSize: "13px", color: "#2A1845" }}>{c.phone || "—"}</div>
-                    {c.phone && (
-                      <a href={`https://wa.me/54${c.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer">
-                        <button style={{ ...s.btnWA, marginTop: "4px" }}>💬 WhatsApp</button>
-                      </a>
-                    )}
-                  </td>
-                  <td style={s.td}>
-                    <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{c.appointments?.[0]?.count || 0}</div>
-                    <div style={{ fontSize: "11px", color: "#B89FD0" }}>sesiones</div>
-                  </td>
-                  <td style={s.td}>{getPrecioTag(c.price_type || "normal")}</td>
-                  <td style={s.td}>
-                    <button style={s.btnVer} onClick={() => abrirCliente(c)}>Ver perfil →</button>
-                  </td>
+      {isMobile ? (
+        loading ? <div style={{ ...s.card, ...s.emptyText }}>Cargando...</div> : clientesFiltrados.length === 0 ? (
+          <div style={{ ...s.card, ...s.emptyText }}>No hay clientes aún</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {clientesFiltrados.map((c, i) => (
+              <div key={i} style={{ ...s.card, padding: "1rem" }} onClick={() => abrirCliente(c)}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <div style={{ ...s.avatar, background: avatarColors[i % avatarColors.length] }}>
+                    {c.full_name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: "500", color: "#2A1845" }}>{c.full_name}</div>
+                    <div style={{ fontSize: "12px", color: "#B89FD0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.email}</div>
+                  </div>
+                  {getPrecioTag(c.price_type || "normal")}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "0.5px solid #F0E8F8" }}>
+                  <div style={{ fontSize: "12px", color: "#B89FD0" }}>{c.phone || "Sin celular"} · {c.appointments?.[0]?.count || 0} sesiones</div>
+                  {c.phone && (
+                    <a href={`https://wa.me/54${c.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+                      <button style={s.btnWA}>💬</button>
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : (
+        <div style={s.card}>
+          {loading ? <div style={s.emptyText}>Cargando...</div> : (
+            <table style={s.tabla}>
+              <thead>
+                <tr>
+                  <th style={s.th}>Cliente</th>
+                  <th style={s.th}>Contacto</th>
+                  <th style={s.th}>Sesiones</th>
+                  <th style={s.th}>Precio</th>
+                  <th style={s.th}></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              </thead>
+              <tbody>
+                {clientesFiltrados.length === 0 ? (
+                  <tr><td colSpan={5} style={{ ...s.td, textAlign: "center", color: "#B89FD0" }}>No hay clientes aún</td></tr>
+                ) : clientesFiltrados.map((c, i) => (
+                  <tr key={i} style={{ transition: "background 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                    <td style={s.td}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ ...s.avatar, background: avatarColors[i % avatarColors.length] }}>
+                          {c.full_name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: "500", color: "#2A1845" }}>{c.full_name}</div>
+                          <div style={{ fontSize: "12px", color: "#B89FD0" }}>{c.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td style={s.td}>
+                      <div style={{ fontSize: "13px", color: "#2A1845" }}>{c.phone || "—"}</div>
+                      {c.phone && (
+                        <a href={`https://wa.me/54${c.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer">
+                          <button style={{ ...s.btnWA, marginTop: "4px" }}>💬 WhatsApp</button>
+                        </a>
+                      )}
+                    </td>
+                    <td style={s.td}>
+                      <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{c.appointments?.[0]?.count || 0}</div>
+                      <div style={{ fontSize: "11px", color: "#B89FD0" }}>sesiones</div>
+                    </td>
+                    <td style={s.td}>{getPrecioTag(c.price_type || "normal")}</td>
+                    <td style={s.td}>
+                      <button style={s.btnVer} onClick={() => abrirCliente(c)}>Ver perfil →</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {clienteSeleccionado && (
         <>
           <div style={s.overlay} onClick={() => setClienteSeleccionado(null)} />
-          <div style={s.panel}>
+          <div style={isMobile ? { ...s.panel, width: "100%" } : s.panel}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <div style={{ ...s.avatar, width: "44px", height: "44px", fontSize: "15px", background: "#C4A8D8" }}>

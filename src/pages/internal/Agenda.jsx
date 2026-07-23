@@ -45,8 +45,9 @@ const getHeight = (inicio, fin) => {
 };
 
 export default function Agenda() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [fecha, setFecha] = useState(new Date());
-  const [vista, setVista] = useState("semana");
+  const [vista, setVista] = useState(window.innerWidth < 768 ? "dia" : "semana");
   const [panelAbierto, setPanelAbierto] = useState(false);
   const [turnos, setTurnos] = useState([]);
   const [turnosSemana, setTurnosSemana] = useState([]);
@@ -77,6 +78,16 @@ export default function Agenda() {
   useEffect(() => {
     const interval = setInterval(() => setHoraActual(new Date()), 60000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) setVista("dia");
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const getSemana = (date) => {
@@ -300,30 +311,36 @@ export default function Agenda() {
 
   return (
     <div style={{ display: "flex", flex: 1, flexDirection: "column" }}>
-      <div style={s.main}>
+      <div style={{ ...s.main, padding: isMobile ? "1rem" : "1.5rem" }}>
         <div style={s.topbar}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
             <button style={s.arrowBtn} onClick={() => irDia(-1)}>‹</button>
-            <div style={s.dateLabel}>
+            <div style={{ ...s.dateLabel, minWidth: isMobile ? "auto" : "140px", fontSize: isMobile ? "13px" : "15px" }}>
               {vista === "dia" ? formatFecha(fecha) : `${semana[0].toLocaleDateString("es-AR",{day:"numeric",month:"short"})} – ${semana[6].toLocaleDateString("es-AR",{day:"numeric",month:"long", year:"numeric"})}`}
             </div>
             <button style={s.arrowBtn} onClick={() => irDia(1)}>›</button>
             <button style={s.hoyBtn} onClick={() => setFecha(new Date())}>Hoy</button>
-            <div style={s.toggleWrap}>
-              <button style={vista === "dia" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("dia")}>Día</button>
-              <button style={vista === "semana" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("semana")}>Semana</button>
-            </div>
+            {!isMobile && (
+              <div style={s.toggleWrap}>
+                <button style={vista === "dia" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("dia")}>Día</button>
+                <button style={vista === "semana" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("semana")}>Semana</button>
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <select style={s.select} value={filtroProf} onChange={e => setFiltroProf(e.target.value)}>
-              <option value="todos">Todos los profesionales</option>
-              {profesionales.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-            </select>
-            <select style={s.select} value={filtroMod} onChange={e => setFiltroMod(e.target.value)}>
-              <option value="todas">Todas las modalidades</option>
-              <option value="virtual">Virtual</option>
-              <option value="presencial">Presencial</option>
-            </select>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            {!isMobile && (
+              <>
+                <select style={s.select} value={filtroProf} onChange={e => setFiltroProf(e.target.value)}>
+                  <option value="todos">Todos los profesionales</option>
+                  {profesionales.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </select>
+                <select style={s.select} value={filtroMod} onChange={e => setFiltroMod(e.target.value)}>
+                  <option value="todas">Todas las modalidades</option>
+                  <option value="virtual">Virtual</option>
+                  <option value="presencial">Presencial</option>
+                </select>
+              </>
+            )}
             {vista === "dia" && (
               bloqueadoHoy ? (
                 <button onClick={desbloquearDia} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#F3F4F6", color: "#6B7280", border: "0.5px solid #E5E7EB", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -339,8 +356,8 @@ export default function Agenda() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "1rem", flex: 1 }}>
-          <div style={s.card}>
+        <div style={{ display: "flex", gap: "1rem", flex: 1, flexDirection: isMobile ? "column" : "row" }}>
+          <div style={{ ...s.card, padding: isMobile ? "0.75rem" : "1rem 1.25rem" }}>
             {loading ? <div style={s.emptyText}>Cargando...</div> : (
               <>
                 {vista === "dia" && (
@@ -448,7 +465,7 @@ export default function Agenda() {
             const isCancelled = t.status === "cancelled";
             const isVirtual = t.modality === "virtual";
             return (
-              <div style={s.panel}>
+              <div style={isMobile ? { ...s.panel, position: "fixed", inset: 0, maxWidth: "100%", borderRadius: 0, zIndex: 300, boxShadow: "none" } : s.panel}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>
                     {isVirtual ? "📹" : "📍"} {t.clients?.full_name}
@@ -541,7 +558,7 @@ export default function Agenda() {
           })()}
 
           {panelAbierto && (
-            <div style={s.panel}>
+            <div style={isMobile ? { ...s.panel, position: "fixed", inset: 0, maxWidth: "100%", borderRadius: 0, zIndex: 300, boxShadow: "none", paddingBottom: "90px" } : s.panel}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>📅 Nuevo turno</div>
                 <button onClick={() => setPanelAbierto(false)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
@@ -620,7 +637,7 @@ export default function Agenda() {
         {blockModal && (
           <>
             <div style={{ position: "fixed", inset: 0, background: "rgba(42,24,69,0.2)", zIndex: 200 }} onClick={() => setBlockModal(false)} />
-            <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.5rem", width: "320px", zIndex: 201, boxShadow: "0 8px 32px rgba(42,24,69,0.15)", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.5rem", width: "320px", maxWidth: "90vw", boxSizing: "border-box", zIndex: 201, boxShadow: "0 8px 32px rgba(42,24,69,0.15)", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>🔒 Bloquear día</div>
                 <button onClick={() => setBlockModal(false)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
@@ -640,7 +657,7 @@ export default function Agenda() {
           </>
         )}
 
-        <div style={{ display: "flex", gap: "12px" }}>
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           {[["#EDE8FA","#9B72C0","Virtual"],["#FDE8F0","#E88BB0","Presencial"],["#FFF8E8","#F0A800","Pendiente"]].map(([bg,border,label]) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#B89FD0" }}>
               <div style={{ width: "10px", height: "10px", borderRadius: "2px", background: bg, borderLeft: `2px solid ${border}` }}></div>
