@@ -87,12 +87,14 @@ export default function Cobros() {
     await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", id).eq("type", "seña");
     const saldo = Math.round(parseFloat(totalPrice) / 2);
     await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "pending" });
+    fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: id }) });
     cargar();
   };
 
   const pagarTodo = async (id) => {
     await supabase.from("appointments").update({ status: "confirmed" }).eq("id", id);
     await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", id).eq("type", "seña");
+    fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: id }) });
     cargar();
   };
 

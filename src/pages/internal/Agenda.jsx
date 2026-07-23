@@ -159,6 +159,7 @@ export default function Agenda() {
       const saldo = Math.round(parseFloat(t.total_price) / 2);
       await supabase.from("payments").insert({ appointment_id: t.id, type: "saldo", amount: saldo, status: "pending" });
       await supabase.from("appointments").update({ status: "partial" }).eq("id", t.id);
+      fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: t.id }) });
     } else if (tipo === "confirmar_saldo") {
       const pago = pagosDelTurno.find(p => p.type === "saldo");
       if (pago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pago.id);
@@ -166,6 +167,7 @@ export default function Agenda() {
     } else if (tipo === "pago_completo") {
       await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", t.id).eq("type", "seña");
       await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+      fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: t.id }) });
     } else if (tipo === "cancelar_sin_devolucion") {
       if (!window.confirm("¿Cancelar el turno sin devolver la seña?")) { setSavingPago(false); return; }
       await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
