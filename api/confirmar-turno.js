@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       ? `📍 ${modalidad} — ${turno.profiles.address}`
       : `📍 ${modalidad}`;
 
-    const mensaje = `Hola ${turno.clients.full_name}! 👋 Tu turno de ${turno.services.name} con ${turno.profiles.full_name} quedó confirmado.\n\n📅 ${fecha}\n🕐 ${hora}\n${lineaUbicacion}\n\n¡Te esperamos! 🗓`;
+    const mensaje = `Hola ${turno.clients.full_name}! 👋 Tu turno quedó *confirmado*.\n\n📌 Servicio: ${turno.services.name}\n🧑‍⚕️ Profesional: ${turno.profiles.full_name}\n📅 Fecha: ${fecha}\n🕐 Hora: ${hora}\n${lineaUbicacion}\n\n¡Te esperamos en Espacio Lec! 🪷`;
 
     await enviarWhatsApp(celular, mensaje);
     return res.status(200).json({ ok: true });
