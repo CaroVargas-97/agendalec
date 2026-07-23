@@ -69,11 +69,7 @@ export default function Agenda() {
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
   const [horaActual, setHoraActual] = useState(new Date());
-  const [uid, setUid] = useState(null);
   const [blockedDates, setBlockedDates] = useState([]);
-  const [blockModal, setBlockModal] = useState(false);
-  const [blockReason, setBlockReason] = useState("");
-  const [savingBlock, setSavingBlock] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setHoraActual(new Date()), 60000);
@@ -106,7 +102,6 @@ export default function Agenda() {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     const currentUid = session?.user?.id;
-    if (currentUid && !uid) setUid(currentUid);
     if (currentUid) {
       const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", currentUid);
       setBlockedDates(blocked || []);
@@ -285,16 +280,6 @@ export default function Agenda() {
   const bloqueadoHoy = blockedDates.find(b => b.date === fechaActualStr && !b.start_time);
   const bloqueosParcialesHoy = blockedDates.filter(b => b.date === fechaActualStr && b.start_time);
 
-  const bloquearDia = async () => {
-    if (!uid) return;
-    setSavingBlock(true);
-    await supabase.from("blocked_dates").insert({ professional_id: uid, date: fechaActualStr, reason: blockReason || null });
-    setBlockModal(false);
-    setBlockReason("");
-    setSavingBlock(false);
-    await cargarDatos();
-  };
-
   const desbloquearDia = async () => {
     if (!bloqueadoHoy) return;
     await supabase.from("blocked_dates").delete().eq("id", bloqueadoHoy.id);
@@ -354,16 +339,10 @@ export default function Agenda() {
                 </select>
               </>
             )}
-            {vista === "dia" && (
-              bloqueadoHoy ? (
-                <button onClick={desbloquearDia} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#F3F4F6", color: "#6B7280", border: "0.5px solid #E5E7EB", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  🔓 Desbloquear día
-                </button>
-              ) : (
-                <button onClick={() => setBlockModal(true)} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#FEF0F3", color: "#C06080", border: "0.5px solid #F0D0D8", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  🔒 Bloquear día
-                </button>
-              )
+            {vista === "dia" && bloqueadoHoy && (
+              <button onClick={desbloquearDia} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#F3F4F6", color: "#6B7280", border: "0.5px solid #E5E7EB", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                🔓 Desbloquear día
+              </button>
             )}
             <button style={s.btnNuevo} onClick={() => { setPanelAbierto(true); cerrarTurno(); }}>+ Nuevo turno</button>
           </div>
@@ -657,29 +636,6 @@ export default function Agenda() {
             </div>
           )}
         </div>
-
-        {blockModal && (
-          <>
-            <div style={{ position: "fixed", inset: 0, background: "rgba(42,24,69,0.2)", zIndex: 200 }} onClick={() => setBlockModal(false)} />
-            <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.5rem", width: "320px", maxWidth: "90vw", boxSizing: "border-box", zIndex: 201, boxShadow: "0 8px 32px rgba(42,24,69,0.15)", display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>🔒 Bloquear día</div>
-                <button onClick={() => setBlockModal(false)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
-              </div>
-              <div style={{ fontSize: "13px", color: "#9B72C0" }}>{formatFecha(fecha)}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                <label style={{ fontSize: "11px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Motivo (opcional)</label>
-                <textarea value={blockReason} onChange={e => setBlockReason(e.target.value)} placeholder="Ej: Vacaciones, evento personal..." style={{ fontSize: "13px", padding: "8px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%", height: "72px", resize: "none", boxSizing: "border-box" }} />
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={() => setBlockModal(false)} style={{ flex: 1, padding: "10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>Cancelar</button>
-                <button onClick={bloquearDia} disabled={savingBlock} style={{ flex: 1, padding: "10px", background: "#C06080", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                  {savingBlock ? "Bloqueando..." : "🔒 Bloquear"}
-                </button>
-              </div>
-            </div>
-          </>
-        )}
 
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           {[["#EDE8FA","#9B72C0","Virtual"],["#FDE8F0","#E88BB0","Presencial"],["#FFF8E8","#F0A800","Pendiente"]].map(([bg,border,label]) => (

@@ -347,7 +347,6 @@ export default function Configuracion() {
           {tab === "pausas" && (
             <>
               {[
-                { key: "pausa", label: "Pausa entre sesiones", sub: "Tiempo bloqueado entre turno y turno", unit: "min", color: "#9B72C0" },
                 { key: "anticipacion", label: "Anticipación mínima", sub: "Horas antes en que puede reservar un cliente", unit: "hs", color: "#F59E0B" },
                 { key: "cancelacion", label: "Plazo de cancelación", sub: "Horas antes del turno para cancelar con reembolso", unit: "hs", color: "#63B522" },
               ].map(f => (
