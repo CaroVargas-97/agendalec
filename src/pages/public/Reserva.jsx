@@ -138,7 +138,7 @@ export default function Reserva() {
     const anio = mesActual.getFullYear();
     const mes = mesActual.getMonth() + 1;
     const fecha = `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
-    supabase.from("appointments").select("start_time")
+    supabase.from("turnos_ocupados").select("start_time")
       .eq("professional_id", profData.id).eq("date", fecha)
       .in("status", ["pending", "confirmed", "partial"])
       .then(({ data }) => setHorariosOcupados((data || []).map(t => t.start_time.slice(0, 5))));
@@ -229,7 +229,8 @@ export default function Reserva() {
 
   const buscarClientePorMail = async (mail) => {
     if (!mail || !mail.includes("@")) return;
-    const { data } = await supabase.from("clients").select("full_name, phone").eq("email", mail).maybeSingle();
+    const { data: rows } = await supabase.rpc("buscar_cliente_por_email", { p_email: mail });
+    const data = rows?.[0];
     if (data) {
       setForm(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
       setClienteReconocido(true);
@@ -242,14 +243,10 @@ export default function Reserva() {
     setGuardando(true);
     setError("");
     try {
-      let clienteId;
-      const { data: clienteExistente } = await supabase.from("clients").select("id").eq("email", form.mail).maybeSingle();
-      if (clienteExistente) {
-        clienteId = clienteExistente.id;
-      } else {
-        const { data: nuevoCliente } = await supabase.from("clients").insert({ full_name: form.nombre, phone: form.celular, email: form.mail }).select("id").single();
-        clienteId = nuevoCliente.id;
-      }
+      const { data: clienteId, error: errCliente } = await supabase.rpc("obtener_o_crear_cliente", {
+        p_nombre: form.nombre, p_telefono: form.celular, p_email: form.mail
+      });
+      if (errCliente) throw errCliente;
 
       let endTime = null;
       if (!esACoorinar && hora) {
@@ -259,26 +256,31 @@ export default function Reserva() {
         endTime = `${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}`;
       }
 
-      const { data: turno } = await supabase.from("appointments").insert({
+      const turnoId = crypto.randomUUID();
+      const { error: errTurno } = await supabase.from("appointments").insert({
+        id: turnoId,
         professional_id: profData.id, client_id: clienteId, service_id: srv.id,
         date: esACoorinar ? null : fechaStr,
         start_time: esACoorinar ? null : hora,
         end_time: endTime,
         modality: modalidad || srv.modality, status: "pending", total_price: total
-      }).select("id").single();
+      });
+      if (errTurno) throw errTurno;
 
-      const { data: pago } = await supabase.from("payments").insert({
-        appointment_id: turno.id, type: "seña", amount: sena, status: "pending"
-      }).select("id").single();
+      const pagoId = crypto.randomUUID();
+      const { error: errPago } = await supabase.from("payments").insert({
+        id: pagoId, appointment_id: turnoId, type: "seña", amount: sena, status: "pending"
+      });
+      if (errPago) throw errPago;
 
-      if (comprobante && pago?.id) {
+      if (comprobante) {
         const ext = comprobante.name.split(".").pop();
         const { data: uploadData } = await supabase.storage
           .from("comprobantes")
-          .upload(`${turno.id}-sena.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
+          .upload(`${turnoId}-sena.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
         if (uploadData) {
           const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
-          await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pago.id);
+          await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
         }
       }
 
