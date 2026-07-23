@@ -46,7 +46,10 @@ export default function Layout({ children, page, setPage }) {
       {!isMobile && (
         <div style={s.sidebar}>
           <div style={s.logoWrap}>
-            <div style={s.logo}>🗓 AgendaLec</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <img src="/logo-flower.png" alt="" style={{ width: "22px", height: "22px", filter: "brightness(0) invert(1)" }} />
+              <div style={s.logo}>AgendaLec</div>
+            </div>
             <div style={s.logoSub}>Gestión de turnos</div>
           </div>
           {navItems.map(item => (

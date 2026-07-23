@@ -20,7 +20,10 @@ export default function Terminos() {
     <div style={s.wrap}>
       <div style={s.container}>
         <div style={s.header}>
-          <div style={s.logo}>🗓 AgendaLec</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", ...s.logo }}>
+            <img src="/logo-flower.png" alt="" style={{ width: "22px", height: "22px" }} />
+            AgendaLec
+          </div>
           <div style={s.sub}>Términos y Condiciones</div>
         </div>
 

@@ -48,7 +48,7 @@ function App() {
       <div style={{ minHeight: "100vh", background: "#F8F4FC", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
         <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "2rem" }}>
           <div>
-            <div style={{ fontSize: "32px", marginBottom: "8px" }}>🗓</div>
+            <img src="/logo-flower.png" alt="" style={{ width: "56px", height: "56px", marginBottom: "8px" }} />
             <div style={{ fontSize: "22px", fontWeight: "600", color: "#2A1845" }}>AgendaLec</div>
             <div style={{ fontSize: "14px", color: "#B89FD0", marginTop: "4px" }}>Gestión de turnos</div>
           </div>

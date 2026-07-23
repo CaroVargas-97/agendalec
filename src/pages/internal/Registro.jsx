@@ -104,7 +104,10 @@ export default function Registro({ onLogin }) {
     <div style={styles.container}>
       <div style={styles.wrapper}>
         <div style={styles.header}>
-          <div style={styles.logo}>🗓 AgendaLec</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", ...styles.logo }}>
+            <img src="/logo-flower.png" alt="" style={{ width: "26px", height: "26px" }} />
+            AgendaLec
+          </div>
         </div>
         <div style={styles.card}>
           <div style={styles.success}>
@@ -120,7 +123,10 @@ export default function Registro({ onLogin }) {
     <div style={styles.container}>
       <div style={styles.wrapper}>
         <div style={styles.header}>
-          <div style={styles.logo}>🗓 AgendaLec</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", ...styles.logo }}>
+            <img src="/logo-flower.png" alt="" style={{ width: "26px", height: "26px" }} />
+            AgendaLec
+          </div>
           <div style={styles.sub}>Creá tu cuenta de profesional</div>
         </div>
         <div style={styles.card}>

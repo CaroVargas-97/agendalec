@@ -301,7 +301,10 @@ export default function Reserva() {
     <div style={s.wrap}>
       <div style={s.header}>
         <div>
-          <div style={s.logo}>🗓 AgendaLec</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", ...s.logo }}>
+            <img src="/logo-flower.png" alt="" style={{ width: "18px", height: "18px" }} />
+            AgendaLec
+          </div>
           <div style={s.logoSub}>Gestión de turnos</div>
         </div>
       </div>
@@ -319,7 +322,10 @@ export default function Reserva() {
     <div style={s.wrap}>
       <div style={s.header}>
         <div>
-          <div style={s.logo}>🗓 AgendaLec</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", ...s.logo }}>
+            <img src="/logo-flower.png" alt="" style={{ width: "18px", height: "18px" }} />
+            AgendaLec
+          </div>
           <div style={s.logoSub}>Gestión de turnos</div>
         </div>
         <StepDots step={step} />
