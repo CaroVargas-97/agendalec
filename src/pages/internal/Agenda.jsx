@@ -217,7 +217,7 @@ export default function Agenda() {
     setClienteEncontrado(null);
     setClienteNuevo(false);
     if (nombre.length < 3) return;
-    const { data } = await supabase.from("clients").select("id, full_name, phone").ilike("full_name", `%${nombre}%`).limit(5);
+    const { data } = await supabase.from("clients").select("id, full_name, phone, price_type, custom_price").ilike("full_name", `%${nombre}%`).limit(5);
     if (data && data.length > 0) setClienteEncontrado(data[0]);
     else setClienteNuevo(true);
   };
@@ -250,21 +250,22 @@ export default function Agenda() {
     const endMin = h * 60 + m + srv.duration_minutes;
     const endTime = `${String(Math.floor(endMin/60)).padStart(2,"0")}:${String(endMin%60).padStart(2,"0")}`;
 
+    const precio = getPrecioEfectivo(srv);
     const status = estadoPago === "completo" ? "confirmed" : "pending";
     const { data: turno } = await supabase.from("appointments").insert({
       professional_id: form.profesional, client_id: clienteId, service_id: form.servicioId,
       date: form.fecha, start_time: form.hora, end_time: endTime,
-      modality: form.modalidad, status, total_price: srv.price, notes: form.notas
+      modality: form.modalidad, status, total_price: precio, notes: form.notas
     }).select("id").single();
 
     // Registrar pagos según el estado
     if (estadoPago === "sena") {
-      const sena = Math.round(srv.price / 2);
+      const sena = Math.round(precio / 2);
       await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: sena, status: "pending" });
     } else if (estadoPago === "completo") {
-      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: srv.price, status: "paid", paid_at: new Date().toISOString() });
+      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: precio, status: "paid", paid_at: new Date().toISOString() });
     } else {
-      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: Math.round(srv.price / 2), status: "pending" });
+      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: Math.round(precio / 2), status: "pending" });
     }
 
     await cargarDatos();
@@ -299,14 +300,22 @@ export default function Agenda() {
   const serviciosFiltrados = servicios.filter(sv => !form.profesional || sv.professional_id === form.profesional);
   const semana = getSemana(fecha);
 
+  const getPrecioEfectivo = (srv) => {
+    if (clienteEncontrado?.price_type === "cortesia") return clienteEncontrado.custom_price != null ? clienteEncontrado.custom_price : 0;
+    if (clienteEncontrado?.price_type === "especial" && clienteEncontrado.custom_price != null) return clienteEncontrado.custom_price;
+    return srv.price;
+  };
+
   const getPrecioInfo = () => {
     const srv = servicios.find(s => s.id === form.servicioId);
     if (!srv) return null;
-    const sena = Math.round(srv.price / 2);
+    const precio = getPrecioEfectivo(srv);
+    const sena = Math.round(precio / 2);
     const sym = srv.currency === "USD" ? "U$S " : srv.currency === "EUR" ? "€" : "$";
-    if (estadoPago === "sena") return `Seña ${sym}${sena.toLocaleString("es-AR")} · Saldo ${sym}${sena.toLocaleString("es-AR")} pendiente`;
-    if (estadoPago === "completo") return `Pago completo ${sym}${srv.price.toLocaleString("es-AR")}`;
-    return `Pendiente · Seña ${sym}${sena.toLocaleString("es-AR")} a confirmar`;
+    const aviso = precio !== srv.price ? (clienteEncontrado.price_type === "cortesia" ? " 🎁 Cortesía aplicada" : " ✨ Precio especial aplicado") : "";
+    if (estadoPago === "sena") return `Seña ${sym}${sena.toLocaleString("es-AR")} · Saldo ${sym}${sena.toLocaleString("es-AR")} pendiente${aviso}`;
+    if (estadoPago === "completo") return `Pago completo ${sym}${precio.toLocaleString("es-AR")}${aviso}`;
+    return `Pendiente · Seña ${sym}${sena.toLocaleString("es-AR")} a confirmar${aviso}`;
   };
 
   return (
@@ -568,6 +577,8 @@ export default function Agenda() {
                 <label style={s.label}>Cliente</label>
                 <input type="text" value={busquedaCliente} onChange={e => buscarCliente(e.target.value)} placeholder="Escribí el nombre..." style={s.input} />
                 {clienteEncontrado && <span style={s.clienteTag}>✓ {clienteEncontrado.full_name} (existente)</span>}
+                {clienteEncontrado?.price_type === "especial" && <span style={{ ...s.clienteTagNew, marginLeft: "6px" }}>✨ Precio especial</span>}
+                {clienteEncontrado?.price_type === "cortesia" && <span style={{ ...s.clienteTagNew, marginLeft: "6px" }}>🎁 Cortesía</span>}
                 {clienteNuevo && busquedaCliente.length >= 3 && <span style={s.clienteTagNew}>+ Se creará nuevo cliente</span>}
               </div>
 
