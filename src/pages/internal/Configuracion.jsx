@@ -685,6 +685,12 @@ export default function Configuracion() {
                 </div>
               </div>
             </div>
+            <div style={s.card}>
+              <div style={s.cardTitle}>Sesión</div>
+              <button style={{ ...s.saveBtn, background: "#FCEBEB", color: "#A32D2D", boxShadow: "none" }} onClick={async () => { await supabase.auth.signOut(); }}>
+                ← Cerrar sesión
+              </button>
+            </div>
             </>
           )}
         </>
