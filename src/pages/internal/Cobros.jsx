@@ -92,9 +92,12 @@ export default function Cobros() {
     cargar();
   };
 
-  const pagarTodo = async (id) => {
+  const pagarTodo = async (id, totalPrice) => {
+    const { data: senaPago } = await supabase.from("payments").select("id, amount").eq("appointment_id", id).eq("type", "seña").maybeSingle();
     await supabase.from("appointments").update({ status: "confirmed" }).eq("id", id);
-    await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", id).eq("type", "seña");
+    if (senaPago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", senaPago.id);
+    const saldo = Math.round(parseFloat(totalPrice || 0) - parseFloat(senaPago?.amount || 0));
+    if (saldo > 0) await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "paid", paid_at: new Date().toISOString() });
     fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: id }) });
     cargar();
   };
@@ -168,7 +171,7 @@ export default function Cobros() {
                   </div>
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
                     <button style={s.btnConfirmar} onClick={() => confirmarTurno(t.id, t.total_price)}>✓ Confirmar seña</button>
-                    <button style={s.btnPagoTotal} onClick={() => pagarTodo(t.id)}>💰 Pagó todo</button>
+                    <button style={s.btnPagoTotal} onClick={() => pagarTodo(t.id, t.total_price)}>💰 Pagó todo</button>
                     <button style={{ padding: "6px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => cancelarTurno(t.id)}>✗</button>
                   </div>
                 </div>

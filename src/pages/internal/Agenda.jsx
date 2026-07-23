@@ -176,7 +176,10 @@ export default function Agenda() {
       if (pago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pago.id);
       await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
     } else if (tipo === "pago_completo") {
-      await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", t.id).eq("type", "seña");
+      const pagoSena = pagosDelTurno.find(p => p.type === "seña");
+      if (pagoSena) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pagoSena.id);
+      const saldoRestante = Math.round(parseFloat(t.total_price || 0) - parseFloat(pagoSena?.amount || 0));
+      if (saldoRestante > 0) await supabase.from("payments").insert({ appointment_id: t.id, type: "saldo", amount: saldoRestante, status: "paid", paid_at: new Date().toISOString() });
       await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
       fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: t.id }) });
     } else if (tipo === "cancelar_sin_devolucion") {

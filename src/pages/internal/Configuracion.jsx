@@ -61,6 +61,7 @@ export default function Configuracion() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [profesionales, setProfesionales] = useState([]);
   const [nuevoProf, setNuevoProf] = useState({ nombre: "", email: "", password: "" });
   const [savingProf, setSavingProf] = useState(false);
@@ -182,7 +183,7 @@ export default function Configuracion() {
   };
 
   const guardarServicios = async () => {
-    setSaving(true);
+    setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
 
@@ -196,44 +197,53 @@ export default function Configuracion() {
 
     // Update existing services
     for (const sv of existentes) {
-      await supabase.from("services").update({ name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", requires_slot: sv.requiresSlot !== false }).eq("id", sv.id);
+      const { error } = await supabase.from("services").update({ name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", requires_slot: sv.requiresSlot !== false }).eq("id", sv.id);
+      if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     }
 
     // Insert new services
     if (nuevos.length > 0) {
-      await supabase.from("services").insert(nuevos.map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", active: true, requires_slot: sv.requiresSlot !== false })));
+      const { error } = await supabase.from("services").insert(nuevos.map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", active: true, requires_slot: sv.requiresSlot !== false })));
+      if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     }
 
     // Soft-delete services removed from the form
     const toDeactivate = (dbSvs || []).filter(s => !idsEnForm.has(s.id)).map(s => s.id);
-    if (toDeactivate.length > 0) await supabase.from("services").update({ active: false }).in("id", toDeactivate);
+    if (toDeactivate.length > 0) {
+      const { error } = await supabase.from("services").update({ active: false }).in("id", toDeactivate);
+      if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
+    }
 
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
   const guardarDisponibilidad = async () => {
-    setSaving(true);
+    setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    await supabase.from("availability").delete().eq("professional_id", uid);
+    const { error: errDelete } = await supabase.from("availability").delete().eq("professional_id", uid);
+    if (errDelete) { setSaveError("Error al guardar: " + errDelete.message); setSaving(false); return; }
     const rows = dias.map((d, i) => ({ professional_id: uid, day_of_week: i === 6 ? 0 : i + 1, start_time: d.inicio, end_time: d.fin, modality: d.modalidad, active: d.activo }));
-    await supabase.from("availability").insert(rows);
+    const { error: errInsert } = await supabase.from("availability").insert(rows);
+    if (errInsert) { setSaveError("Error al guardar (revisá tu disponibilidad, puede haber quedado vacía): " + errInsert.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
   const guardarPausas = async () => {
-    setSaving(true);
+    setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    await supabase.from("settings").upsert({ professional_id: uid, break_minutes: parseInt(pausas.pausa), min_advance_hours: parseInt(pausas.anticipacion), cancellation_hours: parseInt(pausas.cancelacion) }, { onConflict: "professional_id" });
+    const { error } = await supabase.from("settings").upsert({ professional_id: uid, break_minutes: parseInt(pausas.pausa), min_advance_hours: parseInt(pausas.anticipacion), cancellation_hours: parseInt(pausas.cancelacion) }, { onConflict: "professional_id" });
+    if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
   const guardarPagos = async () => {
-    setSaving(true);
+    setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, alias_eur: pagos.alias_eur, cbu_eur: pagos.cbu_eur, mp_enabled: pagos.mp_enabled }, { onConflict: "professional_id" });
+    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, alias_eur: pagos.alias_eur, cbu_eur: pagos.cbu_eur, mp_enabled: pagos.mp_enabled }, { onConflict: "professional_id" });
+    if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
 
@@ -260,7 +270,7 @@ export default function Configuracion() {
       </div>
       <div style={s.tabs}>
         {["disponibilidad","servicios","pausas","pagos","profesionales","bloqueos","cuenta"].map(t => (
-          <button key={t} style={tab === t ? s.tabActive : s.tab} onClick={() => setTab(t)}>
+          <button key={t} style={tab === t ? s.tabActive : s.tab} onClick={() => { setTab(t); setSaveError(""); }}>
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
@@ -293,6 +303,7 @@ export default function Configuracion() {
                   </div>
                 ))}
               </div>
+              {saveError && <div style={{ fontSize: "12px", color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: "8px" }}>{saveError}</div>}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarDisponibilidad} disabled={saving}>{saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}</button>
               </div>
@@ -326,6 +337,7 @@ export default function Configuracion() {
                 ))}
                 <button style={s.addBtn} onClick={addServicio}>+ Agregar servicio</button>
               </div>
+              {saveError && <div style={{ fontSize: "12px", color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: "8px" }}>{saveError}</div>}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarServicios} disabled={saving}>{saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}</button>
               </div>
@@ -348,6 +360,7 @@ export default function Configuracion() {
                   <span style={{ fontSize: "13px", color: f.color, fontWeight: "500", minWidth: "24px" }}>{f.unit}</span>
                 </div>
               ))}
+              {saveError && <div style={{ fontSize: "12px", color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: "8px" }}>{saveError}</div>}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarPausas} disabled={saving}>{saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}</button>
               </div>
@@ -408,6 +421,7 @@ export default function Configuracion() {
                   </div>
                 )}
               </div>
+              {saveError && <div style={{ fontSize: "12px", color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: "8px" }}>{saveError}</div>}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>
                 <button style={saved ? s.saveBtnOk : s.saveBtn} onClick={guardarPagos} disabled={saving}>{saving ? "Guardando..." : saved ? "✓ Guardado!" : "Guardar cambios"}</button>
               </div>
