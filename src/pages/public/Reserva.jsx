@@ -194,8 +194,11 @@ export default function Reserva() {
     const endMins = eH * 60 + eM;
     const slotStep = srv.duration_minutes + profPausa;
     const bloquesParciales = blockedDatesProf.filter(b => b.date === fechaStr && b.start_time);
+    const esHoy = fechaObj.getTime() === hoy.getTime();
+    const ahoraMins = esHoy ? new Date().getHours() * 60 + new Date().getMinutes() : -1;
     const slots = [];
     for (let t = startMins; t + srv.duration_minutes <= endMins; t += slotStep) {
+      if (esHoy && t <= ahoraMins) continue;
       const slotFin = t + srv.duration_minutes;
       const bloqueado = bloquesParciales.some(b => {
         const [bH, bM] = b.start_time.slice(0,5).split(":").map(Number);
@@ -232,7 +235,7 @@ export default function Reserva() {
 
   const buscarClientePorMail = async (mail) => {
     if (!mail || !mail.includes("@")) return;
-    const { data: rows } = await supabase.rpc("buscar_cliente_por_email", { p_email: mail });
+    const { data: rows } = await supabase.rpc("buscar_cliente_por_email", { p_email: mail.trim().toLowerCase() });
     const data = rows?.[0];
     if (data) {
       setForm(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
@@ -249,7 +252,7 @@ export default function Reserva() {
     setError("");
     try {
       const { data: clienteId, error: errCliente } = await supabase.rpc("obtener_o_crear_cliente", {
-        p_nombre: form.nombre, p_telefono: form.celular, p_email: form.mail
+        p_nombre: form.nombre, p_telefono: form.celular, p_email: form.mail.trim().toLowerCase()
       });
       if (errCliente) throw errCliente;
 
@@ -591,10 +594,10 @@ export default function Reserva() {
           <div style={s.pendienteCircle}>✓</div>
           <div>
             <div style={s.title}>¡Reserva recibida!</div>
-            <div style={s.sub}>Tu turno quedará confirmado una vez que se verifique la transferencia</div>
+            <div style={s.sub}>{esCortesia ? "Tu turno quedará confirmado a la brevedad" : "Tu turno quedará confirmado una vez que se verifique la transferencia"}</div>
           </div>
 
-          {aliasActivo && (
+          {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora{esMonedaExtranjera ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
@@ -608,9 +611,9 @@ export default function Reserva() {
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{srv?.name} · {modalidad}</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>
+            {!esCortesia && <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>}
           </div>
-          <div style={s.avisoBox}>🔔 Recibirás una confirmación por WhatsApp cuando se verifique el pago.</div>
+          <div style={s.avisoBox}>🔔 Recibirás una confirmación por WhatsApp cuando el equipo confirme tu turno.</div>
           <button style={s.btnNext} onClick={() => {
             setStep(1); setProf(null); setServicio(null); setMoneda(null); setDia(null); setHora(null);
             setModalidad(null); setForm({ nombre: "", celular: "", mail: "" }); setClienteReconocido(false);

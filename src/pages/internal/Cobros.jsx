@@ -44,8 +44,9 @@ export default function Cobros() {
 
   const cargar = async () => {
     setLoading(true);
-    const hoy = new Date().toISOString().split("T")[0];
-    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+    const ahora = new Date();
+    const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,"0")}-${String(ahora.getDate()).padStart(2,"0")}`;
+    const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString().split("T")[0];
 
     const { data: turnos } = await supabase
       .from("appointments")

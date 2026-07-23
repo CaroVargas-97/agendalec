@@ -63,7 +63,7 @@ export default function Estadisticas() {
     else if (periodo === "mes") desde.setMonth(hoy.getMonth() - 1);
     else if (periodo === "trimestre") desde.setMonth(hoy.getMonth() - 3);
     else if (periodo === "año") desde.setFullYear(hoy.getFullYear() - 1);
-    const desdeISO = desde.toISOString().split("T")[0];
+    const desdeISO = `${desde.getFullYear()}-${String(desde.getMonth()+1).padStart(2,"0")}-${String(desde.getDate()).padStart(2,"0")}`;
 
     const { data: appts } = await supabase
       .from("appointments")
@@ -111,7 +111,7 @@ export default function Estadisticas() {
     const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
     const diaMap = {};
     sesiones.forEach(a => {
-      const n = dias[new Date(a.date).getDay()];
+      const n = dias[new Date(a.date + "T12:00:00").getDay()];
       diaMap[n] = (diaMap[n] || 0) + 1;
     });
     const diasPopulares = Object.entries(diaMap).map(([dia, count]) => ({ dia, count })).sort((a, b) => b.count - a.count);

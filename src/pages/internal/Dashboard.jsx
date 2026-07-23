@@ -30,13 +30,16 @@ const metrics = [
   { key: "profCount",  label: "Profesionales", color: "#EC4899", sub: "registrados" },
 ];
 
-const todayISO = new Date().toISOString().split("T")[0];
+const getTodayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
 
 export default function Dashboard({ setPage }) {
   const [profile, setProfile] = useState(null);
   const [turnos, setTurnos] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
-  const [stats, setStats] = useState({ total: 0, virtual: 0, presencial: 0, pendientes: 0 });
+  const [stats, setStats] = useState({ total: 0, virtual: 0, presencial: 0, pendientes: 0, confirmados: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -45,14 +48,15 @@ export default function Dashboard({ setPage }) {
       if (!session) return;
       const { data: prof } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
       setProfile(prof);
-      const { data: appts } = await supabase.from("appointments").select("*, clients(full_name), services(name, duration_minutes)").eq("date", todayISO).order("start_time");
+      const { data: appts } = await supabase.from("appointments").select("*, clients(full_name), services(name, duration_minutes)").eq("date", getTodayISO()).order("start_time");
       setTurnos(appts || []);
       const { data: profs } = await supabase.from("profiles").select("*").eq("role", "professional");
       setProfesionales(profs || []);
       const virtual = (appts || []).filter(a => a.modality === "virtual").length;
       const presencial = (appts || []).filter(a => a.modality === "presencial").length;
-      const pendientes = (appts || []).filter(a => a.status === "pending").length;
-      setStats({ total: (appts || []).length, virtual, presencial, pendientes });
+      const pendientes = (appts || []).filter(a => a.status === "pending" || a.status === "partial").length;
+      const confirmados = (appts || []).filter(a => a.status === "confirmed").length;
+      setStats({ total: (appts || []).length, virtual, presencial, pendientes, confirmados });
       setLoading(false);
     };
     cargar();
@@ -64,7 +68,7 @@ export default function Dashboard({ setPage }) {
   const metricValues = {
     total: stats.total,
     pendientes: stats.pendientes,
-    confirmados: stats.total - stats.pendientes,
+    confirmados: stats.confirmados,
     profCount: profesionales.length,
   };
 
