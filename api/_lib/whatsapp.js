@@ -3,7 +3,7 @@ function normalizarCelularAR(raw) {
   if (d.startsWith("54")) d = d.slice(2);
   if (d.startsWith("9")) d = d.slice(1);
   if (d.startsWith("0")) d = d.slice(1);
-  return `549${d}`;
+  return `54${d}`;
 }
 
 export async function enviarWhatsApp(telefono, mensaje) {
