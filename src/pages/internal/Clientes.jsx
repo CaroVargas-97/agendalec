@@ -47,6 +47,12 @@ export default function Clientes() {
   const [customPrice, setCustomPrice] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [nuevoAbierto, setNuevoAbierto] = useState(false);
+  const [nuevoForm, setNuevoForm] = useState({ nombre: "", celular: "", mail: "" });
+  const [nuevoPrecioTipo, setNuevoPrecioTipo] = useState("normal");
+  const [nuevoCustomPrice, setNuevoCustomPrice] = useState("");
+  const [savingNuevo, setSavingNuevo] = useState(false);
+  const [nuevoError, setNuevoError] = useState("");
 
   const cargar = async () => {
     setLoading(true);
@@ -83,6 +89,26 @@ export default function Clientes() {
     await cargar();
   };
 
+  const crearCliente = async () => {
+    setNuevoError("");
+    if (!nuevoForm.nombre.trim()) { setNuevoError("Falta el nombre."); return; }
+    setSavingNuevo(true);
+    const { error } = await supabase.from("clients").insert({
+      full_name: nuevoForm.nombre.trim(),
+      phone: nuevoForm.celular || null,
+      email: nuevoForm.mail || null,
+      price_type: nuevoPrecioTipo,
+      custom_price: (nuevoPrecioTipo === "especial" || nuevoPrecioTipo === "cortesia") && nuevoCustomPrice ? parseFloat(nuevoCustomPrice) : null,
+    });
+    if (error) { setNuevoError(error.message.includes("duplicate") ? "Ya existe un cliente con ese mail." : "Error al crear: " + error.message); setSavingNuevo(false); return; }
+    await cargar();
+    setSavingNuevo(false);
+    setNuevoAbierto(false);
+    setNuevoForm({ nombre: "", celular: "", mail: "" });
+    setNuevoPrecioTipo("normal");
+    setNuevoCustomPrice("");
+  };
+
   const guardarCliente = async () => {
     setSaving(true);
     const updates = { price_type: precioTipo, custom_price: (precioTipo === "especial" || precioTipo === "cortesia") && customPrice ? parseFloat(customPrice) : null };
@@ -104,7 +130,10 @@ export default function Clientes() {
           <div style={s.title}>Clientes</div>
           <div style={s.titleSub}>{clientes.length} clientes registrados</div>
         </div>
-        <input type="text" placeholder="🔍 Buscar por nombre o mail..." value={busqueda} onChange={e => setBusqueda(e.target.value)} style={{ ...s.searchInput, width: isMobile ? "100%" : "260px", boxSizing: "border-box" }} />
+        <div style={{ display: "flex", gap: "8px", flexDirection: isMobile ? "column" : "row" }}>
+          <input type="text" placeholder="🔍 Buscar por nombre o mail..." value={busqueda} onChange={e => setBusqueda(e.target.value)} style={{ ...s.searchInput, width: isMobile ? "100%" : "260px", boxSizing: "border-box" }} />
+          <button onClick={() => setNuevoAbierto(true)} style={{ padding: "8px 16px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" }}>+ Agregar cliente</button>
+        </div>
       </div>
 
       {isMobile ? (
@@ -255,6 +284,52 @@ export default function Clientes() {
             <button style={s.saveBtn} onClick={guardarCliente} disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button>
             <button style={s.cancelBtn} onClick={() => setClienteSeleccionado(null)}>Cerrar</button>
             <button style={{ ...s.cancelBtn, color: "#A32D2D", borderColor: "#F4C4C4", marginTop: "4px" }} onClick={eliminarCliente}>🗑 Eliminar cliente</button>
+          </div>
+        </>
+      )}
+
+      {nuevoAbierto && (
+        <>
+          <div style={s.overlay} onClick={() => setNuevoAbierto(false)} />
+          <div style={isMobile ? { ...s.panel, width: "100%" } : s.panel}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>+ Agregar cliente</div>
+              <button onClick={() => setNuevoAbierto(false)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+            </div>
+            <div style={{ fontSize: "12px", color: "#B89FD0" }}>Cargalo antes de mandarle el link de reserva para que el precio especial o la cortesía se aplique solos cuando reserve con este mismo mail.</div>
+
+            <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
+            <div style={s.field}><label style={s.label}>Celular</label><input type="tel" value={nuevoForm.celular} onChange={e => setNuevoForm({...nuevoForm, celular: e.target.value})} placeholder="+54 9 11..." style={s.input} /></div>
+            <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={nuevoForm.mail} onChange={e => setNuevoForm({...nuevoForm, mail: e.target.value})} placeholder="mail@ejemplo.com" style={s.input} /></div>
+
+            <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
+              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Precio especial</div>
+              <div style={{ display: "flex", gap: "6px", marginBottom: "10px" }}>
+                {[
+                  { key: "normal", label: "Normal" },
+                  { key: "especial", label: "Especial" },
+                  { key: "cortesia", label: "Cortesía" },
+                ].map(p => (
+                  <button key={p.key} onClick={() => setNuevoPrecioTipo(p.key)}
+                    style={nuevoPrecioTipo === p.key ? (p.key === "cortesia" ? s.precioBtnRegalo : s.precioBtnActive) : s.precioBtn}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              {(nuevoPrecioTipo === "especial" || nuevoPrecioTipo === "cortesia") && (
+                <div style={{ marginTop: "6px" }}>
+                  <label style={s.label}>{nuevoPrecioTipo === "cortesia" ? "Precio de cortesía (0 si es gratis)" : "Precio especial"}</label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+                    <span style={{ fontSize: "13px", color: "#9B72C0" }}>$</span>
+                    <input type="number" min="0" value={nuevoCustomPrice} onChange={e => setNuevoCustomPrice(e.target.value)} placeholder="0" style={{ ...s.input, width: "100%" }} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {nuevoError && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{nuevoError}</div>}
+            <button style={s.saveBtn} onClick={crearCliente} disabled={savingNuevo}>{savingNuevo ? "Creando..." : "Crear cliente"}</button>
+            <button style={s.cancelBtn} onClick={() => setNuevoAbierto(false)}>Cancelar</button>
           </div>
         </>
       )}
