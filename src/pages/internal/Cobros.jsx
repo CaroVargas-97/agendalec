@@ -41,6 +41,8 @@ export default function Cobros() {
   const [historial, setHistorial] = useState([]);
   const [stats, setStats] = useState({ cobradoHoy: 0, saldosPendientes: 0, estesMes: 0, cancelaciones: 0 });
   const [loading, setLoading] = useState(true);
+  const [comprobantesSaldo, setComprobantesSaldo] = useState({});
+  const [subiendoSaldo, setSubiendoSaldo] = useState(null);
 
   const cargar = async () => {
     setLoading(true);
@@ -103,8 +105,22 @@ export default function Cobros() {
   };
 
   const confirmarSaldo = async (pagoId, appointmentId) => {
+    setSubiendoSaldo(pagoId);
+    const comprobante = comprobantesSaldo[pagoId];
+    if (comprobante) {
+      const ext = comprobante.name.split(".").pop();
+      const { data: uploadData } = await supabase.storage
+        .from("comprobantes")
+        .upload(`${appointmentId}-saldo.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
+      if (uploadData) {
+        const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+        await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
+      }
+    }
     await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pagoId);
     await supabase.from("appointments").update({ status: "confirmed" }).eq("id", appointmentId);
+    setComprobantesSaldo(c => { const n = { ...c }; delete n[pagoId]; return n; });
+    setSubiendoSaldo(null);
     cargar();
   };
 
@@ -192,9 +208,13 @@ export default function Cobros() {
                       </a>
                     )}
                   </div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
                     <div style={s.cobroMonto}>${parseFloat(p.amount || 0).toLocaleString("es-AR")}</div>
-                    <button style={s.btnSaldo} onClick={() => confirmarSaldo(p.id, p.appointment_id)}>✓ Cobrado</button>
+                    <label style={{ display: "flex", alignItems: "center", gap: "4px", padding: "6px 10px", background: comprobantesSaldo[p.id] ? "#EAF3DE" : "#fff", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", color: comprobantesSaldo[p.id] ? "#3B6D11" : "#9B72C0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                      {comprobantesSaldo[p.id] ? "✅ Adjunto" : "📎 Adjuntar"}
+                      <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobantesSaldo(c => ({ ...c, [p.id]: e.target.files[0] || null }))} />
+                    </label>
+                    <button style={s.btnSaldo} disabled={subiendoSaldo === p.id} onClick={() => confirmarSaldo(p.id, p.appointment_id)}>{subiendoSaldo === p.id ? "..." : "✓ Cobrado"}</button>
                     <button style={{ padding: "6px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => cancelarTurno(p.appointment_id)}>✗</button>
                   </div>
                 </div>
