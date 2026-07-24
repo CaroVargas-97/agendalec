@@ -174,10 +174,11 @@ export default function Reserva() {
     if (blockedDatesProf.some(b => b.date === fechaStr && !b.start_time)) return false;
     const dow = fechaObj.getDay();
     if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
+    const modEfectiva = srv?.modality !== "ambas" ? srv?.modality : modalidad;
     return disponibilidad.some(a => {
       if (a.day_of_week !== dow) return false;
-      if (!modalidad || srv?.modality !== "ambas") return true;
-      return a.modality === "ambas" || a.modality === modalidad;
+      if (!modEfectiva) return true;
+      return a.modality === "ambas" || a.modality === modEfectiva;
     });
   };
 
