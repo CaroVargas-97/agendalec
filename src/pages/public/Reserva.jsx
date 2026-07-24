@@ -96,6 +96,7 @@ export default function Reserva() {
 
   const [reservasCerradas, setReservasCerradas] = useState(false);
   const [blockedDatesProf, setBlockedDatesProf] = useState([]);
+  const [modalityOverrides, setModalityOverrides] = useState([]);
 
   useEffect(() => {
     supabase.from("profiles").select("id, full_name, email, address, phone, reservas_desde, reservas_hasta").eq("role", "professional")
@@ -117,14 +118,16 @@ export default function Reserva() {
       const pd = profesionales.find(p => p.full_name === prof);
       if (!pd) { setLoadingServicios(false); return; }
       setProfData(pd);
-      const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }] = await Promise.all([
+      const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }, { data: overrides }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
+        supabase.from("modality_overrides").select("date, modality").eq("professional_id", pd.id),
       ]);
       setBlockedDatesProf(blocked || []);
+      setModalityOverrides(overrides || []);
       setServicios(svs || []);
       setProfSettings(cfg);
       setDisponibilidad(avail || []);
@@ -178,10 +181,12 @@ export default function Reserva() {
     const dow = fechaObj.getDay();
     if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
     const modEfectiva = srv?.modality !== "ambas" ? srv?.modality : modalidad;
+    const override = modalityOverrides.find(o => o.date === fechaStr);
     return disponibilidad.some(a => {
       if (a.day_of_week !== dow) return false;
       if (!modEfectiva) return true;
-      return a.modality === "ambas" || a.modality === modEfectiva;
+      const modDia = override ? override.modality : a.modality;
+      return modDia === "ambas" || modDia === modEfectiva;
     });
   };
 

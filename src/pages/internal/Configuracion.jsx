@@ -84,6 +84,11 @@ export default function Configuracion() {
   const [bloqueoHoraFin, setBloqueoHoraFin] = useState("13:00");
   const [savingBloqueos, setSavingBloqueos] = useState(false);
   const [bloqueosMsg, setBloqueosMsg] = useState("");
+  const [overridesDB, setOverridesDB] = useState([]);
+  const [overrideFecha, setOverrideFecha] = useState("");
+  const [overrideModalidad, setOverrideModalidad] = useState("ambas");
+  const [savingOverride, setSavingOverride] = useState(false);
+  const [overrideMsg, setOverrideMsg] = useState("");
 
   const cargarProfesionales = async () => {
     const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
@@ -143,6 +148,9 @@ export default function Configuracion() {
       const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
       setBloqueosDB(blocked || []);
 
+      const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality").eq("professional_id", uid).order("date");
+      setOverridesDB(overrides || []);
+
       setLoading(false);
     };
     cargar();
@@ -180,6 +188,29 @@ export default function Configuracion() {
     await supabase.from("blocked_dates").delete().eq("id", id);
     const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
     setBloqueosDB(blocked || []);
+  };
+
+  const guardarOverride = async () => {
+    if (!overrideFecha) return;
+    setSavingOverride(true); setOverrideMsg("");
+    const uid = await getUid();
+    if (!uid) { setSavingOverride(false); return; }
+    const { error } = await supabase.from("modality_overrides").upsert({ professional_id: uid, date: overrideFecha, modality: overrideModalidad }, { onConflict: "professional_id,date" });
+    if (error) { setOverrideMsg("Error: " + error.message); setSavingOverride(false); return; }
+    const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality").eq("professional_id", uid).order("date");
+    setOverridesDB(overrides || []);
+    setOverrideFecha("");
+    setOverrideModalidad("ambas");
+    setSavingOverride(false);
+    setOverrideMsg("✓ Excepción guardada");
+    setTimeout(() => setOverrideMsg(""), 2500);
+  };
+
+  const eliminarOverride = async (id) => {
+    const uid = await getUid();
+    await supabase.from("modality_overrides").delete().eq("id", id);
+    const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality").eq("professional_id", uid).order("date");
+    setOverridesDB(overrides || []);
   };
 
   const guardarServicios = async () => {
@@ -532,6 +563,44 @@ export default function Configuracion() {
                 )}
 
                 {bloqueosMsg && <div style={{ fontSize: "12px", color: "#3B6D11", background: "#EAF3DE", padding: "10px 14px", borderRadius: "8px" }}>{bloqueosMsg}</div>}
+
+                <div style={s.card}>
+                  <div style={s.cardTitle}>Excepciones de modalidad</div>
+                  <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "12px" }}>Para un día puntual que atendés distinto a lo habitual (ej: un lunes que también podés presencial, siendo que los lunes son solo virtual).</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "10px" }}>
+                    <div>
+                      <div style={s.label}>Fecha</div>
+                      <input type="date" value={overrideFecha} onChange={e => setOverrideFecha(e.target.value)} style={{ ...s.inputFull, marginTop: "4px" }} />
+                    </div>
+                    <div>
+                      <div style={s.label}>Modalidad ese día</div>
+                      <select value={overrideModalidad} onChange={e => setOverrideModalidad(e.target.value)} style={{ ...s.inputFull, marginTop: "4px" }}>
+                        <option value="ambas">Virtual y presencial</option>
+                        <option value="virtual">Solo virtual</option>
+                        <option value="presencial">Solo presencial</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button onClick={guardarOverride} disabled={savingOverride || !overrideFecha} style={{ padding: "10px 20px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" }}>
+                    {savingOverride ? "Guardando..." : "Guardar excepción"}
+                  </button>
+                  {overrideMsg && <div style={{ fontSize: "12px", color: overrideMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D", marginTop: "10px" }}>{overrideMsg}</div>}
+
+                  {overridesDB.length > 0 && (
+                    <div style={{ marginTop: "14px", borderTop: "0.5px solid #F0E8F8", paddingTop: "10px" }}>
+                      {overridesDB.map((o, i) => (
+                        <div key={o.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", borderBottom: i < overridesDB.length - 1 ? "0.5px solid #F0E8F8" : "none" }}>
+                          <div style={{ fontSize: "16px" }}>{o.modality === "ambas" ? "🔀" : o.modality === "virtual" ? "📹" : "📍"}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{new Date(o.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
+                            <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>{o.modality === "ambas" ? "Virtual y presencial" : o.modality === "virtual" ? "Solo virtual" : "Solo presencial"}</div>
+                          </div>
+                          <button onClick={() => eliminarOverride(o.id)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #F0D0D8", background: "#FEF0F3", cursor: "pointer", color: "#C06080", fontSize: "14px" }}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             );
           })()}
