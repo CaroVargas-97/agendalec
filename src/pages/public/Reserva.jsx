@@ -119,7 +119,7 @@ export default function Reserva() {
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, alias_eur, cbu_eur").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
@@ -153,8 +153,11 @@ export default function Reserva() {
   const sena = Math.round(total / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
   const esMonedaExtranjera = srv?.currency === "USD" || srv?.currency === "EUR";
-  const aliasActivo = srv?.currency === "EUR" ? profSettings?.alias_eur : srv?.currency === "USD" ? profSettings?.alias_usd : profSettings?.alias;
-  const cbuActivo = srv?.currency === "EUR" ? profSettings?.cbu_eur : srv?.currency === "USD" ? profSettings?.cbu_usd : profSettings?.cbu;
+  const esPaypal = srv?.currency === "EUR";
+  const aliasActivo = esPaypal ? null : srv?.currency === "USD" ? profSettings?.alias_usd : profSettings?.alias;
+  const cbuActivo = esPaypal ? null : srv?.currency === "USD" ? profSettings?.cbu_usd : profSettings?.cbu;
+  const paypalActivo = esPaypal ? profSettings?.paypal_link : null;
+  const paypalUrl = paypalActivo ? (paypalActivo.startsWith("http") ? paypalActivo : `https://${paypalActivo}`) : null;
 
   // Calendar helpers
   const hoy = new Date();
@@ -229,7 +232,7 @@ export default function Reserva() {
     : "";
 
   const copiarAlias = () => {
-    navigator.clipboard.writeText(aliasActivo || "");
+    navigator.clipboard.writeText(aliasActivo || paypalActivo || "");
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
   };
@@ -549,7 +552,7 @@ export default function Reserva() {
 
           {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
-              <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{srv?.currency === "USD" ? " (en dólares)" : srv?.currency === "EUR" ? " (en euros)" : ""}</div>
+              <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{srv?.currency === "USD" ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
               {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
@@ -557,13 +560,22 @@ export default function Reserva() {
             </div>
           )}
 
-          {!aliasActivo && !esCortesia && (
+          {paypalActivo && !esCortesia && (
+            <div style={s.aliasBox}>
+              <div style={s.aliasTitulo}>Pagá la seña por PayPal (en euros)</div>
+              <a href={paypalUrl} target="_blank" rel="noreferrer" style={{ ...s.aliasValor, textDecoration: "none", wordBreak: "break-all" }}>{paypalActivo}</a>
+              <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar link"}</div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a pagar: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>
+            </div>
+          )}
+
+          {!aliasActivo && !paypalActivo && !esCortesia && (
             <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99" }}>
               El equipo se va a contactar con vos para coordinar el pago de la seña ({sym}{sena.toLocaleString("es-AR")}).
             </div>
           )}
 
-          {!esCortesia && aliasActivo && (
+          {!esCortesia && (aliasActivo || paypalActivo) && (
             <div style={s.field}>
               <label style={s.label}>Comprobante de transferencia <span style={{ color: "#A32D2D" }}>*</span></label>
               <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobante ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobante ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
@@ -584,8 +596,8 @@ export default function Reserva() {
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
-            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && (comprobante || esCortesia || !aliasActivo) ? 1 : 0.5 }}
-              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || (!comprobante && !esCortesia && !!aliasActivo)}
+            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && (comprobante || esCortesia || !(aliasActivo || paypalActivo)) ? 1 : 0.5 }}
+              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || (!comprobante && !esCortesia && !!(aliasActivo || paypalActivo))}
               onClick={confirmarReserva}>
               {guardando ? "Confirmando..." : "✓ Confirmar turno"}
             </button>
@@ -606,10 +618,19 @@ export default function Reserva() {
 
           {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
-              <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora{srv?.currency === "USD" ? " (en dólares)" : srv?.currency === "EUR" ? " (en euros)" : ""}</div>
+              <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora{srv?.currency === "USD" ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
               {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>
+            </div>
+          )}
+
+          {paypalActivo && !esCortesia && (
+            <div style={s.aliasBox}>
+              <div style={s.aliasTitulo}>Si aún no pagaste, hacelo ahora por PayPal (en euros)</div>
+              <a href={paypalUrl} target="_blank" rel="noreferrer" style={{ ...s.aliasValor, textDecoration: "none", wordBreak: "break-all" }}>{paypalActivo}</a>
+              <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar link"}</div>
               <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>
             </div>
           )}

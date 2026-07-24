@@ -57,7 +57,7 @@ export default function Configuracion() {
   const [dias, setDias] = useState(defaultDias);
   const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
-  const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", alias_eur: "", cbu_eur: "", mp_enabled: false });
+  const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -137,7 +137,7 @@ export default function Configuracion() {
       const { data: cfg } = await supabase.from("settings").select("*").eq("professional_id", uid).maybeSingle();
       if (cfg) {
         setPausas({ pausa: cfg.break_minutes ?? 15, anticipacion: cfg.min_advance_hours ?? 24, cancelacion: cfg.cancellation_hours ?? 24 });
-        setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", alias_eur: cfg.alias_eur || "", cbu_eur: cfg.cbu_eur || "", mp_enabled: cfg.mp_enabled || false });
+        setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", paypal_link: cfg.paypal_link || "", mp_enabled: cfg.mp_enabled || false });
       }
 
       const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
@@ -242,7 +242,7 @@ export default function Configuracion() {
     setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, alias_eur: pagos.alias_eur, cbu_eur: pagos.cbu_eur, mp_enabled: pagos.mp_enabled }, { onConflict: "professional_id" });
+    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled }, { onConflict: "professional_id" });
     if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
@@ -400,15 +400,11 @@ export default function Configuracion() {
                       </div>
                     </div>
                     <div style={{ borderTop: "0.5px solid #F0E8F8", paddingTop: "16px", marginBottom: "10px" }}>
-                      <div style={s.label}>Euros (EUR)</div>
+                      <div style={s.label}>Euros (EUR) — PayPal</div>
                       <div style={{ marginBottom: "6px" }}></div>
                       <div style={{ marginBottom: "10px" }}>
-                        <div style={s.pausaSub}>Alias EUR</div>
-                        <input type="text" value={pagos.alias_eur} onChange={e => setPagos({...pagos,alias_eur:e.target.value})} placeholder="tu.alias.eur" style={{...s.inputFull, marginTop: "4px"}} />
-                      </div>
-                      <div style={{ marginBottom: "10px" }}>
-                        <div style={s.pausaSub}>CBU EUR (opcional)</div>
-                        <input type="text" value={pagos.cbu_eur} onChange={e => setPagos({...pagos,cbu_eur:e.target.value})} placeholder="0000000000000000000000" style={{...s.inputFull, marginTop: "4px"}} />
+                        <div style={s.pausaSub}>Link de PayPal.me</div>
+                        <input type="text" value={pagos.paypal_link} onChange={e => setPagos({...pagos,paypal_link:e.target.value})} placeholder="paypal.me/tuusuario" style={{...s.inputFull, marginTop: "4px"}} />
                       </div>
                     </div>
                     <div style={s.infoBox}>💡 El cliente verá el alias que corresponda según la moneda del servicio.</div>
