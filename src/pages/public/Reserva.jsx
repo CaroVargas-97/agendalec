@@ -153,8 +153,8 @@ export default function Reserva() {
   const sena = Math.round(total / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
   const esMonedaExtranjera = srv?.currency === "USD" || srv?.currency === "EUR";
-  const aliasActivo = srv?.currency === "EUR" ? (profSettings?.alias_eur || profSettings?.alias) : srv?.currency === "USD" ? (profSettings?.alias_usd || profSettings?.alias) : profSettings?.alias;
-  const cbuActivo = srv?.currency === "EUR" ? (profSettings?.cbu_eur || profSettings?.cbu) : srv?.currency === "USD" ? (profSettings?.cbu_usd || profSettings?.cbu) : profSettings?.cbu;
+  const aliasActivo = srv?.currency === "EUR" ? profSettings?.alias_eur : srv?.currency === "USD" ? profSettings?.alias_usd : profSettings?.alias;
+  const cbuActivo = srv?.currency === "EUR" ? profSettings?.cbu_eur : srv?.currency === "USD" ? profSettings?.cbu_usd : profSettings?.cbu;
 
   // Calendar helpers
   const hoy = new Date();
@@ -549,7 +549,7 @@ export default function Reserva() {
 
           {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
-              <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{esMonedaExtranjera ? " (en dólares)" : ""}</div>
+              <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{srv?.currency === "USD" ? " (en dólares)" : srv?.currency === "EUR" ? " (en euros)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
               {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
@@ -557,7 +557,13 @@ export default function Reserva() {
             </div>
           )}
 
-          {!esCortesia && (
+          {!aliasActivo && !esCortesia && (
+            <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99" }}>
+              El equipo se va a contactar con vos para coordinar el pago de la seña ({sym}{sena.toLocaleString("es-AR")}).
+            </div>
+          )}
+
+          {!esCortesia && aliasActivo && (
             <div style={s.field}>
               <label style={s.label}>Comprobante de transferencia <span style={{ color: "#A32D2D" }}>*</span></label>
               <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobante ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobante ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
@@ -578,8 +584,8 @@ export default function Reserva() {
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
-            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && (comprobante || esCortesia) ? 1 : 0.5 }}
-              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || (!comprobante && !esCortesia)}
+            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && (comprobante || esCortesia || !aliasActivo) ? 1 : 0.5 }}
+              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || (!comprobante && !esCortesia && !!aliasActivo)}
               onClick={confirmarReserva}>
               {guardando ? "Confirmando..." : "✓ Confirmar turno"}
             </button>
@@ -600,7 +606,7 @@ export default function Reserva() {
 
           {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
-              <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora{esMonedaExtranjera ? " (en dólares)" : ""}</div>
+              <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora{srv?.currency === "USD" ? " (en dólares)" : srv?.currency === "EUR" ? " (en euros)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
               {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
