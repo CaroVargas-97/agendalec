@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { linkWhatsApp } from "../../utils/whatsapp";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
 const DIAS_SEMANA = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
@@ -474,7 +475,7 @@ export default function Agenda() {
                   <button onClick={cerrarTurno} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
                 </div>
                 {t.clients?.phone && (
-                  <a href={`https://wa.me/54${t.clients.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
+                  <a href={linkWhatsApp(t.clients.phone)} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
                     <button style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", background: "#25D366", color: "#fff", border: "none", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" }}>
                       💬 WhatsApp · {t.clients.phone}
                     </button>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { linkWhatsApp } from "../../utils/whatsapp";
 
 const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
 
@@ -156,7 +157,7 @@ export default function Clientes() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "0.5px solid #F0E8F8" }}>
                   <div style={{ fontSize: "12px", color: "#B89FD0" }}>{c.phone || "Sin celular"} · {c.appointments?.[0]?.count || 0} sesiones</div>
                   {c.phone && (
-                    <a href={`https://wa.me/54${c.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+                    <a href={linkWhatsApp(c.phone)} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
                       <button style={s.btnWA}>💬</button>
                     </a>
                   )}
@@ -197,7 +198,7 @@ export default function Clientes() {
                     <td style={s.td}>
                       <div style={{ fontSize: "13px", color: "#2A1845" }}>{c.phone || "—"}</div>
                       {c.phone && (
-                        <a href={`https://wa.me/54${c.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer">
+                        <a href={linkWhatsApp(c.phone)} target="_blank" rel="noreferrer">
                           <button style={{ ...s.btnWA, marginTop: "4px" }}>💬 WhatsApp</button>
                         </a>
                       )}
@@ -236,7 +237,7 @@ export default function Clientes() {
             </div>
 
             {clienteSeleccionado.phone && (
-              <a href={`https://wa.me/54${clienteSeleccionado.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer">
+              <a href={linkWhatsApp(clienteSeleccionado.phone)} target="_blank" rel="noreferrer">
                 <button style={{ ...s.btnWA, width: "100%", justifyContent: "center" }}>💬 WhatsApp · {clienteSeleccionado.phone}</button>
               </a>
             )}
