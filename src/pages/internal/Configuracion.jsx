@@ -87,6 +87,9 @@ export default function Configuracion() {
   const [overridesDB, setOverridesDB] = useState([]);
   const [overrideFecha, setOverrideFecha] = useState("");
   const [overrideModalidad, setOverrideModalidad] = useState("ambas");
+  const [overrideHorarioCustom, setOverrideHorarioCustom] = useState(false);
+  const [overrideHoraInicio, setOverrideHoraInicio] = useState("09:00");
+  const [overrideHoraFin, setOverrideHoraFin] = useState("18:00");
   const [savingOverride, setSavingOverride] = useState(false);
   const [overrideMsg, setOverrideMsg] = useState("");
 
@@ -148,7 +151,7 @@ export default function Configuracion() {
       const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
       setBloqueosDB(blocked || []);
 
-      const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality").eq("professional_id", uid).order("date");
+      const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality, start_time, end_time").eq("professional_id", uid).order("date");
       setOverridesDB(overrides || []);
 
       setLoading(false);
@@ -195,12 +198,19 @@ export default function Configuracion() {
     setSavingOverride(true); setOverrideMsg("");
     const uid = await getUid();
     if (!uid) { setSavingOverride(false); return; }
-    const { error } = await supabase.from("modality_overrides").upsert({ professional_id: uid, date: overrideFecha, modality: overrideModalidad }, { onConflict: "professional_id,date" });
+    const { error } = await supabase.from("modality_overrides").upsert({
+      professional_id: uid, date: overrideFecha, modality: overrideModalidad,
+      start_time: overrideHorarioCustom ? overrideHoraInicio : null,
+      end_time: overrideHorarioCustom ? overrideHoraFin : null,
+    }, { onConflict: "professional_id,date" });
     if (error) { setOverrideMsg("Error: " + error.message); setSavingOverride(false); return; }
-    const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality").eq("professional_id", uid).order("date");
+    const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality, start_time, end_time").eq("professional_id", uid).order("date");
     setOverridesDB(overrides || []);
     setOverrideFecha("");
     setOverrideModalidad("ambas");
+    setOverrideHorarioCustom(false);
+    setOverrideHoraInicio("09:00");
+    setOverrideHoraFin("18:00");
     setSavingOverride(false);
     setOverrideMsg("✓ Excepción guardada");
     setTimeout(() => setOverrideMsg(""), 2500);
@@ -581,6 +591,22 @@ export default function Configuracion() {
                       </select>
                     </div>
                   </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: overrideHorarioCustom ? "10px" : "16px" }}>
+                    <input type="checkbox" id="overrideHorario" checked={overrideHorarioCustom} onChange={e => setOverrideHorarioCustom(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
+                    <label htmlFor="overrideHorario" style={{ fontSize: "12px", color: "#5C3F99", cursor: "pointer" }}>Ese día también atiendo en otro horario</label>
+                  </div>
+                  {overrideHorarioCustom && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+                      <div>
+                        <div style={s.label}>Desde</div>
+                        <input type="time" value={overrideHoraInicio} onChange={e => setOverrideHoraInicio(e.target.value)} style={{ ...s.inputFull, marginTop: "4px" }} />
+                      </div>
+                      <div>
+                        <div style={s.label}>Hasta</div>
+                        <input type="time" value={overrideHoraFin} onChange={e => setOverrideHoraFin(e.target.value)} style={{ ...s.inputFull, marginTop: "4px" }} />
+                      </div>
+                    </div>
+                  )}
                   <button onClick={guardarOverride} disabled={savingOverride || !overrideFecha} style={{ padding: "10px 20px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" }}>
                     {savingOverride ? "Guardando..." : "Guardar excepción"}
                   </button>
@@ -593,7 +619,10 @@ export default function Configuracion() {
                           <div style={{ fontSize: "16px" }}>{o.modality === "ambas" ? "🔀" : o.modality === "virtual" ? "📹" : "📍"}</div>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{new Date(o.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" })}</div>
-                            <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>{o.modality === "ambas" ? "Virtual y presencial" : o.modality === "virtual" ? "Solo virtual" : "Solo presencial"}</div>
+                            <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>
+                              {o.modality === "ambas" ? "Virtual y presencial" : o.modality === "virtual" ? "Solo virtual" : "Solo presencial"}
+                              {o.start_time && ` · ${o.start_time.slice(0,5)} a ${o.end_time?.slice(0,5)}`}
+                            </div>
                           </div>
                           <button onClick={() => eliminarOverride(o.id)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #F0D0D8", background: "#FEF0F3", cursor: "pointer", color: "#C06080", fontSize: "14px" }}>✕</button>
                         </div>

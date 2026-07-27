@@ -135,7 +135,7 @@ export default function Reserva() {
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
-        supabase.from("modality_overrides").select("date, modality").eq("professional_id", pd.id),
+        supabase.from("modality_overrides").select("date, modality, start_time, end_time").eq("professional_id", pd.id),
       ]);
       setBlockedDatesProf(blocked || []);
       setModalityOverrides(overrides || []);
@@ -210,8 +210,10 @@ export default function Reserva() {
     const dow = fechaObj.getDay();
     const avail = disponibilidad.find(a => a.day_of_week === dow);
     if (!avail) return [];
-    const [sH, sM] = avail.start_time.slice(0, 5).split(":").map(Number);
-    const [eH, eM] = avail.end_time.slice(0, 5).split(":").map(Number);
+    const overrideHorario = modalityOverrides.find(o => o.date === fechaStr && o.start_time);
+    const horaBase = overrideHorario || avail;
+    const [sH, sM] = horaBase.start_time.slice(0, 5).split(":").map(Number);
+    const [eH, eM] = horaBase.end_time.slice(0, 5).split(":").map(Number);
     const startMins = sH * 60 + sM;
     const endMins = eH * 60 + eM;
     const slotStep = srv.duration_minutes + profPausa;
