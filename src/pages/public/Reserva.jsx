@@ -172,11 +172,13 @@ export default function Reserva() {
   const offsetLunes = primerDow === 0 ? 6 : primerDow - 1;
   const nombreMes = mesActual.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   const mesAnteriorPermitido = new Date(anioMes, mesMes, 1) > new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const mesSiguientePermitido = !profData?.reservas_hasta || new Date(anioMes, mesMes + 1, 1) <= new Date(profData.reservas_hasta + "T00:00:00");
 
   const esDiaSeleccionable = (d) => {
     const fechaObj = new Date(anioMes, mesMes, d);
     if (fechaObj < hoy) return false;
     const fechaStr = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    if (profData?.reservas_hasta && fechaStr > profData.reservas_hasta) return false;
     if (blockedDatesProf.some(b => b.date === fechaStr && !b.start_time)) return false;
     const dow = fechaObj.getDay();
     if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
@@ -223,6 +225,7 @@ export default function Reserva() {
   const cambiarMes = (delta) => {
     const nuevo = new Date(anioMes, mesMes + delta, 1);
     if (delta < 0 && nuevo < new Date(hoy.getFullYear(), hoy.getMonth(), 1)) return;
+    if (delta > 0 && profData?.reservas_hasta && nuevo > new Date(profData.reservas_hasta + "T00:00:00")) return;
     setMesActual(nuevo);
     setDia(null);
     setHora(null);
@@ -449,7 +452,7 @@ export default function Reserva() {
                 <div style={s.calHeader}>
                   <span style={{ cursor: mesAnteriorPermitido ? "pointer" : "default", color: mesAnteriorPermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(-1)}>‹</span>
                   <span>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
-                  <span style={{ cursor: "pointer", color: "#9B72C0" }} onClick={() => cambiarMes(1)}>›</span>
+                  <span style={{ cursor: mesSiguientePermitido ? "pointer" : "default", color: mesSiguientePermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(1)}>›</span>
                 </div>
                 <div style={s.calGrid}>
                   {["L","M","X","J","V","S","D"].map(d => <div key={d} style={s.calDayName}>{d}</div>)}
