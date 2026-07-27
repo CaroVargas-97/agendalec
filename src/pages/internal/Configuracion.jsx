@@ -72,7 +72,7 @@ export default function Configuracion() {
   const [nombreMsg, setNombreMsg] = useState("");
   const [contactoForm, setContactoForm] = useState({ phone: "", address: "" });
   const [contactoMsg, setContactoMsg] = useState("");
-  const [reservasForm, setReservasForm] = useState({ desde: "", hasta: "" });
+  const [reservasForm, setReservasForm] = useState({ pausadas: false });
   const [reservasMsg, setReservasMsg] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
@@ -117,10 +117,10 @@ export default function Configuracion() {
       if (!uid) { setLoading(false); return; }
       cargarProfesionales();
 
-      const { data: prof } = await supabase.from("profiles").select("full_name, phone, address, reservas_desde, reservas_hasta").eq("id", uid).maybeSingle();
+      const { data: prof } = await supabase.from("profiles").select("full_name, phone, address, reservas_pausadas").eq("id", uid).maybeSingle();
       if (prof?.full_name) setNombreForm(prof.full_name);
       if (prof) setContactoForm({ phone: prof.phone || "", address: prof.address || "" });
-      if (prof) setReservasForm({ desde: prof.reservas_desde || "", hasta: prof.reservas_hasta || "" });
+      if (prof) setReservasForm({ pausadas: prof.reservas_pausadas || false });
       try {
         const { data: cfg } = await supabase.from("app_config").select("value").eq("key", "invite_code").maybeSingle();
         if (cfg) setInviteCode(cfg.value || "");
@@ -711,34 +711,17 @@ export default function Configuracion() {
             </div>
             <div style={s.card}>
               <div style={s.cardTitle}>Período de reservas</div>
-              <div style={{ fontSize: "12px", color: "#B89FD0", marginBottom: "8px" }}>Los clientes solo pueden reservar entre estas fechas. Si no hay fechas configuradas, las reservas están cerradas.</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                  <div>
-                    <div style={s.pausaSub}>Apertura</div>
-                    <input type="date" value={reservasForm.desde} onChange={e => setReservasForm({...reservasForm, desde: e.target.value})} style={{...s.inputFull, marginTop: "4px"}} />
-                  </div>
-                  <div>
-                    <div style={s.pausaSub}>Cierre</div>
-                    <input type="date" value={reservasForm.hasta} onChange={e => setReservasForm({...reservasForm, hasta: e.target.value})} style={{...s.inputFull, marginTop: "4px"}} />
-                  </div>
-                </div>
-                {reservasMsg && <div style={{ fontSize: "12px", color: reservasMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D" }}>{reservasMsg}</div>}
-                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                  <button style={{ ...s.saveBtn, background: "#F3F4F6", color: "#6B7280", border: "0.5px solid #E5E7EB" }} onClick={async () => {
-                    const uid = await getUid();
-                    const { error } = await supabase.from("profiles").update({ reservas_desde: null, reservas_hasta: null }).eq("id", uid);
-                    if (error) setReservasMsg("Error al guardar");
-                    else { setReservasForm({ desde: "", hasta: "" }); setReservasMsg("✓ Reservas cerradas"); setTimeout(() => setReservasMsg(""), 2000); }
-                  }}>Cerrar reservas</button>
-                  <button style={s.saveBtn} onClick={async () => {
-                    const uid = await getUid();
-                    const { error } = await supabase.from("profiles").update({ reservas_desde: reservasForm.desde || null, reservas_hasta: reservasForm.hasta || null }).eq("id", uid);
-                    if (error) setReservasMsg("Error al guardar");
-                    else { setReservasMsg("✓ Guardado"); setTimeout(() => setReservasMsg(""), 2000); }
-                  }}>Guardar período</button>
-                </div>
-              </div>
+              <div style={{ fontSize: "12px", color: "#B89FD0", marginBottom: "12px" }}>Se abre solo, automáticamente: el mes en curso siempre está disponible, y el mes siguiente se habilita una semana antes de que empiece. No hace falta tocar nada acá salvo que quieras pausar las reservas temporalmente (ej: vacaciones).</div>
+              {reservasMsg && <div style={{ fontSize: "12px", color: reservasMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D", marginBottom: "10px" }}>{reservasMsg}</div>}
+              <button style={reservasForm.pausadas ? s.saveBtnOk : { ...s.saveBtn, background: "#FCEBEB", color: "#A32D2D", boxShadow: "none" }} onClick={async () => {
+                const uid = await getUid();
+                const nuevoValor = !reservasForm.pausadas;
+                const { error } = await supabase.from("profiles").update({ reservas_pausadas: nuevoValor }).eq("id", uid);
+                if (error) setReservasMsg("Error al guardar");
+                else { setReservasForm({ pausadas: nuevoValor }); setReservasMsg(nuevoValor ? "✓ Reservas pausadas" : "✓ Reservas reactivadas"); setTimeout(() => setReservasMsg(""), 2000); }
+              }}>
+                {reservasForm.pausadas ? "🔓 Reactivar reservas" : "⏸ Pausar reservas temporalmente"}
+              </button>
             </div>
             <div style={s.card}>
               <div style={s.cardTitle}>Cambiar contraseña</div>

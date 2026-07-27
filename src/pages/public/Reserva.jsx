@@ -99,16 +99,27 @@ export default function Reserva() {
   const [modalityOverrides, setModalityOverrides] = useState([]);
 
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email, address, phone, reservas_desde, reservas_hasta").eq("role", "professional")
+    supabase.from("profiles").select("id, full_name, email, address, phone, reservas_pausadas").eq("role", "professional")
       .then(({ data }) => {
         const profs = data || [];
         setProfesionales(profs);
-        const hoy = new Date().toISOString().slice(0, 10);
-        const abierta = profs.some(p => p.reservas_desde && p.reservas_hasta && hoy >= p.reservas_desde && hoy <= p.reservas_hasta);
+        const abierta = profs.some(p => !p.reservas_pausadas);
         setReservasCerradas(!abierta);
         setLoading(false);
       });
   }, []);
+
+  // Ventana de reservas: mes actual siempre habilitado, y el mes siguiente se
+  // habilita solo, automáticamente, una semana antes de que empiece.
+  const finVentanaReservas = () => {
+    const hoy = new Date();
+    const inicioProximo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+    const cutoff = new Date(inicioProximo);
+    cutoff.setDate(cutoff.getDate() - 7);
+    const abreProximo = hoy >= cutoff;
+    const mesFin = hoy.getMonth() + (abreProximo ? 1 : 0);
+    return new Date(hoy.getFullYear(), mesFin + 1, 0);
+  };
 
   useEffect(() => {
     if (!prof) return;
@@ -172,13 +183,13 @@ export default function Reserva() {
   const offsetLunes = primerDow === 0 ? 6 : primerDow - 1;
   const nombreMes = mesActual.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   const mesAnteriorPermitido = new Date(anioMes, mesMes, 1) > new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-  const mesSiguientePermitido = !profData?.reservas_hasta || new Date(anioMes, mesMes + 1, 1) <= new Date(profData.reservas_hasta + "T00:00:00");
+  const mesSiguientePermitido = new Date(anioMes, mesMes + 1, 1) <= finVentanaReservas();
 
   const esDiaSeleccionable = (d) => {
     const fechaObj = new Date(anioMes, mesMes, d);
     if (fechaObj < hoy) return false;
+    if (fechaObj > finVentanaReservas()) return false;
     const fechaStr = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-    if (profData?.reservas_hasta && fechaStr > profData.reservas_hasta) return false;
     if (blockedDatesProf.some(b => b.date === fechaStr && !b.start_time)) return false;
     const dow = fechaObj.getDay();
     if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
@@ -225,7 +236,7 @@ export default function Reserva() {
   const cambiarMes = (delta) => {
     const nuevo = new Date(anioMes, mesMes + delta, 1);
     if (delta < 0 && nuevo < new Date(hoy.getFullYear(), hoy.getMonth(), 1)) return;
-    if (delta > 0 && profData?.reservas_hasta && nuevo > new Date(profData.reservas_hasta + "T00:00:00")) return;
+    if (delta > 0 && nuevo > finVentanaReservas()) return;
     setMesActual(nuevo);
     setDia(null);
     setHora(null);
