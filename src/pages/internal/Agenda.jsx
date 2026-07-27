@@ -494,18 +494,28 @@ export default function Agenda() {
                     <div style={{ padding: "12px 14px", fontSize: "12px", color: "#B89FD0" }}>Cargando...</div>
                   ) : (
                     <>
-                      <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "0.5px solid #F0E8F8" }}>
-                        <span style={{ fontSize: "12px", color: "#9B72C0" }}>Seña ${(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</span>
-                        <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: sena?.status === "paid" ? "#EAF3DE" : "#FAEEDA", color: sena?.status === "paid" ? "#3B6D11" : "#854F0B" }}>
-                          {sena?.status === "paid" ? "✓ Pagado" : "⏳ Pendiente"}
-                        </span>
+                      <div style={{ padding: "10px 14px", borderBottom: "0.5px solid #F0E8F8" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <span style={{ fontSize: "12px", color: "#9B72C0" }}>Seña ${(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</span>
+                          <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: sena?.status === "paid" ? "#EAF3DE" : "#FAEEDA", color: sena?.status === "paid" ? "#3B6D11" : "#854F0B" }}>
+                            {sena?.status === "paid" ? "✓ Pagado" : "⏳ Pendiente"}
+                          </span>
+                        </div>
+                        {sena?.receipt_url && (
+                          <a href={sena.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
+                        )}
                       </div>
                       {saldo && (
-                        <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "0.5px solid #F0E8F8" }}>
-                          <span style={{ fontSize: "12px", color: "#9B72C0" }}>Saldo ${parseFloat(saldo.amount || 0).toLocaleString("es-AR")}</span>
-                          <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: saldo.status === "paid" ? "#EAF3DE" : "#EDE8FA", color: saldo.status === "paid" ? "#3B6D11" : "#5C3F99" }}>
-                            {saldo.status === "paid" ? "✓ Pagado" : "Pendiente"}
-                          </span>
+                        <div style={{ padding: "10px 14px", borderBottom: "0.5px solid #F0E8F8" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <span style={{ fontSize: "12px", color: "#9B72C0" }}>Saldo ${parseFloat(saldo.amount || 0).toLocaleString("es-AR")}</span>
+                            <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: saldo.status === "paid" ? "#EAF3DE" : "#EDE8FA", color: saldo.status === "paid" ? "#3B6D11" : "#5C3F99" }}>
+                              {saldo.status === "paid" ? "✓ Pagado" : "Pendiente"}
+                            </span>
+                          </div>
+                          {saldo.receipt_url && (
+                            <a href={saldo.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
+                          )}
                         </div>
                       )}
                       <div style={{ padding: "10px 14px", display: "flex", justifyContent: "space-between" }}>
