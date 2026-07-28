@@ -51,7 +51,7 @@ export default function Cobros() {
 
     const { data: turnos } = await supabase
       .from("appointments")
-      .select("id, date, start_time, status, total_price, modality, clients(full_name), services(name), profiles(full_name), payments(receipt_url, type, status)")
+      .select("id, date, start_time, status, total_price, modality, clients(full_name), services(name), profiles(full_name), payments(id, receipt_url, type, status)")
       .in("status", ["pending", "partial"])
       .order("date", { ascending: true });
     const conSenaPendiente = (turnos || []).filter(t => t.payments?.some(p => p.type === "seña" && p.status === "pending"));
