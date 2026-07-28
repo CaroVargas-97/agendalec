@@ -245,15 +245,21 @@ export default function Agenda() {
     }
     if (!clienteId) { setSavingError("No se pudo crear el cliente."); setSaving(false); return; }
 
-    const [h, m] = form.hora.split(":").map(Number);
-    const endMin = h * 60 + m + srv.duration_minutes;
-    const endTime = `${String(Math.floor(endMin/60)).padStart(2,"0")}:${String(endMin%60).padStart(2,"0")}`;
+    const esACoordinarSrv = srv.requires_slot === false;
+    let endTime = null;
+    if (!esACoordinarSrv) {
+      const [h, m] = form.hora.split(":").map(Number);
+      const endMin = h * 60 + m + srv.duration_minutes;
+      endTime = `${String(Math.floor(endMin/60)).padStart(2,"0")}:${String(endMin%60).padStart(2,"0")}`;
+    }
 
     const precio = getPrecioEfectivo(srv);
     const status = estadoPago === "completo" ? "confirmed" : "pending";
     const { data: turno } = await supabase.from("appointments").insert({
       professional_id: form.profesional, client_id: clienteId, service_id: form.servicioId,
-      date: form.fecha, start_time: form.hora, end_time: endTime,
+      date: esACoordinarSrv ? (form.fecha || null) : form.fecha,
+      start_time: esACoordinarSrv ? null : form.hora,
+      end_time: endTime,
       modality: form.modalidad, status, total_price: precio, notes: form.notas
     }).select("id").single();
 
@@ -288,6 +294,8 @@ export default function Agenda() {
   };
 
   const serviciosFiltrados = servicios.filter(sv => !form.profesional || sv.professional_id === form.profesional);
+  const servicioSeleccionado = servicios.find(sv => sv.id === form.servicioId);
+  const esACoordinarForm = servicioSeleccionado?.requires_slot === false;
   const semana = getSemana(fecha);
 
   const getPrecioEfectivo = (srv) => {
@@ -354,6 +362,20 @@ export default function Agenda() {
             {loading ? <div style={s.emptyText}>Cargando...</div> : (
               <>
                 {vista === "dia" && (
+                  <>
+                  {turnos.some(t => !t.start_time) && (
+                    <div style={{ marginBottom: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ fontSize: "11px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>A coordinar este día</div>
+                      {turnos.filter(t => !t.start_time).map((t, i) => {
+                        const isPending = t.status === "pending" || t.status === "partial";
+                        return (
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
+                            <strong>{t.clients?.full_name}</strong> · {t.services?.name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div style={{ display: "grid", gridTemplateColumns: "52px 1fr" }}>
                     <div>{HORAS.map(h => <div key={h} style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>)}</div>
                     <div style={{ position: "relative", borderLeft: "0.5px solid #F0E8F8", height: `${HORAS.length * 64}px` }}>
@@ -384,7 +406,7 @@ export default function Agenda() {
                         );
                       })()}
                       {turnos.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: "13px", color: "#C4A8D8" }}>No hay turnos para este día</div>}
-                      {turnos.map((t, i) => {
+                      {turnos.filter(t => t.start_time).map((t, i) => {
                         const isPending = t.status === "pending" || t.status === "partial";
                         const isVirtual = t.modality === "virtual";
                         const isCancelled = t.status === "cancelled";
@@ -404,6 +426,7 @@ export default function Agenda() {
                       })}
                     </div>
                   </div>
+                  </>
                 )}
                 {vista === "semana" && (
                   <div style={{ overflowX: "auto" }}><div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, minWidth: "600px" }}>
@@ -622,10 +645,17 @@ export default function Agenda() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                <div style={s.field}><label style={s.label}>Fecha</label><input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} style={s.input} /></div>
-                <div style={s.field}><label style={s.label}>Hora</label><input type="time" value={form.hora} onChange={e => setForm({...form, hora: e.target.value})} style={s.input} /></div>
-              </div>
+              {esACoordinarForm ? (
+                <div style={s.field}>
+                  <label style={s.label}>Fecha (opcional, se coordina aparte)</label>
+                  <input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} style={s.input} />
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div style={s.field}><label style={s.label}>Fecha</label><input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})} style={s.input} /></div>
+                  <div style={s.field}><label style={s.label}>Hora</label><input type="time" value={form.hora} onChange={e => setForm({...form, hora: e.target.value})} style={s.input} /></div>
+                </div>
+              )}
 
               <div style={s.field}>
                 <label style={s.label}>Estado del pago</label>
