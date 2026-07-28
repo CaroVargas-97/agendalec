@@ -93,6 +93,7 @@ export default function Reserva() {
   const [horariosOcupados, setHorariosOcupados] = useState([]);
   const [loadingServicios, setLoadingServicios] = useState(false);
   const [comprobante, setComprobante] = useState(null);
+  const [comprobanteFallo, setComprobanteFallo] = useState(false);
 
   const [reservasCerradas, setReservasCerradas] = useState(false);
   const [blockedDatesProf, setBlockedDatesProf] = useState([]);
@@ -275,6 +276,7 @@ export default function Reserva() {
   const confirmarReserva = async () => {
     setGuardando(true);
     setError("");
+    setComprobanteFallo(false);
     try {
       const { data: clienteId, error: errCliente } = await supabase.rpc("obtener_o_crear_cliente", {
         p_nombre: form.nombre, p_telefono: form.celular, p_email: form.mail.trim().toLowerCase()
@@ -310,12 +312,16 @@ export default function Reserva() {
 
       if (comprobante) {
         const ext = comprobante.name.split(".").pop();
-        const { data: uploadData } = await supabase.storage
+        const { data: uploadData, error: errUpload } = await supabase.storage
           .from("comprobantes")
           .upload(`${turnoId}-sena.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
-        if (uploadData) {
+        if (errUpload) {
+          console.error("Error subiendo comprobante:", errUpload.message);
+          setComprobanteFallo(true);
+        } else if (uploadData) {
           const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
-          await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
+          const { error: errUpdate } = await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
+          if (errUpdate) { console.error("Error guardando comprobante:", errUpdate.message); setComprobanteFallo(true); }
         }
       }
 
@@ -662,11 +668,16 @@ export default function Reserva() {
             <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
             {!esCortesia && <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>}
           </div>
+          {comprobanteFallo && (
+            <div style={{ ...s.avisoBox, background: "#FEF3E8", color: "#92400E" }}>
+              ⚠️ Tu turno se reservó bien, pero no pudimos guardar el comprobante que adjuntaste. Por favor mandalo por WhatsApp{profData?.phone ? ` al ${profData.phone}` : ""} para confirmar el pago.
+            </div>
+          )}
           <div style={s.avisoBox}>🔔 Recibirás una confirmación por WhatsApp cuando el equipo confirme tu turno.</div>
           <button style={s.btnNext} onClick={() => {
             setStep(1); setProf(null); setServicio(null); setMoneda(null); setDia(null); setHora(null);
             setModalidad(null); setForm({ nombre: "", celular: "", mail: "" }); setClienteReconocido(false);
-            setMesActual(inicioMes()); setComprobante(null);
+            setMesActual(inicioMes()); setComprobante(null); setComprobanteFallo(false);
           }}>
             Volver al inicio
           </button>

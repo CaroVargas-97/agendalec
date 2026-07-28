@@ -107,12 +107,15 @@ export default function Cobros() {
     if (!file) return;
     setSubiendoSaldo(pagoId);
     const ext = file.name.split(".").pop();
-    const { data: uploadData } = await supabase.storage
+    const { data: uploadData, error: errUpload } = await supabase.storage
       .from("comprobantes")
       .upload(`${appointmentId}-${tipo}.${ext}`, file, { contentType: file.type, upsert: true });
-    if (uploadData) {
+    if (errUpload) {
+      alert("No se pudo subir el comprobante: " + errUpload.message);
+    } else if (uploadData) {
       const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
-      await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
+      const { error: errUpdate } = await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
+      if (errUpdate) alert("No se pudo guardar el comprobante: " + errUpdate.message);
     }
     setSubiendoSaldo(null);
     cargar();
