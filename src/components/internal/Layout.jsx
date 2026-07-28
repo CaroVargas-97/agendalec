@@ -24,6 +24,7 @@ const s = {
 const navItems = [
   { key: "dashboard", icon: "🏠", label: "Inicio" },
   { key: "agenda", icon: "📅", label: "Agenda" },
+  { key: "grupales", icon: "🧑‍🤝‍🧑", label: "Grupales" },
   { key: "clientes", icon: "👥", label: "Clientes" },
   { key: "cobros", icon: "💰", label: "Cobros" },
   { key: "estadisticas", icon: "📊", label: "Stats" },

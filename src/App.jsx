@@ -8,6 +8,7 @@ import Configuracion from "./pages/internal/Configuracion";
 import Clientes from "./pages/internal/Clientes";
 import Cobros from "./pages/internal/Cobros";
 import Estadisticas from "./pages/internal/Estadisticas";
+import Grupales from "./pages/internal/Grupales";
 import Reserva from "./pages/public/Reserva";
 import Terminos from "./pages/public/Terminos";
 import ResetPassword from "./pages/internal/ResetPassword";
@@ -71,6 +72,7 @@ function App() {
     if (page === "clientes") return <Clientes setPage={setPage} />;
     if (page === "cobros") return <Cobros setPage={setPage} />;
     if (page === "estadisticas") return <Estadisticas setPage={setPage} />;
+    if (page === "grupales") return <Grupales setPage={setPage} />;
     return <Dashboard setPage={setPage} />;
   };
 

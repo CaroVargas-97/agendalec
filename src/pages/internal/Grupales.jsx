@@ -1,0 +1,313 @@
+import { useState, useEffect } from "react";
+import { supabase } from "../../supabase";
+import { linkWhatsApp } from "../../utils/whatsapp";
+
+const s = {
+  main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  topbar: { display: "flex", alignItems: "flex-start", justifyContent: "space-between" },
+  title: { fontSize: "18px", fontWeight: "500", color: "#2A1845" },
+  titleSub: { fontSize: "13px", color: "#9B72C0", marginTop: "3px" },
+  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.25rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  field: { display: "flex", flexDirection: "column", gap: "4px" },
+  label: { fontSize: "12px", color: "#9B72C0" },
+  input: { fontSize: "13px", padding: "8px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  saveBtn: { width: "100%", padding: "10px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" },
+  cancelBtn: { width: "100%", padding: "10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
+  panel: { position: "fixed", top: 0, right: 0, width: "420px", height: "100vh", background: "#fff", borderLeft: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto", zIndex: 100, boxShadow: "-4px 0 24px rgba(42,24,69,0.08)" },
+  overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(42,24,69,0.2)", zIndex: 99 },
+  eventoCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)", cursor: "pointer" },
+  modPill: { fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99" },
+  tagPagado: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EAF3DE", color: "#3B6D11" },
+  tagPendiente: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FAEEDA", color: "#854F0B" },
+  btnWA: { display: "inline-flex", alignItems: "center", gap: "4px", padding: "5px 8px", background: "#25D366", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+};
+
+const getUid = async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.id || null;
+};
+
+export default function Grupales() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [eventos, setEventos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [eventoSeleccionado, setEventoSeleccionado] = useState(null);
+  const [asistentes, setAsistentes] = useState([]);
+  const [loadingAsistentes, setLoadingAsistentes] = useState(false);
+  const [subiendo, setSubiendo] = useState(null);
+
+  const [nuevoAbierto, setNuevoAbierto] = useState(false);
+  const [nuevoForm, setNuevoForm] = useState({ nombre: "", fecha: "", precio: "", currency: "ARS", cupo: "", modalidad: "ambas" });
+  const [savingNuevo, setSavingNuevo] = useState(false);
+  const [nuevoError, setNuevoError] = useState("");
+
+  const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
+  const [savingAsistente, setSavingAsistente] = useState(false);
+
+  const cargar = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("group_events").select("*, group_attendees(id, status)").order("date", { ascending: true });
+    setEventos(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const crearEvento = async () => {
+    setNuevoError("");
+    if (!nuevoForm.nombre.trim()) { setNuevoError("Falta el nombre."); return; }
+    setSavingNuevo(true);
+    const uid = await getUid();
+    if (!uid) { setSavingNuevo(false); return; }
+    const { error } = await supabase.from("group_events").insert({
+      professional_id: uid,
+      name: nuevoForm.nombre.trim(),
+      date: nuevoForm.fecha || null,
+      price: nuevoForm.precio ? parseFloat(nuevoForm.precio) : null,
+      currency: nuevoForm.currency,
+      capacity: nuevoForm.cupo ? parseInt(nuevoForm.cupo) : null,
+      modality: nuevoForm.modalidad,
+    });
+    if (error) { setNuevoError("Error al crear: " + error.message); setSavingNuevo(false); return; }
+    await cargar();
+    setSavingNuevo(false);
+    setNuevoAbierto(false);
+    setNuevoForm({ nombre: "", fecha: "", precio: "", currency: "ARS", cupo: "", modalidad: "ambas" });
+  };
+
+  const eliminarEvento = async (ev) => {
+    if (!window.confirm(`¿Eliminar "${ev.name}"? Se borrarán también los asistentes anotados.`)) return;
+    await supabase.from("group_attendees").delete().eq("event_id", ev.id);
+    await supabase.from("group_events").delete().eq("id", ev.id);
+    setEventoSeleccionado(null);
+    await cargar();
+  };
+
+  const abrirEvento = async (ev) => {
+    setEventoSeleccionado(ev);
+    setLoadingAsistentes(true);
+    const { data } = await supabase.from("group_attendees").select("*").eq("event_id", ev.id).order("created_at");
+    setAsistentes(data || []);
+    setLoadingAsistentes(false);
+  };
+
+  const refrescarAsistentes = async () => {
+    if (!eventoSeleccionado) return;
+    const { data } = await supabase.from("group_attendees").select("*").eq("event_id", eventoSeleccionado.id).order("created_at");
+    setAsistentes(data || []);
+    await cargar();
+  };
+
+  const agregarAsistente = async () => {
+    if (!asistenteForm.nombre.trim()) return;
+    setSavingAsistente(true);
+    const { error } = await supabase.from("group_attendees").insert({
+      event_id: eventoSeleccionado.id,
+      full_name: asistenteForm.nombre.trim(),
+      phone: asistenteForm.telefono || null,
+      email: asistenteForm.mail || null,
+      status: "pending",
+    });
+    if (error) { alert("Error al agregar: " + error.message); setSavingAsistente(false); return; }
+    setAsistenteForm({ nombre: "", telefono: "", mail: "" });
+    setSavingAsistente(false);
+    await refrescarAsistentes();
+  };
+
+  const eliminarAsistente = async (id) => {
+    await supabase.from("group_attendees").delete().eq("id", id);
+    await refrescarAsistentes();
+  };
+
+  const togglePago = async (asistente) => {
+    const nuevoEstado = asistente.status === "paid" ? "pending" : "paid";
+    await supabase.from("group_attendees").update({ status: nuevoEstado }).eq("id", asistente.id);
+    await refrescarAsistentes();
+  };
+
+  const subirComprobante = async (asistenteId, file) => {
+    if (!file) return;
+    setSubiendo(asistenteId);
+    const ext = file.name.split(".").pop();
+    const { data: uploadData, error: errUpload } = await supabase.storage
+      .from("comprobantes")
+      .upload(`grupal-${asistenteId}.${ext}`, file, { contentType: file.type, upsert: true });
+    if (errUpload) {
+      alert("No se pudo subir el comprobante: " + errUpload.message);
+    } else if (uploadData) {
+      const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+      const { error: errUpdate } = await supabase.from("group_attendees").update({ receipt_url: publicUrl }).eq("id", asistenteId);
+      if (errUpdate) alert("No se pudo guardar el comprobante: " + errUpdate.message);
+    }
+    setSubiendo(null);
+    await refrescarAsistentes();
+  };
+
+  const symFor = (cur) => cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+  const modLabel = (m) => m === "virtual" ? "📹 Virtual" : m === "presencial" ? "📍 Presencial" : "🔀 Virtual y presencial";
+
+  return (
+    <div style={{ ...s.main, padding: isMobile ? "1rem" : "1.5rem" }}>
+      <div style={{ ...s.topbar, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-start", gap: isMobile ? "10px" : 0 }}>
+        <div>
+          <div style={s.title}>Cursos y grupales</div>
+          <div style={s.titleSub}>{eventos.length} eventos cargados</div>
+        </div>
+        <button onClick={() => setNuevoAbierto(true)} style={{ padding: "8px 16px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" }}>+ Nuevo evento</button>
+      </div>
+
+      {loading ? (
+        <div style={{ ...s.card, ...s.emptyText }}>Cargando...</div>
+      ) : eventos.length === 0 ? (
+        <div style={{ ...s.card, ...s.emptyText }}>No hay cursos ni eventos grupales cargados aún</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {eventos.map((ev, i) => {
+            const total = ev.group_attendees?.length || 0;
+            const pagados = ev.group_attendees?.filter(a => a.status === "paid").length || 0;
+            return (
+              <div key={i} style={s.eventoCard} onClick={() => abrirEvento(ev)}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: "500", color: "#2A1845" }}>{ev.name}</div>
+                    <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "2px" }}>
+                      {ev.date ? new Date(ev.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" }) : "Sin fecha"}
+                      {ev.price != null && ` · ${symFor(ev.currency)}${ev.price.toLocaleString("es-AR")} por persona`}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={s.modPill}>{modLabel(ev.modality)}</span>
+                    <span style={{ fontSize: "12px", color: "#5C3F99", fontWeight: "500" }}>{total}{ev.capacity ? `/${ev.capacity}` : ""} anotados</span>
+                    <span style={s.tagPagado}>{pagados} pagó</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {eventoSeleccionado && (
+        <>
+          <div style={s.overlay} onClick={() => setEventoSeleccionado(null)} />
+          <div style={isMobile ? { ...s.panel, width: "100%" } : s.panel}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>{eventoSeleccionado.name}</div>
+                <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "2px" }}>
+                  {eventoSeleccionado.date ? new Date(eventoSeleccionado.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }) : "Sin fecha"}
+                  {eventoSeleccionado.price != null && ` · ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price.toLocaleString("es-AR")} p/persona`}
+                  {eventoSeleccionado.capacity && ` · cupo ${eventoSeleccionado.capacity}`}
+                </div>
+              </div>
+              <button onClick={() => setEventoSeleccionado(null)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+            </div>
+
+            <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
+              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotar persona</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <input type="text" placeholder="Nombre y apellido" value={asistenteForm.nombre} onChange={e => setAsistenteForm({...asistenteForm, nombre: e.target.value})} style={s.input} />
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <input type="tel" placeholder="Celular" value={asistenteForm.telefono} onChange={e => setAsistenteForm({...asistenteForm, telefono: e.target.value})} style={{ ...s.input, flex: 1 }} />
+                  <input type="email" placeholder="Mail (opcional)" value={asistenteForm.mail} onChange={e => setAsistenteForm({...asistenteForm, mail: e.target.value})} style={{ ...s.input, flex: 1 }} />
+                </div>
+                <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim()} style={{ ...s.saveBtn, padding: "8px" }}>{savingAsistente ? "Agregando..." : "+ Anotar"}</button>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotados ({asistentes.length})</div>
+              {loadingAsistentes ? (
+                <div style={s.emptyText}>Cargando...</div>
+              ) : asistentes.length === 0 ? (
+                <div style={{ ...s.emptyText, padding: "1rem 0" }}>Nadie anotado todavía</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {asistentes.map(a => (
+                    <div key={a.id} style={{ border: "0.5px solid #F0E8F8", borderRadius: "10px", padding: "10px 12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
+                        <span style={a.status === "paid" ? s.tagPagado : s.tagPendiente}>{a.status === "paid" ? "✓ Pagó" : "⏳ Pendiente"}</span>
+                      </div>
+                      {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "2px" }}>{a.phone}</div>}
+                      {a.receipt_url && (
+                        <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
+                      )}
+                      <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                        <button onClick={() => togglePago(a)} style={{ padding: "5px 10px", background: a.status === "paid" ? "#F3F4F6" : "#EDE8FA", color: a.status === "paid" ? "#6B7280" : "#5C3F99", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {a.status === "paid" ? "Marcar pendiente" : "✓ Marcar pagado"}
+                        </button>
+                        <label style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar"}
+                          <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
+                        </label>
+                        {a.phone && (
+                          <a href={linkWhatsApp(a.phone)} target="_blank" rel="noreferrer"><button style={s.btnWA}>💬</button></a>
+                        )}
+                        <button onClick={() => eliminarAsistente(a.id)} style={{ padding: "5px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button style={{ ...s.cancelBtn, color: "#A32D2D", borderColor: "#F4C4C4" }} onClick={() => eliminarEvento(eventoSeleccionado)}>🗑 Eliminar evento</button>
+          </div>
+        </>
+      )}
+
+      {nuevoAbierto && (
+        <>
+          <div style={s.overlay} onClick={() => setNuevoAbierto(false)} />
+          <div style={isMobile ? { ...s.panel, width: "100%" } : s.panel}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>+ Nuevo evento grupal</div>
+              <button onClick={() => setNuevoAbierto(false)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+            </div>
+
+            <div style={s.field}><label style={s.label}>Nombre del curso/evento</label><input type="text" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} placeholder="Constelaciones familiares grupales" style={s.input} /></div>
+            <div style={s.field}><label style={s.label}>Fecha (opcional)</label><input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={s.input} /></div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div style={s.field}>
+                <label style={s.label}>Precio por persona</label>
+                <input type="number" min="0" value={nuevoForm.precio} onChange={e => setNuevoForm({...nuevoForm, precio: e.target.value})} placeholder="0" style={s.input} />
+              </div>
+              <div style={s.field}>
+                <label style={s.label}>Moneda</label>
+                <select value={nuevoForm.currency} onChange={e => setNuevoForm({...nuevoForm, currency: e.target.value})} style={s.input}>
+                  <option value="ARS">Pesos</option>
+                  <option value="USD">Dólares</option>
+                  <option value="EUR">Euros</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={s.field}><label style={s.label}>Cupo máximo (opcional)</label><input type="number" min="1" value={nuevoForm.cupo} onChange={e => setNuevoForm({...nuevoForm, cupo: e.target.value})} placeholder="Sin límite" style={s.input} /></div>
+
+            <div style={s.field}>
+              <label style={s.label}>Modalidad</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {[["presencial","📍 Presencial"],["virtual","📹 Virtual"],["ambas","🔀 Ambas"]].map(([key,label]) => (
+                  <button key={key} onClick={() => setNuevoForm({...nuevoForm, modalidad: key})} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: `0.5px solid ${nuevoForm.modalidad===key?"#9B72C0":"#E0D0F0"}`, background: nuevoForm.modalidad===key?"#EDE8FA":"#fff", color: nuevoForm.modalidad===key?"#5C3F99":"#B89FD0", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {nuevoError && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{nuevoError}</div>}
+            <button style={s.saveBtn} onClick={crearEvento} disabled={savingNuevo}>{savingNuevo ? "Creando..." : "Crear evento"}</button>
+            <button style={s.cancelBtn} onClick={() => setNuevoAbierto(false)}>Cancelar</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
