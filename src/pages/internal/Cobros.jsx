@@ -193,7 +193,11 @@ export default function Cobros() {
                   <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: "4px", padding: "6px 10px", background: t.payments?.find(p => p.type === "seña")?.receipt_url ? "#EAF3DE" : "#fff", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", color: t.payments?.find(p => p.type === "seña")?.receipt_url ? "#3B6D11" : "#9B72C0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       {subiendoSaldo === t.payments?.find(p => p.type === "seña")?.id ? "Subiendo..." : t.payments?.find(p => p.type === "seña")?.receipt_url ? "✅ Adjunto" : "📎 Adjuntar"}
-                      <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(t.payments?.find(p => p.type === "seña")?.id, t.id, "sena", e.target.files[0])} />
+                      <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} disabled={!t.payments?.find(p => p.type === "seña")?.id} onChange={e => {
+                        const pagoId = t.payments?.find(p => p.type === "seña")?.id;
+                        if (!pagoId) { alert("Este turno no tiene un pago de seña asociado. Avisale a Caro para revisarlo."); return; }
+                        subirComprobante(pagoId, t.id, "sena", e.target.files[0]);
+                      }} />
                     </label>
                     <button style={s.btnConfirmar} onClick={() => confirmarTurno(t.id, t.total_price)}>✓ Confirmar seña</button>
                     <button style={s.btnPagoTotal} onClick={() => pagarTodo(t.id, t.total_price)}>💰 Pagó todo</button>
