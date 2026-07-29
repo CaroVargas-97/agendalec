@@ -341,12 +341,10 @@ export default function Agenda() {
             </div>
             <button style={s.arrowBtn} onClick={() => irDia(1)}>›</button>
             <button style={s.hoyBtn} onClick={() => setFecha(new Date())}>Hoy</button>
-            {!isMobile && (
-              <div style={s.toggleWrap}>
-                <button style={vista === "dia" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("dia")}>Día</button>
-                <button style={vista === "semana" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("semana")}>Semana</button>
-              </div>
-            )}
+            <div style={s.toggleWrap}>
+              <button style={vista === "dia" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("dia")}>Día</button>
+              <button style={vista === "semana" ? s.toggleBtnActive : s.toggleBtn} onClick={() => setVista("semana")}>Semana</button>
+            </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
             {!isMobile && (
