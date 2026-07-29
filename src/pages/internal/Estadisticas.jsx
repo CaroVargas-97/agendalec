@@ -65,16 +65,39 @@ export default function Estadisticas() {
     else if (periodo === "año") desde.setFullYear(hoy.getFullYear() - 1);
     const desdeISO = `${desde.getFullYear()}-${String(desde.getMonth()+1).padStart(2,"0")}-${String(desde.getDate()).padStart(2,"0")}`;
 
-    const { data: appts } = await supabase
-      .from("appointments")
-      .select("*, clients(full_name), services(name, price, currency)")
-      .eq("professional_id", uid)
-      .gte("date", desdeISO)
-      .neq("status", "cancelled");
+    const [{ data: appts }, { data: eventos }] = await Promise.all([
+      supabase
+        .from("appointments")
+        .select("*, clients(full_name), services(name, price, currency)")
+        .eq("professional_id", uid)
+        .gte("date", desdeISO)
+        .neq("status", "cancelled"),
+      supabase
+        .from("group_events")
+        .select("id, name, date, price, currency, group_attendees(full_name, status)")
+        .eq("professional_id", uid)
+        .gte("date", desdeISO),
+    ]);
 
     const sesiones = appts || [];
-    const totalSesiones = sesiones.length;
-    const clientesSet = new Set(sesiones.map(a => a.client_id));
+    // Cada persona anotada a un curso/evento grupal cuenta como una sesión
+    // más. La cortesía se cuenta como sesión pero no suma ingreso.
+    const asistentesGrupales = (eventos || []).flatMap(ev =>
+      (ev.group_attendees || []).map(a => ({
+        nombre: a.full_name,
+        status: a.status,
+        evento: ev.name,
+        date: ev.date,
+        currency: ev.currency || "ARS",
+        monto: a.status === "cortesia" ? 0 : parseFloat(ev.price || 0),
+      }))
+    );
+
+    const totalSesiones = sesiones.length + asistentesGrupales.length;
+    const clientesSet = new Set([
+      ...sesiones.map(a => a.client_id),
+      ...asistentesGrupales.map(a => `grupal:${a.nombre?.trim().toLowerCase()}`),
+    ]);
     const clientesUnicos = clientesSet.size;
 
     const ingresoByCurrency = {};
@@ -82,8 +105,12 @@ export default function Estadisticas() {
       const cur = a.services?.currency || "ARS";
       ingresoByCurrency[cur] = (ingresoByCurrency[cur] || 0) + parseFloat(a.total_price || 0);
     });
+    asistentesGrupales.forEach(a => {
+      ingresoByCurrency[a.currency] = (ingresoByCurrency[a.currency] || 0) + a.monto;
+    });
     const ingresoARS = ingresoByCurrency["ARS"] || 0;
-    const arsCount = sesiones.filter(a => !a.services?.currency || a.services?.currency === "ARS").length;
+    const arsCount = sesiones.filter(a => !a.services?.currency || a.services?.currency === "ARS").length
+      + asistentesGrupales.filter(a => a.currency === "ARS").length;
     const promedioSesion = arsCount > 0 ? Math.round(ingresoARS / arsCount) : 0;
 
     const servMap = {};
@@ -92,6 +119,12 @@ export default function Estadisticas() {
       if (!servMap[n]) servMap[n] = { count: 0, total: 0 };
       servMap[n].count++;
       servMap[n].total += parseFloat(a.total_price || 0);
+    });
+    asistentesGrupales.forEach(a => {
+      const n = a.evento || "Evento grupal";
+      if (!servMap[n]) servMap[n] = { count: 0, total: 0 };
+      servMap[n].count++;
+      servMap[n].total += a.monto;
     });
     const servicios = Object.entries(servMap).map(([nombre, v]) => ({ nombre, ...v })).sort((a, b) => b.count - a.count);
 
@@ -106,11 +139,22 @@ export default function Estadisticas() {
       cliMap[id].count++;
       cliMap[id].total += parseFloat(a.total_price || 0);
     });
+    asistentesGrupales.forEach(a => {
+      const id = `grupal:${a.nombre?.trim().toLowerCase()}`;
+      if (!cliMap[id]) cliMap[id] = { nombre: a.nombre || "Sin nombre", count: 0, total: 0 };
+      cliMap[id].count++;
+      cliMap[id].total += a.monto;
+    });
     const topClientes = Object.values(cliMap).sort((a, b) => b.count - a.count).slice(0, 5);
 
     const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
     const diaMap = {};
     sesiones.forEach(a => {
+      const n = dias[new Date(a.date + "T12:00:00").getDay()];
+      diaMap[n] = (diaMap[n] || 0) + 1;
+    });
+    asistentesGrupales.forEach(a => {
+      if (!a.date) return;
       const n = dias[new Date(a.date + "T12:00:00").getDay()];
       diaMap[n] = (diaMap[n] || 0) + 1;
     });

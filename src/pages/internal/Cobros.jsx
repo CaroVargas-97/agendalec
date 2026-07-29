@@ -73,12 +73,25 @@ export default function Cobros() {
       .limit(50);
     setHistorial(confirmados || []);
 
-    const cobradoHoy = (confirmados || []).filter(t => t.date === hoy && t.status === "confirmed").reduce((sum, t) => sum + parseFloat(t.total_price || 0), 0);
-    const saldosPendientes = (pagosSaldo || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-    const estesMes = (confirmados || []).filter(t => t.date >= inicioMes && t.status === "confirmed").reduce((sum, t) => sum + parseFloat(t.total_price || 0), 0);
+    // Los cursos y eventos grupales también son ingresos: se suman a las
+    // métricas para que la facturación no quede partida entre pantallas.
+    const { data: eventos } = await supabase
+      .from("group_events")
+      .select("id, name, date, price, currency, group_attendees(status)");
+    const asistentesGrupales = (eventos || []).flatMap(ev =>
+      (ev.group_attendees || []).map(a => ({ status: a.status, date: ev.date, monto: parseFloat(ev.price || 0) }))
+    );
+    const grupalCobradoHoy = asistentesGrupales.filter(a => a.status === "paid" && a.date === hoy).reduce((s, a) => s + a.monto, 0);
+    const grupalEsteMes = asistentesGrupales.filter(a => a.status === "paid" && a.date >= inicioMes).reduce((s, a) => s + a.monto, 0);
+    const grupalPendiente = asistentesGrupales.filter(a => a.status === "pending").reduce((s, a) => s + a.monto, 0);
+
+    const cobradoHoy = (confirmados || []).filter(t => t.date === hoy && t.status === "confirmed").reduce((sum, t) => sum + parseFloat(t.total_price || 0), 0) + grupalCobradoHoy;
+    const saldosPendientes = (pagosSaldo || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) + grupalPendiente;
+    const estesMes = (confirmados || []).filter(t => t.date >= inicioMes && t.status === "confirmed").reduce((sum, t) => sum + parseFloat(t.total_price || 0), 0) + grupalEsteMes;
     const cancelaciones = (confirmados || []).filter(t => t.status === "cancelled").length;
 
-    setStats({ cobradoHoy, saldosPendientes, estesMes, cancelaciones });
+    const grupalPendientesCount = asistentesGrupales.filter(a => a.status === "pending").length;
+    setStats({ cobradoHoy, saldosPendientes, estesMes, cancelaciones, grupalPendientesCount });
     setLoading(false);
   };
 
@@ -156,7 +169,7 @@ export default function Cobros() {
           <div key={m.key} style={s.metricCard}>
             <div style={{ fontSize: "11px", color: m.color, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</div>
             <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
-            <div style={s.metricSub}>{m.key === "saldosPendientes" ? `${saldos.length} saldos a cobrar` : m.sub || " "}</div>
+            <div style={s.metricSub}>{m.key === "saldosPendientes" ? `${saldos.length + (stats.grupalPendientesCount || 0)} pagos a cobrar` : m.sub || " "}</div>
             <div style={{ width: "28px", height: "3px", background: m.color, borderRadius: "2px", marginTop: "10px" }}></div>
           </div>
         ))}
