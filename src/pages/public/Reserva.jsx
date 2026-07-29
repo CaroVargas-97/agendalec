@@ -245,6 +245,17 @@ export default function Reserva() {
     setHora(null);
   };
 
+  // Si el mes que se está mostrando no tiene ningún día disponible
+  // (por ejemplo, quedó todo bloqueado o ya pasó), salta solo al
+  // siguiente mes en vez de dejar al cliente viendo un calendario
+  // gris sin explicación.
+  useEffect(() => {
+    if (!srv || disponibilidad.length === 0) return;
+    if (srv.modality === "ambas" && !modalidad) return;
+    const hayDisponible = Array.from({ length: diasEnMes }, (_, i) => i + 1).some(esDiaSeleccionable);
+    if (!hayDisponible && mesSiguientePermitido) cambiarMes(1);
+  }, [srv, modalidad, disponibilidad, blockedDatesProf, modalityOverrides, mesActual]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const fechaStr = dia
     ? `${anioMes}-${String(mesMes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`
     : "";
