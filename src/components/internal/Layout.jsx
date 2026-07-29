@@ -32,8 +32,13 @@ const navItems = [
   { key: "config", icon: "⚙️", label: "Config" },
 ];
 
+// En el celular no entran las 8 secciones en la barra de abajo: se
+// muestran las de uso diario y el resto va a un menú "Más".
+const navPrincipales = ["dashboard", "agenda", "cobros", "clientes"];
+
 export default function Layout({ children, page, setPage }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [masAbierto, setMasAbierto] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -42,6 +47,12 @@ export default function Layout({ children, page, setPage }) {
   }, []);
 
   const handleLogout = async () => { await supabase.auth.signOut(); };
+
+  const itemsBarra = navItems.filter(i => navPrincipales.includes(i.key));
+  const itemsMas = navItems.filter(i => !navPrincipales.includes(i.key));
+  const enMas = itemsMas.some(i => i.key === page);
+
+  const irA = (key) => { setPage(key); setMasAbierto(false); };
 
   return (
     <div style={s.wrap}>
@@ -67,14 +78,37 @@ export default function Layout({ children, page, setPage }) {
         {children}
       </div>
 
+      {isMobile && masAbierto && (
+        <>
+          <div style={{ position: "fixed", inset: 0, background: "rgba(42,24,69,0.25)", zIndex: 99 }} onClick={() => setMasAbierto(false)} />
+          <div style={{ position: "fixed", bottom: "72px", left: "12px", right: "12px", background: "#fff", borderRadius: "16px", border: "0.5px solid #E0D0F0", padding: "8px", zIndex: 101, boxShadow: "0 -8px 32px rgba(42,24,69,0.18)", display: "flex", flexDirection: "column", gap: "2px" }}>
+            {itemsMas.map(item => (
+              <button key={item.key} onClick={() => irA(item.key)}
+                style={{ display: "flex", alignItems: "center", gap: "12px", padding: "13px 14px", borderRadius: "10px", border: "none", background: page === item.key ? "#EDE8FA" : "transparent", color: page === item.key ? "#3B2460" : "#2A1845", fontWeight: page === item.key ? "500" : "400", fontSize: "14px", cursor: "pointer", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" }}>
+                <span style={{ fontSize: "20px" }}>{item.icon}</span>{item.label}
+              </button>
+            ))}
+            <div style={{ height: "0.5px", background: "#F0E8F8", margin: "4px 0" }} />
+            <button onClick={handleLogout}
+              style={{ display: "flex", alignItems: "center", gap: "12px", padding: "13px 14px", borderRadius: "10px", border: "none", background: "transparent", color: "#A32D2D", fontSize: "14px", cursor: "pointer", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" }}>
+              <span style={{ fontSize: "20px" }}>←</span>Cerrar sesión
+            </button>
+          </div>
+        </>
+      )}
+
       {isMobile && (
         <div style={s.bottomNav}>
-          {navItems.map(item => (
-            <button key={item.key} style={s.bottomNavItem} onClick={() => setPage(item.key)}>
+          {itemsBarra.map(item => (
+            <button key={item.key} style={s.bottomNavItem} onClick={() => irA(item.key)}>
               <span style={s.bottomNavIcon}>{item.icon}</span>
               <span style={page === item.key ? s.bottomNavLabelActive : s.bottomNavLabel}>{item.label}</span>
             </button>
           ))}
+          <button style={s.bottomNavItem} onClick={() => setMasAbierto(v => !v)}>
+            <span style={s.bottomNavIcon}>{masAbierto ? "✕" : "☰"}</span>
+            <span style={enMas || masAbierto ? s.bottomNavLabelActive : s.bottomNavLabel}>Más</span>
+          </button>
         </div>
       )}
     </div>
