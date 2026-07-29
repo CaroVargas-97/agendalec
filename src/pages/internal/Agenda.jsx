@@ -263,13 +263,18 @@ export default function Agenda() {
 
     const precio = getPrecioEfectivo(srv);
     const status = estadoPago === "completo" ? "confirmed" : "pending";
-    const { data: turno } = await supabase.from("appointments").insert({
+    const { data: turno, error: errTurno } = await supabase.from("appointments").insert({
       professional_id: form.profesional, client_id: clienteId, service_id: form.servicioId,
       date: esACoordinarSrv ? (form.fecha || null) : form.fecha,
       start_time: esACoordinarSrv ? null : form.hora,
       end_time: endTime,
       modality: form.modalidad, status, total_price: precio, notes: form.notas
     }).select("id").single();
+    if (errTurno) {
+      setSavingError(errTurno.code === "23P01" ? "Ese horario se superpone con otro turno ya cargado." : "Error al guardar el turno: " + errTurno.message);
+      setSaving(false);
+      return;
+    }
 
     // Registrar pagos según el estado
     if (estadoPago === "sena") {

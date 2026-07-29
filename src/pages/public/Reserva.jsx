@@ -154,10 +154,11 @@ export default function Reserva() {
     const anio = mesActual.getFullYear();
     const mes = mesActual.getMonth() + 1;
     const fecha = `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
-    supabase.from("turnos_ocupados").select("start_time")
+    supabase.from("turnos_ocupados").select("start_time, end_time")
       .eq("professional_id", profData.id).eq("date", fecha)
       .in("status", ["pending", "confirmed", "partial"])
-      .then(({ data }) => setHorariosOcupados((data || []).map(t => t.start_time.slice(0, 5))));
+      .not("start_time", "is", null)
+      .then(({ data }) => setHorariosOcupados(data || []));
   }, [dia, profData, mesActual]);
 
   const srv = servicios.find(s => s.id === servicio);
@@ -337,8 +338,14 @@ export default function Reserva() {
       }
 
       setStep(4);
-    } catch {
-      setError("Hubo un error al confirmar el turno. Intentá de nuevo.");
+    } catch (err) {
+      if (err?.code === "23P01") {
+        setError("Justo se ocupó ese horario. Elegí otro, por favor.");
+        setHora(null);
+        setStep(2);
+      } else {
+        setError("Hubo un error al confirmar el turno. Intentá de nuevo.");
+      }
     }
     setGuardando(false);
   };
@@ -507,7 +514,15 @@ export default function Reserva() {
                   ) : (
                     <div style={s.horaGrid}>
                       {horariosDia.map(h => {
-                        const ocupado = horariosOcupados.includes(h);
+                        const [hH, hM] = h.split(":").map(Number);
+                        const slotInicio = hH * 60 + hM;
+                        const slotFin = slotInicio + srv.duration_minutes;
+                        const ocupado = horariosOcupados.some(o => {
+                          const [oH, oM] = o.start_time.slice(0,5).split(":").map(Number);
+                          const [eH, eM] = o.end_time.slice(0,5).split(":").map(Number);
+                          const oInicio = oH * 60 + oM, oFin = eH * 60 + eM;
+                          return slotInicio < oFin && oInicio < slotFin;
+                        });
                         return (
                           <button key={h}
                             style={ocupado ? s.horaBtnOff : hora === h ? s.horaBtnSelected : s.horaBtn}
