@@ -45,6 +45,11 @@ export default function Grupales() {
   const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
   const [savingAsistente, setSavingAsistente] = useState(false);
 
+  const [editando, setEditando] = useState(false);
+  const [editForm, setEditForm] = useState({ nombre: "", fecha: "", hora: "", precio: "", currency: "ARS", cupo: "", modalidad: "ambas" });
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
+
   const cargar = async () => {
     setLoading(true);
     const { data } = await supabase.from("group_events").select("*, group_attendees(id, status)").order("date", { ascending: true });
@@ -93,10 +98,46 @@ export default function Grupales() {
 
   const abrirEvento = async (ev) => {
     setEventoSeleccionado(ev);
+    setEditando(false);
     setLoadingAsistentes(true);
     const { data } = await supabase.from("group_attendees").select("*").eq("event_id", ev.id).order("created_at");
     setAsistentes(data || []);
     setLoadingAsistentes(false);
+  };
+
+  const iniciarEdicion = () => {
+    setEditForm({
+      nombre: eventoSeleccionado.name,
+      fecha: eventoSeleccionado.date || "",
+      hora: eventoSeleccionado.event_time || "",
+      precio: eventoSeleccionado.price != null ? String(eventoSeleccionado.price) : "",
+      currency: eventoSeleccionado.currency || "ARS",
+      cupo: eventoSeleccionado.capacity != null ? String(eventoSeleccionado.capacity) : "",
+      modalidad: eventoSeleccionado.modality || "ambas",
+    });
+    setEditError("");
+    setEditando(true);
+  };
+
+  const guardarEdicion = async () => {
+    setEditError("");
+    if (!editForm.nombre.trim()) { setEditError("Falta el nombre."); return; }
+    setSavingEdit(true);
+    const { error } = await supabase.from("group_events").update({
+      name: editForm.nombre.trim(),
+      date: editForm.fecha || null,
+      event_time: editForm.hora || null,
+      price: editForm.precio ? parseFloat(editForm.precio) : null,
+      currency: editForm.currency,
+      capacity: editForm.cupo ? parseInt(editForm.cupo) : null,
+      modality: editForm.modalidad,
+    }).eq("id", eventoSeleccionado.id);
+    if (error) { setEditError("Error al guardar: " + error.message); setSavingEdit(false); return; }
+    const { data } = await supabase.from("group_events").select("*, group_attendees(id, status)").eq("id", eventoSeleccionado.id).single();
+    setEventoSeleccionado(data);
+    setSavingEdit(false);
+    setEditando(false);
+    await cargar();
   };
 
   const refrescarAsistentes = async () => {
@@ -210,8 +251,49 @@ export default function Grupales() {
                   {eventoSeleccionado.capacity && ` · cupo ${eventoSeleccionado.capacity}`}
                 </div>
               </div>
-              <button onClick={() => setEventoSeleccionado(null)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+              <div style={{ display: "flex", gap: "6px" }}>
+                {!editando && (
+                  <button onClick={iniciarEdicion} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "13px", color: "#9B72C0" }}>✎</button>
+                )}
+                <button onClick={() => setEventoSeleccionado(null)} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+              </div>
             </div>
+
+            {editando && (
+              <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Editar evento</div>
+                <div style={s.field}><label style={s.label}>Nombre del curso/evento</label><input type="text" value={editForm.nombre} onChange={e => setEditForm({...editForm, nombre: e.target.value})} style={s.input} /></div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div style={s.field}><label style={s.label}>Fecha</label><input type="date" value={editForm.fecha} onChange={e => setEditForm({...editForm, fecha: e.target.value})} style={s.input} /></div>
+                  <div style={s.field}><label style={s.label}>Hora</label><input type="time" value={editForm.hora} onChange={e => setEditForm({...editForm, hora: e.target.value})} style={s.input} /></div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <div style={s.field}><label style={s.label}>Precio por persona</label><input type="number" min="0" value={editForm.precio} onChange={e => setEditForm({...editForm, precio: e.target.value})} style={s.input} /></div>
+                  <div style={s.field}>
+                    <label style={s.label}>Moneda</label>
+                    <select value={editForm.currency} onChange={e => setEditForm({...editForm, currency: e.target.value})} style={s.input}>
+                      <option value="ARS">Pesos</option>
+                      <option value="USD">Dólares</option>
+                      <option value="EUR">Euros</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={s.field}><label style={s.label}>Cupo máximo</label><input type="number" min="1" value={editForm.cupo} onChange={e => setEditForm({...editForm, cupo: e.target.value})} placeholder="Sin límite" style={s.input} /></div>
+                <div style={s.field}>
+                  <label style={s.label}>Modalidad</label>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    {[["presencial","📍 Presencial"],["virtual","📹 Virtual"],["ambas","🔀 Ambas"]].map(([key,label]) => (
+                      <button key={key} onClick={() => setEditForm({...editForm, modalidad: key})} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: `0.5px solid ${editForm.modalidad===key?"#9B72C0":"#E0D0F0"}`, background: editForm.modalidad===key?"#EDE8FA":"#fff", color: editForm.modalidad===key?"#5C3F99":"#B89FD0", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                {editError && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{editError}</div>}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => setEditando(false)} style={{ ...s.cancelBtn, flex: 1 }}>Cancelar</button>
+                  <button onClick={guardarEdicion} disabled={savingEdit} style={{ ...s.saveBtn, flex: 1 }}>{savingEdit ? "Guardando..." : "Guardar"}</button>
+                </div>
+              </div>
+            )}
 
             <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
               <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotar persona</div>
