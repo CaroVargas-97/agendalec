@@ -38,7 +38,7 @@ export default function Grupales() {
   const [subiendo, setSubiendo] = useState(null);
 
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
-  const [nuevoForm, setNuevoForm] = useState({ nombre: "", fecha: "", precio: "", currency: "ARS", cupo: "", modalidad: "ambas" });
+  const [nuevoForm, setNuevoForm] = useState({ nombre: "", fecha: "", hora: "", precio: "", currency: "ARS", cupo: "", modalidad: "ambas" });
   const [savingNuevo, setSavingNuevo] = useState(false);
   const [nuevoError, setNuevoError] = useState("");
 
@@ -70,6 +70,7 @@ export default function Grupales() {
       professional_id: uid,
       name: nuevoForm.nombre.trim(),
       date: nuevoForm.fecha || null,
+      event_time: nuevoForm.hora || null,
       price: nuevoForm.precio ? parseFloat(nuevoForm.precio) : null,
       currency: nuevoForm.currency,
       capacity: nuevoForm.cupo ? parseInt(nuevoForm.cupo) : null,
@@ -79,7 +80,7 @@ export default function Grupales() {
     await cargar();
     setSavingNuevo(false);
     setNuevoAbierto(false);
-    setNuevoForm({ nombre: "", fecha: "", precio: "", currency: "ARS", cupo: "", modalidad: "ambas" });
+    setNuevoForm({ nombre: "", fecha: "", hora: "", precio: "", currency: "ARS", cupo: "", modalidad: "ambas" });
   };
 
   const eliminarEvento = async (ev) => {
@@ -179,6 +180,7 @@ export default function Grupales() {
                     <div style={{ fontSize: "14px", fontWeight: "500", color: "#2A1845" }}>{ev.name}</div>
                     <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "2px" }}>
                       {ev.date ? new Date(ev.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" }) : "Sin fecha"}
+                      {ev.event_time && ` · ${ev.event_time.slice(0,5)} hs`}
                       {ev.price != null && ` · ${symFor(ev.currency)}${ev.price.toLocaleString("es-AR")} por persona`}
                     </div>
                   </div>
@@ -203,6 +205,7 @@ export default function Grupales() {
                 <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>{eventoSeleccionado.name}</div>
                 <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "2px" }}>
                   {eventoSeleccionado.date ? new Date(eventoSeleccionado.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }) : "Sin fecha"}
+                  {eventoSeleccionado.event_time && ` · ${eventoSeleccionado.event_time.slice(0,5)} hs`}
                   {eventoSeleccionado.price != null && ` · ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price.toLocaleString("es-AR")} p/persona`}
                   {eventoSeleccionado.capacity && ` · cupo ${eventoSeleccionado.capacity}`}
                 </div>
@@ -274,7 +277,10 @@ export default function Grupales() {
             </div>
 
             <div style={s.field}><label style={s.label}>Nombre del curso/evento</label><input type="text" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} placeholder="Constelaciones familiares grupales" style={s.input} /></div>
-            <div style={s.field}><label style={s.label}>Fecha (opcional)</label><input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={s.input} /></div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div style={s.field}><label style={s.label}>Fecha (opcional)</label><input type="date" value={nuevoForm.fecha} onChange={e => setNuevoForm({...nuevoForm, fecha: e.target.value})} style={s.input} /></div>
+              <div style={s.field}><label style={s.label}>Hora (opcional)</label><input type="time" value={nuevoForm.hora} onChange={e => setNuevoForm({...nuevoForm, hora: e.target.value})} style={s.input} /></div>
+            </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
               <div style={s.field}>

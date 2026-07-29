@@ -61,6 +61,7 @@ export default function Agenda() {
   const [savingError, setSavingError] = useState("");
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [clienteEncontrado, setClienteEncontrado] = useState(null);
+  const [clientesCoincidentes, setClientesCoincidentes] = useState([]);
   const [clienteNuevo, setClienteNuevo] = useState(false);
   const [nuevoClienteData, setNuevoClienteData] = useState({ phone: "", email: "" });
   const [estadoPago, setEstadoPago] = useState("sena"); // sena | completo | pendiente
@@ -214,11 +215,18 @@ export default function Agenda() {
   const buscarCliente = async (nombre) => {
     setBusquedaCliente(nombre);
     setClienteEncontrado(null);
+    setClientesCoincidentes([]);
     setClienteNuevo(false);
     if (nombre.length < 3) return;
     const { data } = await supabase.from("clients").select("id, full_name, phone, price_type, custom_price").ilike("full_name", `%${nombre}%`).limit(5);
-    if (data && data.length > 0) setClienteEncontrado(data[0]);
+    if (data && data.length > 0) setClientesCoincidentes(data);
     else setClienteNuevo(true);
+  };
+
+  const seleccionarCliente = (c) => {
+    setClienteEncontrado(c);
+    setClientesCoincidentes([]);
+    setBusquedaCliente(c.full_name);
   };
 
   const guardarTurno = async () => {
@@ -278,6 +286,7 @@ export default function Agenda() {
     setSaving(false);
     setBusquedaCliente("");
     setClienteEncontrado(null);
+    setClientesCoincidentes([]);
     setClienteNuevo(false);
     setEstadoPago("sena");
     setNuevoClienteData({ phone: "", email: "" });
@@ -602,6 +611,16 @@ export default function Agenda() {
               <div style={s.field}>
                 <label style={s.label}>Cliente</label>
                 <input type="text" value={busquedaCliente} onChange={e => buscarCliente(e.target.value)} placeholder="Escribí el nombre..." style={s.input} />
+                {clientesCoincidentes.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", border: "0.5px solid #E0D0F0", borderRadius: "8px", overflow: "hidden", marginTop: "2px" }}>
+                    {clientesCoincidentes.map(c => (
+                      <button key={c.id} onClick={() => seleccionarCliente(c)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 10px", background: "#fff", border: "none", borderBottom: "0.5px solid #F0E8F8", cursor: "pointer", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        <span style={{ fontSize: "13px", color: "#2A1845" }}>{c.full_name}</span>
+                        <span style={{ fontSize: "11px", color: "#B89FD0" }}>{c.phone || ""}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {clienteEncontrado && <span style={s.clienteTag}>✓ {clienteEncontrado.full_name} (existente)</span>}
                 {clienteEncontrado?.price_type === "especial" && <span style={{ ...s.clienteTagNew, marginLeft: "6px" }}>✨ Precio especial</span>}
                 {clienteEncontrado?.price_type === "cortesia" && <span style={{ ...s.clienteTagNew, marginLeft: "6px" }}>🎁 Cortesía</span>}
