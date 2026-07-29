@@ -20,6 +20,7 @@ const s = {
   modPill: { fontSize: "10px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99" },
   tagPagado: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EAF3DE", color: "#3B6D11" },
   tagPendiente: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FAEEDA", color: "#854F0B" },
+  tagCortesia: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FDE8F0", color: "#A0407A" },
   btnWA: { display: "inline-flex", alignItems: "center", gap: "4px", padding: "5px 8px", background: "#25D366", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
 };
 
@@ -168,8 +169,7 @@ export default function Grupales() {
     await refrescarAsistentes();
   };
 
-  const togglePago = async (asistente) => {
-    const nuevoEstado = asistente.status === "paid" ? "pending" : "paid";
+  const cambiarEstadoAsistente = async (asistente, nuevoEstado) => {
     await supabase.from("group_attendees").update({ status: nuevoEstado }).eq("id", asistente.id);
     await refrescarAsistentes();
   };
@@ -214,6 +214,7 @@ export default function Grupales() {
           {eventos.map((ev, i) => {
             const total = ev.group_attendees?.length || 0;
             const pagados = ev.group_attendees?.filter(a => a.status === "paid").length || 0;
+            const cortesias = ev.group_attendees?.filter(a => a.status === "cortesia").length || 0;
             return (
               <div key={i} style={s.eventoCard} onClick={() => abrirEvento(ev)}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
@@ -229,6 +230,7 @@ export default function Grupales() {
                     <span style={s.modPill}>{modLabel(ev.modality)}</span>
                     <span style={{ fontSize: "12px", color: "#5C3F99", fontWeight: "500" }}>{total}{ev.capacity ? `/${ev.capacity}` : ""} anotados</span>
                     <span style={s.tagPagado}>{pagados} pagó</span>
+                    {cortesias > 0 && <span style={s.tagCortesia}>🎁 {cortesias}</span>}
                   </div>
                 </div>
               </div>
@@ -319,20 +321,30 @@ export default function Grupales() {
                     <div key={a.id} style={{ border: "0.5px solid #F0E8F8", borderRadius: "10px", padding: "10px 12px" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                         <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
-                        <span style={a.status === "paid" ? s.tagPagado : s.tagPendiente}>{a.status === "paid" ? "✓ Pagó" : "⏳ Pendiente"}</span>
+                        <span style={a.status === "paid" ? s.tagPagado : a.status === "cortesia" ? s.tagCortesia : s.tagPendiente}>
+                          {a.status === "paid" ? "✓ Pagó" : a.status === "cortesia" ? "🎁 Cortesía" : "⏳ Pendiente"}
+                        </span>
                       </div>
                       {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "2px" }}>{a.phone}</div>}
                       {a.receipt_url && (
                         <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
                       )}
                       <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-                        <button onClick={() => togglePago(a)} style={{ padding: "5px 10px", background: a.status === "paid" ? "#F3F4F6" : "#EDE8FA", color: a.status === "paid" ? "#6B7280" : "#5C3F99", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          {a.status === "paid" ? "Marcar pendiente" : "✓ Marcar pagado"}
-                        </button>
-                        <label style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar"}
-                          <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
-                        </label>
+                        {a.status !== "pending" && (
+                          <button onClick={() => cambiarEstadoAsistente(a, "pending")} style={{ padding: "5px 10px", background: "#FAEEDA", color: "#854F0B", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>⏳ Pendiente</button>
+                        )}
+                        {a.status !== "paid" && (
+                          <button onClick={() => cambiarEstadoAsistente(a, "paid")} style={{ padding: "5px 10px", background: "#EDE8FA", color: "#5C3F99", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✓ Pagó</button>
+                        )}
+                        {a.status !== "cortesia" && (
+                          <button onClick={() => cambiarEstadoAsistente(a, "cortesia")} style={{ padding: "5px 10px", background: "#FDE8F0", color: "#A0407A", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>🎁 Cortesía</button>
+                        )}
+                        {a.status !== "cortesia" && (
+                          <label style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar"}
+                            <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
+                          </label>
+                        )}
                         {a.phone && (
                           <a href={linkWhatsApp(a.phone)} target="_blank" rel="noreferrer"><button style={s.btnWA}>💬</button></a>
                         )}
