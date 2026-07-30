@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { cuando } from "../../utils/fecha";
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -195,7 +196,7 @@ export default function Cobros() {
                 <div key={i} style={{ ...s.cobroRow, background: "#FFFBEB" }}>
                   <div style={{ flex: 1, minWidth: "180px" }}>
                     <div style={s.cobroNombre}>{t.clients?.full_name}</div>
-                    <div style={s.cobroDetalle}>{t.services?.name} · {t.date} {t.start_time?.slice(0,5)}</div>
+                    <div style={s.cobroDetalle}>{t.services?.name} · {cuando(t.date, t.start_time)}</div>
                     <div style={{ ...s.cobroDetalle, color: "#D97706", marginTop: "2px", fontWeight: "500" }}>Seña: ${(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</div>
                     {t.payments?.find(p => p.type === "seña")?.receipt_url && (
                       <a href={t.payments.find(p => p.type === "seña").receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
@@ -227,7 +228,7 @@ export default function Cobros() {
                 <div key={i} style={{ ...s.cobroRow, background: "#F3E8FF" }}>
                   <div style={{ flex: 1, minWidth: "180px" }}>
                     <div style={s.cobroNombre}>{p.appointments?.clients?.full_name}</div>
-                    <div style={s.cobroDetalle}>{p.appointments?.services?.name} · {p.appointments?.date} {p.appointments?.start_time?.slice(0,5)}</div>
+                    <div style={s.cobroDetalle}>{p.appointments?.services?.name} · {cuando(p.appointments?.date, p.appointments?.start_time)}</div>
                     {p.receipt_url && (
                       <a href={p.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                         📎 Ver comprobante
@@ -254,7 +255,7 @@ export default function Cobros() {
                 <div key={i} style={{ ...s.cobroRow, background: t.status === "confirmed" ? "#F8F4FC" : "#FFF5F5" }}>
                   <div style={{ flex: 1 }}>
                     <div style={s.cobroNombre}>{t.clients?.full_name}</div>
-                    <div style={s.cobroDetalle}>{t.services?.name} · {t.date} {t.start_time?.slice(0,5)}</div>
+                    <div style={s.cobroDetalle}>{t.services?.name} · {cuando(t.date, t.start_time)}</div>
                     <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
                       {t.payments?.filter(p => p.receipt_url).map((p, pi) => (
                         <a key={pi} href={p.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>

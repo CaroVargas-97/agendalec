@@ -109,7 +109,7 @@ export default function Dashboard({ setPage }) {
            turnos.length === 0 ? <div style={s.emptyText}>No hay turnos para hoy</div> :
            turnos.map((t, i) => (
             <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "8px", background: turnoRowBg(t), marginBottom: i < turnos.length - 1 ? "6px" : 0 }}>
-              <div style={{ fontSize: "11px", color: "#9B72C0", minWidth: "38px" }}>{t.start_time?.slice(0,5)}</div>
+              <div style={{ fontSize: "11px", color: "#9B72C0", minWidth: "38px" }}>{t.start_time ? t.start_time.slice(0,5) : "a coord."}</div>
               <span style={t.modality === "virtual" ? s.badgeV : s.badgeP}>
                 {t.modality === "virtual" ? "📹 Virtual" : "📍 Presencial"}
               </span>

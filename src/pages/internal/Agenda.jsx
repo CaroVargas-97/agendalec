@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 import { linkWhatsApp } from "../../utils/whatsapp";
+import { cuando } from "../../utils/fecha";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
 const DIAS_SEMANA = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
@@ -519,7 +520,7 @@ export default function Agenda() {
 
                 <div style={{ background: "#F8F4FC", borderRadius: "10px", padding: "12px" }}>
                   <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "6px" }}>{t.services?.name} · {t.services?.duration_minutes} min</div>
-                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{t.date} · {t.start_time?.slice(0,5)} hs</div>
+                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{cuando(t.date, t.start_time)}</div>
                   <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "4px" }}>{t.profiles?.full_name}</div>
                 </div>
 
