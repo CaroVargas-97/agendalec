@@ -67,7 +67,7 @@ export default function Notificaciones({ setPage, isMobile }) {
         .select("id, date, completed_at, clients(full_name), services(name)")
         .eq("professional_id", uid)
         .in("service_id", [...idsLimpieza])
-        .eq("date", hoyISO())
+        .lte("date", hoyISO())
         .is("completed_at", null)
         .neq("status", "cancelled");
       setLimpiezasHoy(limps || []);
@@ -129,13 +129,15 @@ export default function Notificaciones({ setPage, isMobile }) {
 
               {limpiezasHoy.length > 0 && (
                 <>
-                  <div style={s.panelTitulo}>Limpiezas para hoy</div>
+                  <div style={s.panelTitulo}>Limpiezas pendientes</div>
                   {limpiezasHoy.map(l => (
                     <button key={l.id} style={s.item} onClick={() => irA("limpiezas")}>
                       <span style={{ fontSize: "16px" }}>🌿</span>
                       <span>
                         <span style={s.itemTexto}>{l.clients?.full_name}</span>
-                        <span style={s.itemSub}>{l.services?.name?.trim()} · pendiente de hacer</span>
+                        <span style={s.itemSub}>
+                          {l.services?.name?.trim()} · {l.date === hoyISO() ? "pendiente de hacer" : `⚠️ atrasada (${l.date})`}
+                        </span>
                       </span>
                     </button>
                   ))}

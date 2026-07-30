@@ -34,15 +34,16 @@ export default async function handler(req, res) {
     const idsLimpieza = (svsLimpieza || []).map(sv => sv.id);
     if (idsLimpieza.length === 0) return res.status(200).json({ ok: true, motivo: "sin servicios de limpieza" });
 
-    // Limpiezas pendientes: las asignadas para hoy y las que todavía no
-    // tienen día, para que no se pierdan de vista.
+    // Limpiezas pendientes: las de hoy, las que ya se pasaron de fecha sin
+    // marcarse como hechas (si no, desaparecerían del aviso para siempre) y
+    // las que todavía no tienen día asignado.
     const { data: limpiezas, error } = await supabase
       .from("appointments")
       .select("id, date, professional_id, completed_at, clients(full_name)")
       .in("service_id", idsLimpieza)
       .is("completed_at", null)
       .neq("status", "cancelled")
-      .or(`date.eq.${hoy},date.is.null`);
+      .or(`date.lte.${hoy},date.is.null`);
     if (error) throw error;
 
     if (!limpiezas || limpiezas.length === 0) {
@@ -52,9 +53,10 @@ export default async function handler(req, res) {
     // Agrupadas por profesional, porque cada una recibe lo suyo.
     const porProfesional = {};
     for (const l of limpiezas) {
-      if (!porProfesional[l.professional_id]) porProfesional[l.professional_id] = { hoy: [], sinFecha: [] };
+      if (!porProfesional[l.professional_id]) porProfesional[l.professional_id] = { hoy: [], atrasadas: [], sinFecha: [] };
       const nombre = l.clients?.full_name || "Cliente";
       if (l.date === hoy) porProfesional[l.professional_id].hoy.push(nombre);
+      else if (l.date) porProfesional[l.professional_id].atrasadas.push(nombre);
       else porProfesional[l.professional_id].sinFecha.push(nombre);
     }
 
@@ -63,6 +65,9 @@ export default async function handler(req, res) {
       const partes = [];
       if (grupo.hoy.length > 0) {
         partes.push(`${grupo.hoy.length} para hoy: ${listarNombres(grupo.hoy)}`);
+      }
+      if (grupo.atrasadas.length > 0) {
+        partes.push(`⚠️ ${grupo.atrasadas.length} atrasada${grupo.atrasadas.length > 1 ? "s" : ""}: ${listarNombres(grupo.atrasadas)}`);
       }
       if (grupo.sinFecha.length > 0) {
         partes.push(`${grupo.sinFecha.length} sin día asignado`);
