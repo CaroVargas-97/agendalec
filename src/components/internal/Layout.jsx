@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import Notificaciones from "./Notificaciones";
 
 const s = {
   wrap: { display: "flex", minHeight: "100vh", background: "#F8F4FC", fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: "hidden" },
@@ -59,9 +60,12 @@ export default function Layout({ children, page, setPage }) {
       {!isMobile && (
         <div style={s.sidebar}>
           <div style={s.logoWrap}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <img src="/logo-flower.png" alt="" style={{ width: "22px", height: "22px", filter: "brightness(0) invert(1)" }} />
-              <div style={s.logo}>AgendaLec</div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <img src="/logo-flower.png" alt="" style={{ width: "22px", height: "22px", filter: "brightness(0) invert(1)" }} />
+                <div style={s.logo}>AgendaLec</div>
+              </div>
+              <Notificaciones setPage={setPage} isMobile={false} />
             </div>
             <div style={s.logoSub}>Gestión de turnos</div>
           </div>
@@ -95,6 +99,12 @@ export default function Layout({ children, page, setPage }) {
             </button>
           </div>
         </>
+      )}
+
+      {isMobile && (
+        <div style={{ position: "fixed", right: "14px", bottom: "84px", zIndex: 150 }}>
+          <Notificaciones setPage={setPage} isMobile={true} />
+        </div>
       )}
 
       {isMobile && (
