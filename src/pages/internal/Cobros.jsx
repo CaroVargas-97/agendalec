@@ -31,7 +31,7 @@ const s = {
 const metrics = [
   { key: "cobradoHoy",      label: "Cobrado hoy",       color: "#63B522", prefix: "$", sub: null },
   { key: "saldosPendientes",label: "Saldos pendientes",  color: "#F59E0B", prefix: "$", subKey: "saldosCount" },
-  { key: "estesMes",        label: "Este mes",           color: "#9B72C0", prefix: "$", sub: null },
+  { key: "estesMes",        label: "Este mes",           color: "#9B72C0", prefix: "$", sub: "cobrado por completo" },
   { key: "cancelaciones",   label: "Cancelaciones",      color: "#E24B4A", prefix: "",  sub: "en historial" },
 ];
 

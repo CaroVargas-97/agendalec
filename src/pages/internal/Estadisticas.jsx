@@ -30,7 +30,7 @@ const s = {
 
 const metricsDef = [
   { key: "totalSesiones", label: "Sesiones", color: "#9B72C0", sub: "realizadas" },
-  { key: "ingresos",      label: "Ingresos",  color: "#63B522", sub: "total facturado" },
+  { key: "ingresos",      label: "Ingresos",  color: "#63B522", sub: "agendado, cobrado o no" },
   { key: "clientesUnicos",label: "Clientes únicos", color: "#F59E0B", sub: "distintos" },
   { key: "promedioSesion",label: "Precio promedio", color: "#EC4899", sub: "por sesión" },
 ];
@@ -64,6 +64,9 @@ export default function Estadisticas() {
     else if (periodo === "trimestre") desde.setMonth(hoy.getMonth() - 3);
     else if (periodo === "año") desde.setFullYear(hoy.getFullYear() - 1);
     const desdeISO = `${desde.getFullYear()}-${String(desde.getMonth()+1).padStart(2,"0")}-${String(desde.getDate()).padStart(2,"0")}`;
+    // Tope hasta hoy: son estadísticas de lo que YA pasó. Sin esto entraban
+    // los turnos agendados a futuro y se contaban como "sesiones realizadas".
+    const hastaISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
 
     const [{ data: appts }, { data: eventos }] = await Promise.all([
       supabase
@@ -71,12 +74,14 @@ export default function Estadisticas() {
         .select("*, clients(full_name), services(name, price, currency)")
         .eq("professional_id", uid)
         .gte("date", desdeISO)
+        .lte("date", hastaISO)
         .neq("status", "cancelled"),
       supabase
         .from("group_events")
         .select("id, name, date, price, currency, group_attendees(full_name, status)")
         .eq("professional_id", uid)
-        .gte("date", desdeISO),
+        .gte("date", desdeISO)
+        .lte("date", hastaISO),
     ]);
 
     const sesiones = appts || [];
