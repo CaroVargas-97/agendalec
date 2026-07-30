@@ -50,29 +50,40 @@ export default function Cobros() {
     const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,"0")}-${String(ahora.getDate()).padStart(2,"0")}`;
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString().split("T")[0];
 
+    // Las limpiezas se gestionan en su propia sección, así que no se
+    // duplican como filas acá. Su plata igual suma en las métricas.
+    const { data: svsLimpieza } = await supabase
+      .from("services")
+      .select("id")
+      .ilike("name", "%limpieza%");
+    const idsLimpieza = new Set((svsLimpieza || []).map(sv => sv.id));
+    const noEsLimpieza = (serviceId) => !idsLimpieza.has(serviceId);
+
     const { data: turnos } = await supabase
       .from("appointments")
-      .select("id, date, start_time, status, total_price, modality, clients(full_name), services(name), profiles(full_name), payments(id, receipt_url, type, status)")
+      .select("id, date, start_time, status, total_price, modality, service_id, clients(full_name), services(name), profiles(full_name), payments(id, receipt_url, type, status)")
       .in("status", ["pending", "partial"])
       .order("date", { ascending: true });
-    const conSenaPendiente = (turnos || []).filter(t => t.payments?.some(p => p.type === "seña" && p.status === "pending"));
+    const conSenaPendiente = (turnos || [])
+      .filter(t => noEsLimpieza(t.service_id))
+      .filter(t => t.payments?.some(p => p.type === "seña" && p.status === "pending"));
     setPendientes(conSenaPendiente);
 
     const { data: pagosSaldo } = await supabase
       .from("payments")
-      .select("id, amount, receipt_url, appointment_id, appointments(id, date, start_time, total_price, clients(full_name), services(name), profiles(full_name))")
+      .select("id, amount, receipt_url, appointment_id, appointments(id, date, start_time, total_price, service_id, clients(full_name), services(name), profiles(full_name))")
       .eq("type", "saldo")
       .eq("status", "pending")
       .order("created_at", { ascending: true });
-    setSaldos(pagosSaldo || []);
+    setSaldos((pagosSaldo || []).filter(p => noEsLimpieza(p.appointments?.service_id)));
 
     const { data: confirmados } = await supabase
       .from("appointments")
-      .select("id, date, start_time, status, total_price, clients(full_name), services(name), payments(receipt_url, type)")
+      .select("id, date, start_time, status, total_price, service_id, clients(full_name), services(name), payments(receipt_url, type)")
       .in("status", ["confirmed", "cancelled"])
       .order("date", { ascending: false })
       .limit(50);
-    setHistorial(confirmados || []);
+    setHistorial((confirmados || []).filter(t => noEsLimpieza(t.service_id)));
 
     // Los cursos y eventos grupales también son ingresos: se suman a las
     // métricas para que la facturación no quede partida entre pantallas.
@@ -92,7 +103,10 @@ export default function Cobros() {
     const cancelaciones = (confirmados || []).filter(t => t.status === "cancelled").length;
 
     const grupalPendientesCount = asistentesGrupales.filter(a => a.status === "pending").length;
-    setStats({ cobradoHoy, saldosPendientes, estesMes, cancelaciones, grupalPendientesCount });
+    // El contador acompaña al monto: cuenta todos los saldos pendientes
+    // (incluidas limpiezas, que no se listan acá) más los de grupales.
+    const saldosCount = (pagosSaldo || []).length + grupalPendientesCount;
+    setStats({ cobradoHoy, saldosPendientes, estesMes, cancelaciones, saldosCount });
     setLoading(false);
   };
 
@@ -170,7 +184,7 @@ export default function Cobros() {
           <div key={m.key} style={s.metricCard}>
             <div style={{ fontSize: "11px", color: m.color, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</div>
             <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
-            <div style={s.metricSub}>{m.key === "saldosPendientes" ? `${saldos.length + (stats.grupalPendientesCount || 0)} pagos a cobrar` : m.sub || " "}</div>
+            <div style={s.metricSub}>{m.key === "saldosPendientes" ? `${stats.saldosCount || 0} pagos a cobrar` : m.sub || " "}</div>
             <div style={{ width: "28px", height: "3px", background: m.color, borderRadius: "2px", marginTop: "10px" }}></div>
           </div>
         ))}
