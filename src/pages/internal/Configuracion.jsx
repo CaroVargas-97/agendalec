@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { pushSoportado, permisoActual, yaSuscripto, activarNotificaciones, desactivarNotificaciones } from "../../utils/push";
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -62,6 +63,9 @@ export default function Configuracion() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [pushActivo, setPushActivo] = useState(false);
+  const [pushMsg, setPushMsg] = useState("");
+  const [pushCargando, setPushCargando] = useState(false);
   const [profesionales, setProfesionales] = useState([]);
   const [nuevoProf, setNuevoProf] = useState({ nombre: "", email: "", password: "" });
   const [savingProf, setSavingProf] = useState(false);
@@ -92,6 +96,23 @@ export default function Configuracion() {
   const [overrideHoraFin, setOverrideHoraFin] = useState("18:00");
   const [savingOverride, setSavingOverride] = useState(false);
   const [overrideMsg, setOverrideMsg] = useState("");
+
+  useEffect(() => { yaSuscripto().then(setPushActivo); }, []);
+
+  const toggleNotificaciones = async () => {
+    setPushCargando(true); setPushMsg("");
+    if (pushActivo) {
+      await desactivarNotificaciones();
+      setPushActivo(false);
+      setPushMsg("Notificaciones desactivadas en este dispositivo");
+    } else {
+      const r = await activarNotificaciones();
+      if (r.ok) { setPushActivo(true); setPushMsg("✓ Listo, te van a llegar avisos a este dispositivo"); }
+      else setPushMsg(r.error);
+    }
+    setPushCargando(false);
+    setTimeout(() => setPushMsg(""), 6000);
+  };
 
   const cargarProfesionales = async () => {
     const { data } = await supabase.from("profiles").select("id, full_name, email").eq("role", "professional");
@@ -775,6 +796,28 @@ export default function Configuracion() {
                 </div>
               </div>
             </div>
+            <div style={s.card}>
+              <div style={s.cardTitle}>Notificaciones</div>
+              <div style={{ fontSize: "12px", color: "#B89FD0", marginBottom: "10px" }}>
+                Recibí un aviso en el celular cada vez que entra un turno o una limpieza, aunque tengas la app cerrada.
+                {!pushSoportado() && " En iPhone hay que abrir la app desde el ícono de la pantalla de inicio (no desde el navegador)."}
+              </div>
+              <button
+                onClick={toggleNotificaciones}
+                disabled={pushCargando || permisoActual() === "denied"}
+                style={pushActivo
+                  ? { ...s.saveBtn, background: "#F3F4F6", color: "#6B7280", boxShadow: "none" }
+                  : s.saveBtn}>
+                {pushCargando ? "Un momento..." : pushActivo ? "🔕 Desactivar en este dispositivo" : "🔔 Activar notificaciones"}
+              </button>
+              {permisoActual() === "denied" && (
+                <div style={{ fontSize: "12px", color: "#A32D2D", marginTop: "8px" }}>
+                  Bloqueaste las notificaciones para esta app. Hay que habilitarlas desde los ajustes del teléfono.
+                </div>
+              )}
+              {pushMsg && <div style={{ fontSize: "12px", color: pushMsg.startsWith("✓") ? "#3B6D11" : "#A32D2D", marginTop: "8px" }}>{pushMsg}</div>}
+            </div>
+
             <div style={s.card}>
               <div style={s.cardTitle}>Sesión</div>
               <button style={{ ...s.saveBtn, background: "#FCEBEB", color: "#A32D2D", boxShadow: "none" }} onClick={async () => { await supabase.auth.signOut(); }}>

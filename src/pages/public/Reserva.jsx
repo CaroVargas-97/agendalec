@@ -337,6 +337,19 @@ export default function Reserva() {
         }
       }
 
+      // Aviso a la profesional de que entró una reserva nueva.
+      const cuandoTxt = esACoorinar ? "a coordinar" : `${fechaLabel} ${hora} hs`;
+      fetch("/api/notificar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          professionalId: profData.id,
+          title: esACoorinar ? "🌿 Nueva limpieza" : "📅 Nuevo turno",
+          body: `${form.nombre} · ${srv.name.trim()} · ${cuandoTxt}${comprobante ? " · adjuntó comprobante" : ""}`,
+          url: "/",
+        }),
+      }).catch(() => {});
+
       setStep(4);
     } catch (err) {
       if (err?.code === "23P01") {
