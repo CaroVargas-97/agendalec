@@ -67,7 +67,7 @@ export default function Limpiezas() {
 
     const { data } = await supabase
       .from("appointments")
-      .select("id, date, start_time, status, total_price, modality, notes, clients(full_name, phone), services(name, currency), payments(id, type, status, amount, receipt_url)")
+      .select("id, date, start_time, status, total_price, modality, notes, completed_at, clients(full_name, phone), services(name, currency), payments(id, type, status, amount, receipt_url)")
       .eq("professional_id", uid)
       .in("service_id", idsLimpieza)
       .order("date", { ascending: true, nullsFirst: false });
@@ -191,6 +191,16 @@ export default function Limpiezas() {
     await cargar();
   };
 
+  const marcarHecha = async (l) => {
+    await supabase.from("appointments").update({ completed_at: new Date().toISOString() }).eq("id", l.id);
+    await cargar();
+  };
+
+  const desmarcarHecha = async (l) => {
+    await supabase.from("appointments").update({ completed_at: null }).eq("id", l.id);
+    await cargar();
+  };
+
   const asignarFecha = async (l, fecha) => {
     await supabase.from("appointments").update({ date: fecha || null }).eq("id", l.id);
     await cargar();
@@ -223,8 +233,10 @@ export default function Limpiezas() {
     await cargar();
   };
 
-  const pendientes = limpiezas.filter(l => l.status === "pending" || l.status === "partial");
-  const hechas = limpiezas.filter(l => l.status === "confirmed");
+  // El pago y el trabajo son dos cosas distintas: que haya pagado no
+  // significa que la limpieza ya esté hecha. Las pestañas van por trabajo.
+  const pendientes = limpiezas.filter(l => l.status !== "cancelled" && !l.completed_at);
+  const hechas = limpiezas.filter(l => l.status !== "cancelled" && l.completed_at);
   const canceladas = limpiezas.filter(l => l.status === "cancelled");
   const visibles = tab === "pendientes" ? pendientes : tab === "hechas" ? hechas : canceladas;
 
@@ -273,10 +285,14 @@ export default function Limpiezas() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                     {l.date ? <span style={s.tagParcial}>{fmtFecha(l.date)}</span> : <span style={s.tagSinFecha}>Sin fecha</span>}
-                    {l.status === "confirmed" ? <span style={s.tagPagado}>✓ Pagado</span>
-                      : l.status === "cancelled" ? <span style={{ ...s.tagPendiente, background: "#FCEBEB", color: "#A32D2D" }}>Cancelada</span>
-                      : sena?.status === "paid" ? <span style={s.tagParcial}>Seña pagada</span>
-                      : <span style={s.tagPendiente}>⏳ Pendiente</span>}
+                    {l.status === "cancelled" ? <span style={{ ...s.tagPendiente, background: "#FCEBEB", color: "#A32D2D" }}>Cancelada</span> : (
+                      <>
+                        {l.status === "confirmed" ? <span style={s.tagPagado}>💰 Pagado</span>
+                          : sena?.status === "paid" ? <span style={s.tagParcial}>💰 Seña pagada</span>
+                          : <span style={s.tagPendiente}>💰 Sin pagar</span>}
+                        {l.completed_at ? <span style={s.tagPagado}>✓ Hecha</span> : <span style={s.tagSinFecha}>Por hacer</span>}
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -296,6 +312,11 @@ export default function Limpiezas() {
                     )}
                     {l.status !== "confirmed" && (
                       <button onClick={() => confirmarPagoTotal(l)} style={{ padding: "5px 10px", background: "#3B6D11", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>💰 Pagó todo</button>
+                    )}
+                    {l.completed_at ? (
+                      <button onClick={() => desmarcarHecha(l)} style={{ padding: "5px 10px", background: "#F3F4F6", color: "#6B7280", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>↩ Volver a por hacer</button>
+                    ) : (
+                      <button onClick={() => marcarHecha(l)} style={{ padding: "5px 10px", background: "#5C3F99", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✓ Ya la hice</button>
                     )}
                     <label style={{ padding: "5px 10px", background: sena?.receipt_url ? "#EAF3DE" : "#fff", color: sena?.receipt_url ? "#3B6D11" : "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       {subiendo === l.id ? "Subiendo..." : sena?.receipt_url ? "✅ Comprobante" : "📎 Adjuntar"}
