@@ -157,11 +157,35 @@ export default function Limpiezas() {
     await cargar();
   };
 
-  const confirmarPagoTotal = async (l) => {
+  // Flujo real: hablan, acuerdan el día, se pide la seña. Cuando la seña
+  // entra se confirma acá y queda el saldo pendiente para el día de la
+  // limpieza.
+  const confirmarSena = async (l) => {
     const senaPago = l.payments?.find(p => p.type === "seña");
     if (senaPago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", senaPago.id);
-    const restante = Math.round(parseFloat(l.total_price || 0) - parseFloat(senaPago?.amount || 0));
-    if (restante > 0) await supabase.from("payments").insert({ appointment_id: l.id, type: "saldo", amount: restante, status: "paid", paid_at: new Date().toISOString() });
+    const saldo = Math.round(parseFloat(l.total_price || 0) - parseFloat(senaPago?.amount || 0));
+    if (saldo > 0) {
+      const yaHaySaldo = l.payments?.some(p => p.type === "saldo");
+      if (!yaHaySaldo) await supabase.from("payments").insert({ appointment_id: l.id, type: "saldo", amount: saldo, status: "pending" });
+    }
+    await supabase.from("appointments").update({ status: "partial" }).eq("id", l.id);
+    fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: l.id }) });
+    await cargar();
+  };
+
+  const confirmarPagoTotal = async (l) => {
+    const ahora = new Date().toISOString();
+    const senaPago = l.payments?.find(p => p.type === "seña");
+    if (senaPago) await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", senaPago.id);
+    const saldoExistente = l.payments?.find(p => p.type === "saldo");
+    if (saldoExistente) {
+      // Si ya se confirmó la seña antes, el saldo ya existe: se marca pagado
+      // en vez de crear un segundo registro duplicado.
+      await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", saldoExistente.id);
+    } else {
+      const restante = Math.round(parseFloat(l.total_price || 0) - parseFloat(senaPago?.amount || 0));
+      if (restante > 0) await supabase.from("payments").insert({ appointment_id: l.id, type: "saldo", amount: restante, status: "paid", paid_at: ahora });
+    }
     await supabase.from("appointments").update({ status: "confirmed" }).eq("id", l.id);
     fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: l.id }) });
     await cargar();
@@ -267,6 +291,9 @@ export default function Limpiezas() {
                   <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap", alignItems: "center" }}>
                     <input type="date" value={l.date || ""} onChange={e => asignarFecha(l, e.target.value)}
                       style={{ ...s.input, fontSize: "11px", padding: "5px 8px" }} title="Día en que la vas a hacer" />
+                    {sena?.status !== "paid" && (
+                      <button onClick={() => confirmarSena(l)} style={{ padding: "5px 10px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✓ Cobré la seña</button>
+                    )}
                     {l.status !== "confirmed" && (
                       <button onClick={() => confirmarPagoTotal(l)} style={{ padding: "5px 10px", background: "#3B6D11", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>💰 Pagó todo</button>
                     )}
