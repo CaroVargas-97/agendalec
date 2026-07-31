@@ -33,6 +33,7 @@ const metricsDef = [
   { key: "ingresos",      label: "Ingresos",  color: "#63B522", sub: "agendado, cobrado o no" },
   { key: "clientesUnicos",label: "Clientes únicos", color: "#F59E0B", sub: "distintos" },
   { key: "promedioSesion",label: "Precio promedio", color: "#EC4899", sub: "por sesión" },
+  { key: "aFuturo",       label: "A futuro", color: "#7C3AED", sub: null },
 ];
 
 const periodos = [
@@ -49,6 +50,7 @@ export default function Estadisticas() {
     totalSesiones: 0, ingresoTotal: 0, ingresoByCurrency: {},
     clientesUnicos: 0, promedioSesion: 0, servicios: [],
     modalidad: { virtual: 0, presencial: 0 }, topClientes: [], diasPopulares: [],
+    futuroByCurrency: {}, futuroCount: 0,
   });
 
   const cargar = async () => {
@@ -68,7 +70,7 @@ export default function Estadisticas() {
     // los turnos agendados a futuro y se contaban como "sesiones realizadas".
     const hastaISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
 
-    const [{ data: appts }, { data: eventos }] = await Promise.all([
+    const [{ data: appts }, { data: eventos }, { data: futuros }, { data: eventosFuturos }] = await Promise.all([
       supabase
         .from("appointments")
         .select("*, clients(full_name), services(name, price, currency)")
@@ -82,6 +84,19 @@ export default function Estadisticas() {
         .eq("professional_id", uid)
         .gte("date", desdeISO)
         .lte("date", hastaISO),
+      // Lo agendado de mañana en adelante: no depende del período elegido,
+      // es todo lo que ya está reservado y todavía no ocurrió.
+      supabase
+        .from("appointments")
+        .select("total_price, services(currency)")
+        .eq("professional_id", uid)
+        .gt("date", hastaISO)
+        .neq("status", "cancelled"),
+      supabase
+        .from("group_events")
+        .select("price, currency, group_attendees(status)")
+        .eq("professional_id", uid)
+        .gt("date", hastaISO),
     ]);
 
     const sesiones = appts || [];
@@ -165,7 +180,24 @@ export default function Estadisticas() {
     });
     const diasPopulares = Object.entries(diaMap).map(([dia, count]) => ({ dia, count })).sort((a, b) => b.count - a.count);
 
-    setStats({ totalSesiones, ingresoTotal: ingresoARS, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares });
+    // Lo que ya está agendado y todavía no ocurrió, por moneda.
+    const futuroByCurrency = {};
+    (futuros || []).forEach(a => {
+      const cur = a.services?.currency || "ARS";
+      futuroByCurrency[cur] = (futuroByCurrency[cur] || 0) + parseFloat(a.total_price || 0);
+    });
+    const asistentesFuturos = (eventosFuturos || []).flatMap(ev =>
+      (ev.group_attendees || []).map(a => ({
+        currency: ev.currency || "ARS",
+        monto: a.status === "cortesia" ? 0 : parseFloat(ev.price || 0),
+      }))
+    );
+    asistentesFuturos.forEach(a => {
+      futuroByCurrency[a.currency] = (futuroByCurrency[a.currency] || 0) + a.monto;
+    });
+    const futuroCount = (futuros || []).length + asistentesFuturos.length;
+
+    setStats({ totalSesiones, ingresoTotal: ingresoARS, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares, futuroByCurrency, futuroCount });
     setLoading(false);
   };
 
@@ -189,6 +221,12 @@ export default function Estadisticas() {
         }).join(" · "),
     clientesUnicos: stats.clientesUnicos,
     promedioSesion: `$${stats.promedioSesion.toLocaleString("es-AR")}`,
+    aFuturo: Object.entries(stats.futuroByCurrency || {}).length === 0
+      ? "$0"
+      : Object.entries(stats.futuroByCurrency).map(([cur, val]) => {
+          const sym = cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+          return `${sym}${val.toLocaleString("es-AR")}`;
+        }).join(" · "),
   };
 
   const barColors = ["#9B72C0", "#C4A8D8", "#D8B8E8", "#EDE8FA"];
@@ -219,7 +257,7 @@ export default function Estadisticas() {
               <div key={m.key} style={s.metricCard}>
                 <div style={{ fontSize: "11px", color: m.color, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</div>
                 <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
-                <div style={s.metricSub}>{m.sub}</div>
+                <div style={s.metricSub}>{m.key === "aFuturo" ? `${stats.futuroCount} turno${stats.futuroCount === 1 ? "" : "s"} por venir` : m.sub}</div>
                 <div style={{ width: "28px", height: "3px", background: m.color, borderRadius: "2px", marginTop: "10px" }}></div>
               </div>
             ))}
