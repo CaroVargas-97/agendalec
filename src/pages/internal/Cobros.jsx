@@ -43,6 +43,7 @@ export default function Cobros() {
   const [stats, setStats] = useState({ cobradoHoy: 0, saldosPendientes: 0, estesMes: 0, cancelaciones: 0 });
   const [loading, setLoading] = useState(true);
   const [subiendoSaldo, setSubiendoSaldo] = useState(null);
+  const [procesando, setProcesando] = useState(null);
 
   const cargar = async () => {
     setLoading(true);
@@ -113,21 +114,72 @@ export default function Cobros() {
   useEffect(() => { cargar(); }, []);
 
   const confirmarTurno = async (id, totalPrice) => {
-    await supabase.from("appointments").update({ status: "partial" }).eq("id", id);
-    await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("appointment_id", id).eq("type", "seña");
-    const saldo = Math.round(parseFloat(totalPrice) / 2);
-    await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "pending" });
+    if (procesando) return;
+    setProcesando(id);
+    const ahora = new Date().toISOString();
+    const { data: pagos, error: errLeer } = await supabase
+      .from("payments").select("id, type, amount").eq("appointment_id", id);
+    if (errLeer) { alert("No se pudo leer el pago: " + errLeer.message); setProcesando(null); return; }
+
+    const sena = pagos?.find(p => p.type === "seña");
+    if (sena) {
+      const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", sena.id);
+      if (error) { alert("No se pudo confirmar la seña: " + error.message); setProcesando(null); return; }
+    }
+
+    // El saldo es lo que queda del total menos la seña real (no la mitad
+    // exacta, que se desviaba con precios especiales). Si ya existe uno no
+    // se crea otro: al tocar dos veces se duplicaba y "Saldos pendientes"
+    // mostraba plata que no existía.
+    if (!pagos?.some(p => p.type === "saldo")) {
+      const saldo = Math.round(parseFloat(totalPrice || 0) - parseFloat(sena?.amount || 0));
+      if (saldo > 0) {
+        const { error } = await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "pending" });
+        if (error) { alert("No se pudo registrar el saldo: " + error.message); setProcesando(null); return; }
+      }
+    }
+
+    const { error: errEstado } = await supabase.from("appointments").update({ status: "partial" }).eq("id", id);
+    if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setProcesando(null); return; }
+
     fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: id }) });
+    setProcesando(null);
     cargar();
   };
 
   const pagarTodo = async (id, totalPrice) => {
-    const { data: senaPago } = await supabase.from("payments").select("id, amount").eq("appointment_id", id).eq("type", "seña").maybeSingle();
-    await supabase.from("appointments").update({ status: "confirmed" }).eq("id", id);
-    if (senaPago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", senaPago.id);
-    const saldo = Math.round(parseFloat(totalPrice || 0) - parseFloat(senaPago?.amount || 0));
-    if (saldo > 0) await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "paid", paid_at: new Date().toISOString() });
+    if (procesando) return;
+    setProcesando(id);
+    const ahora = new Date().toISOString();
+    const { data: pagos, error: errLeer } = await supabase
+      .from("payments").select("id, type, amount").eq("appointment_id", id);
+    if (errLeer) { alert("No se pudo leer el pago: " + errLeer.message); setProcesando(null); return; }
+
+    const sena = pagos?.find(p => p.type === "seña");
+    if (sena) {
+      const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", sena.id);
+      if (error) { alert("No se pudo confirmar la seña: " + error.message); setProcesando(null); return; }
+    }
+
+    // Si el saldo ya existe (porque antes se confirmó solo la seña) se marca
+    // pagado; crear otro dejaba uno pendiente fantasma sumando de más.
+    const saldoExistente = pagos?.find(p => p.type === "saldo");
+    if (saldoExistente) {
+      const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", saldoExistente.id);
+      if (error) { alert("No se pudo confirmar el saldo: " + error.message); setProcesando(null); return; }
+    } else {
+      const saldo = Math.round(parseFloat(totalPrice || 0) - parseFloat(sena?.amount || 0));
+      if (saldo > 0) {
+        const { error } = await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "paid", paid_at: ahora });
+        if (error) { alert("No se pudo registrar el saldo: " + error.message); setProcesando(null); return; }
+      }
+    }
+
+    const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", id);
+    if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setProcesando(null); return; }
+
     fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: id }) });
+    setProcesando(null);
     cargar();
   };
 
@@ -151,14 +203,18 @@ export default function Cobros() {
 
   const confirmarSaldo = async (pagoId, appointmentId) => {
     setSubiendoSaldo(pagoId);
-    await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pagoId);
-    await supabase.from("appointments").update({ status: "confirmed" }).eq("id", appointmentId);
+    const { error: e1 } = await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pagoId);
+    if (e1) { alert("No se pudo confirmar el saldo: " + e1.message); setSubiendoSaldo(null); return; }
+    const { error: e2 } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", appointmentId);
+    if (e2) alert("El saldo se cobró pero no se pudo cerrar el turno: " + e2.message);
     setSubiendoSaldo(null);
     cargar();
   };
 
   const cancelarTurno = async (id) => {
-    await supabase.from("appointments").update({ status: "cancelled" }).eq("id", id);
+    if (!window.confirm("¿Cancelar este turno? Se marcarán sus pagos como cancelados.")) return;
+    const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", id);
+    if (error) { alert("No se pudo cancelar: " + error.message); return; }
     await supabase.from("payments").update({ status: "cancelled" }).eq("appointment_id", id);
     cargar();
   };
@@ -227,8 +283,12 @@ export default function Cobros() {
                         subirComprobante(pagoId, t.id, "sena", e.target.files[0]);
                       }} />
                     </label>
-                    <button style={s.btnConfirmar} onClick={() => confirmarTurno(t.id, t.total_price)}>✓ Confirmar seña</button>
-                    <button style={s.btnPagoTotal} onClick={() => pagarTodo(t.id, t.total_price)}>💰 Pagó todo</button>
+                    <button style={{ ...s.btnConfirmar, opacity: procesando === t.id ? 0.5 : 1 }} disabled={procesando === t.id} onClick={() => confirmarTurno(t.id, t.total_price)}>
+                      {procesando === t.id ? "..." : "✓ Confirmar seña"}
+                    </button>
+                    <button style={{ ...s.btnPagoTotal, opacity: procesando === t.id ? 0.5 : 1 }} disabled={procesando === t.id} onClick={() => pagarTodo(t.id, t.total_price)}>
+                      {procesando === t.id ? "..." : "💰 Pagó todo"}
+                    </button>
                     <button style={{ padding: "6px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => cancelarTurno(t.id)}>✗</button>
                   </div>
                 </div>
