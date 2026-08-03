@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
-import { linkWhatsApp } from "../../utils/whatsapp";
+import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 
 const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
 
@@ -155,7 +155,9 @@ export default function Clientes() {
                   {getPrecioTag(c.price_type || "normal")}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "0.5px solid #F0E8F8" }}>
-                  <div style={{ fontSize: "12px", color: "#B89FD0" }}>{c.phone || "Sin celular"} · {c.appointments?.[0]?.count || 0} sesiones</div>
+                  <div style={{ fontSize: "12px", color: "#B89FD0" }}>
+                    {c.phone || "Sin celular"}{c.phone && !celularValido(c.phone) ? " ⚠️" : ""} · {c.appointments?.[0]?.count || 0} sesiones
+                  </div>
                   {c.phone && (
                     <a href={linkWhatsApp(c.phone)} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
                       <button style={s.btnWA}>💬</button>
@@ -196,7 +198,13 @@ export default function Clientes() {
                       </div>
                     </td>
                     <td style={s.td}>
-                      <div style={{ fontSize: "13px", color: "#2A1845" }}>{c.phone || "—"}</div>
+                      <div style={{ fontSize: "13px", color: "#2A1845" }}>
+                        {c.phone || "—"}
+                        {c.phone && !celularValido(c.phone) && (
+                          <span title="El número no tiene el formato de un celular argentino, WhatsApp no lo va a encontrar"
+                            style={{ marginLeft: "6px", fontSize: "11px", color: "#A32D2D" }}>⚠️ revisar</span>
+                        )}
+                      </div>
                       {c.phone && (
                         <a href={linkWhatsApp(c.phone)} target="_blank" rel="noreferrer">
                           <button style={{ ...s.btnWA, marginTop: "4px" }}>💬 WhatsApp</button>
@@ -246,7 +254,7 @@ export default function Clientes() {
               <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Datos personales</div>
               {[
                 { label: "Nombre", valor: clienteSeleccionado.full_name },
-                { label: "Celular", valor: clienteSeleccionado.phone },
+                { label: "Celular", valor: clienteSeleccionado.phone ? (celularValido(clienteSeleccionado.phone) ? clienteSeleccionado.phone : `${clienteSeleccionado.phone} ⚠️ revisar`) : null },
                 { label: "Mail", valor: clienteSeleccionado.email },
                 { label: "Sesiones", valor: `${clienteSeleccionado.appointments?.[0]?.count || 0} sesiones` },
               ].map(f => (

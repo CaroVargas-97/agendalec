@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
-import { linkWhatsApp } from "../../utils/whatsapp";
+import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -365,7 +365,10 @@ export default function Limpiezas() {
 
             {clienteNuevo && busquedaCliente.length >= 3 && (
               <>
-                <div style={s.field}><label style={s.label}>Celular (opcional)</label><input type="tel" value={nuevoClienteData.phone} onChange={e => setNuevoClienteData({...nuevoClienteData, phone: e.target.value})} placeholder="+54 9 11..." style={s.input} /></div>
+                <div style={s.field}><label style={s.label}>Celular (opcional)</label><input type="tel" value={nuevoClienteData.phone} onChange={e => setNuevoClienteData({...nuevoClienteData, phone: e.target.value})} placeholder="+54 9 11..." style={s.input} />
+                    {nuevoClienteData.phone && !celularValido(nuevoClienteData.phone) && (
+                      <span style={{ fontSize: "11px", color: "#A32D2D" }}>⚠️ No parece un celular argentino válido (área + número, sin el 15)</span>
+                    )}</div>
                 <div style={s.field}><label style={s.label}>Mail (opcional)</label><input type="email" value={nuevoClienteData.email} onChange={e => setNuevoClienteData({...nuevoClienteData, email: e.target.value})} placeholder="mail@ejemplo.com" style={s.input} /></div>
               </>
             )}

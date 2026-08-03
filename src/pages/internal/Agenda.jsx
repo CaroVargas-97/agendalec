@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
-import { linkWhatsApp } from "../../utils/whatsapp";
+import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 import { cuando } from "../../utils/fecha";
 
 const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
@@ -636,6 +636,9 @@ export default function Agenda() {
                   <div style={s.field}>
                     <label style={s.label}>Celular (opcional)</label>
                     <input type="tel" value={nuevoClienteData.phone} onChange={e => setNuevoClienteData({...nuevoClienteData, phone: e.target.value})} placeholder="+54 9 11..." style={s.input} />
+                    {nuevoClienteData.phone && !celularValido(nuevoClienteData.phone) && (
+                      <span style={{ fontSize: "11px", color: "#A32D2D" }}>⚠️ No parece un celular argentino válido (área + número, sin el 15)</span>
+                    )}
                   </div>
                   <div style={s.field}>
                     <label style={s.label}>Mail (opcional)</label>
