@@ -315,22 +315,37 @@ export default function Grupales() {
             )}
 
             <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
-              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotar persona</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <input type="text" placeholder="Nombre y apellido" value={asistenteForm.nombre} onChange={e => setAsistenteForm({...asistenteForm, nombre: e.target.value})} style={s.input} />
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <input type="tel" placeholder="Celular" value={asistenteForm.telefono} onChange={e => setAsistenteForm({...asistenteForm, telefono: e.target.value})} style={{ ...s.input, flex: 1 }} />
-                  <input type="email" placeholder="Mail (opcional)" value={asistenteForm.mail} onChange={e => setAsistenteForm({...asistenteForm, mail: e.target.value})} style={{ ...s.input, flex: 1 }} />
+              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotar persona</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={s.field}>
+                  <label style={s.label}>Nombre y apellido</label>
+                  <input type="text" placeholder="Ej: Ana García" value={asistenteForm.nombre} onChange={e => setAsistenteForm({...asistenteForm, nombre: e.target.value})} style={s.input} />
                 </div>
-                <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobanteAsistente ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobanteAsistente ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
-                  <span style={{ fontSize: "16px" }}>{comprobanteAsistente ? "✅" : "📎"}</span>
-                  <span style={{ fontSize: "12px", color: comprobanteAsistente ? "#5C3F99" : "#B89FD0", flex: 1 }}>
-                    {comprobanteAsistente ? comprobanteAsistente.name : "Adjuntar seña (opcional)"}
-                  </span>
-                  {comprobanteAsistente && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobanteAsistente(null); }}>✕ quitar</span>}
-                  <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobanteAsistente(e.target.files[0] || null)} />
-                </label>
-                <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim()} style={{ ...s.saveBtn, padding: "8px" }}>{savingAsistente ? "Agregando..." : "+ Anotar"}</button>
+
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+                  <div style={s.field}>
+                    <label style={s.label}>Celular</label>
+                    <input type="tel" placeholder="11 1234-5678" value={asistenteForm.telefono} onChange={e => setAsistenteForm({...asistenteForm, telefono: e.target.value})} style={s.input} />
+                  </div>
+                  <div style={s.field}>
+                    <label style={s.label}>Mail (opcional)</label>
+                    <input type="email" placeholder="mail@ejemplo.com" value={asistenteForm.mail} onChange={e => setAsistenteForm({...asistenteForm, mail: e.target.value})} style={s.input} />
+                  </div>
+                </div>
+
+                <div style={s.field}>
+                  <label style={s.label}>Comprobante (opcional)</label>
+                  <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobanteAsistente ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobanteAsistente ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
+                    <span style={{ fontSize: "16px" }}>{comprobanteAsistente ? "✅" : "📎"}</span>
+                    <span style={{ fontSize: "12px", color: comprobanteAsistente ? "#5C3F99" : "#B89FD0", flex: 1 }}>
+                      {comprobanteAsistente ? comprobanteAsistente.name : "Adjuntar captura o PDF"}
+                    </span>
+                    {comprobanteAsistente && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobanteAsistente(null); }}>✕ quitar</span>}
+                    <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobanteAsistente(e.target.files[0] || null)} />
+                  </label>
+                </div>
+
+                <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim()} style={{ ...s.saveBtn, padding: "10px", marginTop: "2px" }}>{savingAsistente ? "Agregando..." : "+ Anotar"}</button>
               </div>
             </div>
 
