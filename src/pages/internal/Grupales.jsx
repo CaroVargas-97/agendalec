@@ -45,6 +45,9 @@ export default function Grupales() {
 
   const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
   const [comprobanteAsistente, setComprobanteAsistente] = useState(null);
+  const [asistenteEditandoId, setAsistenteEditandoId] = useState(null);
+  const [editAsistenteForm, setEditAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
+  const [savingEditAsistente, setSavingEditAsistente] = useState(false);
   const [savingAsistente, setSavingAsistente] = useState(false);
 
   const [editando, setEditando] = useState(false);
@@ -183,6 +186,25 @@ export default function Grupales() {
 
   const eliminarAsistente = async (id) => {
     await supabase.from("group_attendees").delete().eq("id", id);
+    await refrescarAsistentes();
+  };
+
+  const iniciarEdicionAsistente = (a) => {
+    setEditAsistenteForm({ nombre: a.full_name, telefono: a.phone || "", mail: a.email || "" });
+    setAsistenteEditandoId(a.id);
+  };
+
+  const guardarEdicionAsistente = async () => {
+    if (!editAsistenteForm.nombre.trim()) return;
+    setSavingEditAsistente(true);
+    const { error } = await supabase.from("group_attendees").update({
+      full_name: editAsistenteForm.nombre.trim(),
+      phone: editAsistenteForm.telefono || null,
+      email: editAsistenteForm.mail || null,
+    }).eq("id", asistenteEditandoId);
+    if (error) { alert("No se pudo guardar: " + error.message); setSavingEditAsistente(false); return; }
+    setSavingEditAsistente(false);
+    setAsistenteEditandoId(null);
     await refrescarAsistentes();
   };
 
@@ -359,37 +381,54 @@ export default function Grupales() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {asistentes.map(a => (
                     <div key={a.id} style={{ border: "0.5px solid #F0E8F8", borderRadius: "10px", padding: "10px 12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-                        <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
-                        <span style={a.status === "paid" ? s.tagPagado : a.status === "cortesia" ? s.tagCortesia : s.tagPendiente}>
-                          {a.status === "paid" ? "✓ Pagó" : a.status === "cortesia" ? "🎁 Cortesía" : "⏳ Pendiente"}
-                        </span>
-                      </div>
-                      {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "2px" }}>{a.phone}</div>}
-                      {a.receipt_url && (
-                        <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
+                      {asistenteEditandoId === a.id ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          <input type="text" placeholder="Nombre y apellido" value={editAsistenteForm.nombre} onChange={e => setEditAsistenteForm({...editAsistenteForm, nombre: e.target.value})} style={s.input} />
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <input type="tel" placeholder="Celular" value={editAsistenteForm.telefono} onChange={e => setEditAsistenteForm({...editAsistenteForm, telefono: e.target.value})} style={{ ...s.input, flex: 1 }} />
+                            <input type="email" placeholder="Mail" value={editAsistenteForm.mail} onChange={e => setEditAsistenteForm({...editAsistenteForm, mail: e.target.value})} style={{ ...s.input, flex: 1 }} />
+                          </div>
+                          <div style={{ display: "flex", gap: "6px" }}>
+                            <button onClick={() => setAsistenteEditandoId(null)} style={{ ...s.cancelBtn, flex: 1, padding: "7px" }}>Cancelar</button>
+                            <button onClick={guardarEdicionAsistente} disabled={savingEditAsistente || !editAsistenteForm.nombre.trim()} style={{ ...s.saveBtn, flex: 1, padding: "7px" }}>{savingEditAsistente ? "Guardando..." : "Guardar"}</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                            <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
+                            <span style={a.status === "paid" ? s.tagPagado : a.status === "cortesia" ? s.tagCortesia : s.tagPendiente}>
+                              {a.status === "paid" ? "✓ Pagó" : a.status === "cortesia" ? "🎁 Cortesía" : "⏳ Pendiente"}
+                            </span>
+                          </div>
+                          {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "2px" }}>{a.phone}</div>}
+                          {a.receipt_url && (
+                            <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
+                          )}
+                          <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                            {a.status !== "pending" && (
+                              <button onClick={() => cambiarEstadoAsistente(a, "pending")} style={{ padding: "5px 10px", background: "#FAEEDA", color: "#854F0B", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>⏳ Pendiente</button>
+                            )}
+                            {a.status !== "paid" && (
+                              <button onClick={() => cambiarEstadoAsistente(a, "paid")} style={{ padding: "5px 10px", background: "#EDE8FA", color: "#5C3F99", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✓ Pagó</button>
+                            )}
+                            {a.status !== "cortesia" && (
+                              <button onClick={() => cambiarEstadoAsistente(a, "cortesia")} style={{ padding: "5px 10px", background: "#FDE8F0", color: "#A0407A", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>🎁 Cortesía</button>
+                            )}
+                            {a.status !== "cortesia" && (
+                              <label style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                                {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar"}
+                                <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
+                              </label>
+                            )}
+                            {a.phone && (
+                              <a href={linkWhatsApp(a.phone)} target="_blank" rel="noreferrer"><button style={s.btnWA}>💬</button></a>
+                            )}
+                            <button onClick={() => iniciarEdicionAsistente(a)} style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✎</button>
+                            <button onClick={() => eliminarAsistente(a.id)} style={{ padding: "5px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✕</button>
+                          </div>
+                        </>
                       )}
-                      <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-                        {a.status !== "pending" && (
-                          <button onClick={() => cambiarEstadoAsistente(a, "pending")} style={{ padding: "5px 10px", background: "#FAEEDA", color: "#854F0B", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>⏳ Pendiente</button>
-                        )}
-                        {a.status !== "paid" && (
-                          <button onClick={() => cambiarEstadoAsistente(a, "paid")} style={{ padding: "5px 10px", background: "#EDE8FA", color: "#5C3F99", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✓ Pagó</button>
-                        )}
-                        {a.status !== "cortesia" && (
-                          <button onClick={() => cambiarEstadoAsistente(a, "cortesia")} style={{ padding: "5px 10px", background: "#FDE8F0", color: "#A0407A", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>🎁 Cortesía</button>
-                        )}
-                        {a.status !== "cortesia" && (
-                          <label style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                            {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar"}
-                            <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
-                          </label>
-                        )}
-                        {a.phone && (
-                          <a href={linkWhatsApp(a.phone)} target="_blank" rel="noreferrer"><button style={s.btnWA}>💬</button></a>
-                        )}
-                        <button onClick={() => eliminarAsistente(a.id)} style={{ padding: "5px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✕</button>
-                      </div>
                     </div>
                   ))}
                 </div>
