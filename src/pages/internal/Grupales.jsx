@@ -47,7 +47,7 @@ export default function Grupales() {
   const [comprobanteAsistente, setComprobanteAsistente] = useState(null);
   const [asistenteEditandoId, setAsistenteEditandoId] = useState(null);
   const [editAsistenteForm, setEditAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
-  const [asistenteExpandidoId, setAsistenteExpandidoId] = useState(null);
+  const [asistenteDetalleId, setAsistenteDetalleId] = useState(null);
   const [savingEditAsistente, setSavingEditAsistente] = useState(false);
   const [savingAsistente, setSavingAsistente] = useState(false);
 
@@ -105,6 +105,8 @@ export default function Grupales() {
   const abrirEvento = async (ev) => {
     setEventoSeleccionado(ev);
     setEditando(false);
+    setAsistenteDetalleId(null);
+    setAsistenteEditandoId(null);
     setLoadingAsistentes(true);
     const { data } = await supabase.from("group_attendees").select("*").eq("event_id", ev.id).order("created_at");
     setAsistentes(data || []);
@@ -337,117 +339,143 @@ export default function Grupales() {
               </div>
             )}
 
-            <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
-              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotar persona</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                <div style={s.field}>
-                  <label style={s.label}>Nombre y apellido</label>
-                  <input type="text" placeholder="Ej: Ana García" value={asistenteForm.nombre} onChange={e => setAsistenteForm({...asistenteForm, nombre: e.target.value})} style={s.input} />
-                </div>
+            {asistenteDetalleId ? (() => {
+              const a = asistentes.find(x => x.id === asistenteDetalleId);
+              if (!a) return null;
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <button onClick={() => { setAsistenteDetalleId(null); setAsistenteEditandoId(null); }}
+                    style={{ alignSelf: "flex-start", background: "none", border: "none", color: "#9B72C0", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", padding: 0, display: "flex", alignItems: "center", gap: "4px" }}>
+                    ← Volver a la lista
+                  </button>
 
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
-                  <div style={s.field}>
-                    <label style={s.label}>Celular</label>
-                    <input type="tel" placeholder="11 1234-5678" value={asistenteForm.telefono} onChange={e => setAsistenteForm({...asistenteForm, telefono: e.target.value})} style={s.input} />
+                  {asistenteEditandoId === a.id ? (
+                    <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem", display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Editar datos</div>
+                      <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={editAsistenteForm.nombre} onChange={e => setEditAsistenteForm({...editAsistenteForm, nombre: e.target.value})} style={s.input} /></div>
+                      <div style={s.field}><label style={s.label}>Celular</label><input type="tel" value={editAsistenteForm.telefono} onChange={e => setEditAsistenteForm({...editAsistenteForm, telefono: e.target.value})} style={s.input} /></div>
+                      <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={editAsistenteForm.mail} onChange={e => setEditAsistenteForm({...editAsistenteForm, mail: e.target.value})} style={s.input} /></div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button onClick={() => setAsistenteEditandoId(null)} style={{ ...s.cancelBtn, flex: 1 }}>Cancelar</button>
+                        <button onClick={guardarEdicionAsistente} disabled={savingEditAsistente || !editAsistenteForm.nombre.trim()} style={{ ...s.saveBtn, flex: 1 }}>{savingEditAsistente ? "Guardando..." : "Guardar"}</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1.1rem", display: "flex", flexDirection: "column", gap: "12px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div style={{ fontSize: "16px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
+                        <span style={a.status === "paid" ? s.tagPagado : a.status === "cortesia" ? s.tagCortesia : s.tagPendiente}>
+                          {a.status === "paid" ? "✓ Pagó" : a.status === "cortesia" ? "🎁 Cortesía" : "⏳ Pendiente"}
+                        </span>
+                      </div>
+                      {a.phone && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.phone}</div>}
+                      {a.email && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.email}</div>}
+                      {a.receipt_url && (
+                        <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#9B72C0", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
+                      )}
+
+                      <div style={{ borderTop: "0.5px solid #F0E8F8", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "500", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Estado</div>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          {[["pending","⏳ Pendiente"],["paid","✓ Pagó"],["cortesia","🎁 Cortesía"]].map(([key,label]) => (
+                            <button key={key} onClick={() => cambiarEstadoAsistente(a, key)} style={{ flex: 1, padding: "8px 4px", borderRadius: "8px", border: `0.5px solid ${a.status===key?"#9B72C0":"#E0D0F0"}`, background: a.status===key?"#EDE8FA":"#fff", color: a.status===key?"#5C3F99":"#B89FD0", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        <label style={{ flex: 1, minWidth: "120px", textAlign: "center", padding: "9px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar comprobante"}
+                          <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
+                        </label>
+                        {a.phone && (
+                          <a href={linkWhatsApp(a.phone)} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: "100px" }}><button style={{ ...s.btnWA, width: "100%", justifyContent: "center", padding: "9px" }}>💬 WhatsApp</button></a>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button onClick={() => iniciarEdicionAsistente(a)} style={{ ...s.cancelBtn, flex: 1 }}>✎ Editar datos</button>
+                        <button onClick={() => { eliminarAsistente(a.id); setAsistenteDetalleId(null); }} style={{ ...s.cancelBtn, flex: 1, color: "#A32D2D", borderColor: "#F4C4C4" }}>✕ Eliminar</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })() : (
+              <>
+                <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
+                  <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotar persona</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div style={s.field}>
+                      <label style={s.label}>Nombre y apellido</label>
+                      <input type="text" placeholder="Ej: Ana García" value={asistenteForm.nombre} onChange={e => setAsistenteForm({...asistenteForm, nombre: e.target.value})} style={s.input} />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+                      <div style={s.field}>
+                        <label style={s.label}>Celular</label>
+                        <input type="tel" placeholder="11 1234-5678" value={asistenteForm.telefono} onChange={e => setAsistenteForm({...asistenteForm, telefono: e.target.value})} style={s.input} />
+                      </div>
+                      <div style={s.field}>
+                        <label style={s.label}>Mail (opcional)</label>
+                        <input type="email" placeholder="mail@ejemplo.com" value={asistenteForm.mail} onChange={e => setAsistenteForm({...asistenteForm, mail: e.target.value})} style={s.input} />
+                      </div>
+                    </div>
+
+                    <div style={s.field}>
+                      <label style={s.label}>Comprobante (opcional)</label>
+                      <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobanteAsistente ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobanteAsistente ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
+                        <span style={{ fontSize: "16px" }}>{comprobanteAsistente ? "✅" : "📎"}</span>
+                        <span style={{ fontSize: "12px", color: comprobanteAsistente ? "#5C3F99" : "#B89FD0", flex: 1 }}>
+                          {comprobanteAsistente ? comprobanteAsistente.name : "Adjuntar captura o PDF"}
+                        </span>
+                        {comprobanteAsistente && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobanteAsistente(null); }}>✕ quitar</span>}
+                        <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobanteAsistente(e.target.files[0] || null)} />
+                      </label>
+                    </div>
+
+                    <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim()} style={{ ...s.saveBtn, padding: "10px", marginTop: "2px" }}>{savingAsistente ? "Agregando..." : "+ Anotar"}</button>
                   </div>
-                  <div style={s.field}>
-                    <label style={s.label}>Mail (opcional)</label>
-                    <input type="email" placeholder="mail@ejemplo.com" value={asistenteForm.mail} onChange={e => setAsistenteForm({...asistenteForm, mail: e.target.value})} style={s.input} />
-                  </div>
                 </div>
 
-                <div style={s.field}>
-                  <label style={s.label}>Comprobante (opcional)</label>
-                  <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobanteAsistente ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobanteAsistente ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
-                    <span style={{ fontSize: "16px" }}>{comprobanteAsistente ? "✅" : "📎"}</span>
-                    <span style={{ fontSize: "12px", color: comprobanteAsistente ? "#5C3F99" : "#B89FD0", flex: 1 }}>
-                      {comprobanteAsistente ? comprobanteAsistente.name : "Adjuntar captura o PDF"}
-                    </span>
-                    {comprobanteAsistente && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobanteAsistente(null); }}>✕ quitar</span>}
-                    <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobanteAsistente(e.target.files[0] || null)} />
-                  </label>
-                </div>
-
-                <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim()} style={{ ...s.saveBtn, padding: "10px", marginTop: "2px" }}>{savingAsistente ? "Agregando..." : "+ Anotar"}</button>
-              </div>
-            </div>
-
-            <div>
-              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Anotados ({asistentes.length})</div>
-              {loadingAsistentes ? (
-                <div style={s.emptyText}>Cargando...</div>
-              ) : asistentes.length === 0 ? (
-                <div style={{ ...s.emptyText, padding: "1rem 0" }}>Nadie anotado todavía</div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  {asistentes.map(a => (
-                    <div key={a.id} style={{ border: "0.5px solid #F0E8F8", borderRadius: "10px", padding: "10px 12px" }}>
-                      {asistenteEditandoId === a.id ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                          <input type="text" placeholder="Nombre y apellido" value={editAsistenteForm.nombre} onChange={e => setEditAsistenteForm({...editAsistenteForm, nombre: e.target.value})} style={s.input} />
-                          <div style={{ display: "flex", gap: "8px" }}>
-                            <input type="tel" placeholder="Celular" value={editAsistenteForm.telefono} onChange={e => setEditAsistenteForm({...editAsistenteForm, telefono: e.target.value})} style={{ ...s.input, flex: 1 }} />
-                            <input type="email" placeholder="Mail" value={editAsistenteForm.mail} onChange={e => setEditAsistenteForm({...editAsistenteForm, mail: e.target.value})} style={{ ...s.input, flex: 1 }} />
-                          </div>
-                          <div style={{ display: "flex", gap: "6px" }}>
-                            <button onClick={() => setAsistenteEditandoId(null)} style={{ ...s.cancelBtn, flex: 1, padding: "7px" }}>Cancelar</button>
-                            <button onClick={guardarEdicionAsistente} disabled={savingEditAsistente || !editAsistenteForm.nombre.trim()} style={{ ...s.saveBtn, flex: 1, padding: "7px" }}>{savingEditAsistente ? "Guardando..." : "Guardar"}</button>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {loadingAsistentes ? (
+                    <div style={s.emptyText}>Cargando...</div>
+                  ) : asistentes.length === 0 ? (
+                    <div style={{ ...s.emptyText, padding: "1rem 0" }}>Nadie anotado todavía</div>
+                  ) : (
+                    [
+                      ["pending", "⏳ Pendientes"],
+                      ["paid", "✓ Pagaron"],
+                      ["cortesia", "🎁 Cortesía"],
+                    ].map(([estado, titulo]) => {
+                      const grupo = asistentes.filter(a => a.status === estado);
+                      if (grupo.length === 0) return null;
+                      return (
+                        <div key={estado}>
+                          <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.4px" }}>{titulo} ({grupo.length})</div>
+                          <div style={{ borderRadius: "10px", border: "0.5px solid #F0E8F8", overflow: "hidden" }}>
+                            {grupo.map((a, i) => (
+                              <div key={a.id} onClick={() => setAsistenteDetalleId(a.id)}
+                                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "10px 12px", cursor: "pointer", borderBottom: i < grupo.length - 1 ? "0.5px solid #F0E8F8" : "none", background: "#fff" }}>
+                                <div>
+                                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
+                                  {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>{a.phone}</div>}
+                                </div>
+                                <span style={{ fontSize: "13px", color: "#D0B8E8" }}>›</span>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ) : (
-                        <>
-                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", cursor: "pointer" }}
-                            onClick={() => setAsistenteExpandidoId(asistenteExpandidoId === a.id ? null : a.id)}>
-                            <div>
-                              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
-                              {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>{a.phone}</div>}
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                              <span style={a.status === "paid" ? s.tagPagado : a.status === "cortesia" ? s.tagCortesia : s.tagPendiente}>
-                                {a.status === "paid" ? "✓ Pagó" : a.status === "cortesia" ? "🎁 Cortesía" : "⏳ Pendiente"}
-                              </span>
-                              <span style={{ fontSize: "11px", color: "#B89FD0", transform: asistenteExpandidoId === a.id ? "rotate(180deg)" : "none", transition: "transform 0.15s" }}>▾</span>
-                            </div>
-                          </div>
-
-                          {asistenteExpandidoId === a.id && (
-                            <>
-                              {a.receipt_url && (
-                                <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "8px", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
-                              )}
-                              <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
-                                {a.status !== "pending" && (
-                                  <button onClick={() => cambiarEstadoAsistente(a, "pending")} style={{ padding: "5px 10px", background: "#FAEEDA", color: "#854F0B", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>⏳ Pendiente</button>
-                                )}
-                                {a.status !== "paid" && (
-                                  <button onClick={() => cambiarEstadoAsistente(a, "paid")} style={{ padding: "5px 10px", background: "#EDE8FA", color: "#5C3F99", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✓ Pagó</button>
-                                )}
-                                {a.status !== "cortesia" && (
-                                  <button onClick={() => cambiarEstadoAsistente(a, "cortesia")} style={{ padding: "5px 10px", background: "#FDE8F0", color: "#A0407A", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>🎁 Cortesía</button>
-                                )}
-                                {a.status !== "cortesia" && (
-                                  <label style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                                    {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar"}
-                                    <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
-                                  </label>
-                                )}
-                                {a.phone && (
-                                  <a href={linkWhatsApp(a.phone)} target="_blank" rel="noreferrer"><button style={s.btnWA}>💬</button></a>
-                                )}
-                                <button onClick={() => iniciarEdicionAsistente(a)} style={{ padding: "5px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✎ Editar</button>
-                                <button onClick={() => eliminarAsistente(a.id)} style={{ padding: "5px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✕ Eliminar</button>
-                              </div>
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  ))}
+                      );
+                    })
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
 
-            <button style={{ ...s.cancelBtn, color: "#A32D2D", borderColor: "#F4C4C4" }} onClick={() => eliminarEvento(eventoSeleccionado)}>🗑 Eliminar evento</button>
+            {!asistenteDetalleId && (
+              <button style={{ ...s.cancelBtn, color: "#A32D2D", borderColor: "#F4C4C4" }} onClick={() => eliminarEvento(eventoSeleccionado)}>🗑 Eliminar evento</button>
+            )}
           </div>
         </>
       )}
