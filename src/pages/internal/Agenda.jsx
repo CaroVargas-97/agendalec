@@ -71,6 +71,10 @@ export default function Agenda() {
   const [pagosDelTurno, setPagosDelTurno] = useState([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
+  const [editandoTurno, setEditandoTurno] = useState(false);
+  const [editTurnoForm, setEditTurnoForm] = useState({ fecha: "", hora: "", modalidad: "presencial", notas: "" });
+  const [editTurnoError, setEditTurnoError] = useState("");
+  const [savingEditTurno, setSavingEditTurno] = useState(false);
   const [horaActual, setHoraActual] = useState(new Date());
   const [blockedDates, setBlockedDates] = useState([]);
 
@@ -157,7 +161,56 @@ export default function Agenda() {
     setLoadingPagos(false);
   };
 
-  const cerrarTurno = () => { setTurnoSeleccionado(null); setPagosDelTurno([]); };
+  const cerrarTurno = () => { setTurnoSeleccionado(null); setPagosDelTurno([]); setEditandoTurno(false); };
+
+  const iniciarEdicionTurno = () => {
+    const t = turnoSeleccionado;
+    setEditTurnoForm({
+      fecha: t.date || "",
+      hora: t.start_time ? t.start_time.slice(0, 5) : "",
+      modalidad: t.modality || "presencial",
+      notas: t.notes || "",
+    });
+    setEditTurnoError("");
+    setEditandoTurno(true);
+  };
+
+  const guardarEdicionTurno = async () => {
+    setEditTurnoError("");
+    const t = turnoSeleccionado;
+    const esACoordinarTurno = !t.services?.duration_minutes;
+    if (!esACoordinarTurno && (!editTurnoForm.fecha || !editTurnoForm.hora)) {
+      setEditTurnoError("Completá fecha y hora."); return;
+    }
+    setSavingEditTurno(true);
+
+    let endTime = null;
+    if (!esACoordinarTurno) {
+      const [h, m] = editTurnoForm.hora.split(":").map(Number);
+      const endMin = h * 60 + m + t.services.duration_minutes;
+      endTime = `${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
+    }
+
+    const { error } = await supabase.from("appointments").update({
+      date: editTurnoForm.fecha || null,
+      start_time: esACoordinarTurno ? null : editTurnoForm.hora,
+      end_time: endTime,
+      modality: editTurnoForm.modalidad,
+      notes: editTurnoForm.notas,
+    }).eq("id", t.id);
+
+    if (error) {
+      setEditTurnoError(error.code === "23P01" ? "Ese horario se superpone con otro turno ya cargado." : "Error al guardar: " + error.message);
+      setSavingEditTurno(false);
+      return;
+    }
+
+    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name, phone), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
+    setTurnoSeleccionado(turnoActualizado);
+    setSavingEditTurno(false);
+    setEditandoTurno(false);
+    await cargarDatos();
+  };
 
   const accionPago = async (tipo) => {
     setSavingPago(true);
@@ -508,8 +561,42 @@ export default function Agenda() {
                   <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>
                     {isVirtual ? "📹" : "📍"} {t.clients?.full_name}
                   </div>
-                  <button onClick={cerrarTurno} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {!isCancelled && !editandoTurno && (
+                      <button onClick={iniciarEdicionTurno} title="Editar turno" style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "13px", color: "#9B72C0" }}>✎</button>
+                    )}
+                    <button onClick={cerrarTurno} style={{ width: "28px", height: "28px", borderRadius: "6px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "16px", color: "#9B72C0" }}>×</button>
+                  </div>
                 </div>
+
+                {editandoTurno && (
+                  <div style={{ background: "#F8F4FC", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                    <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Editar turno</div>
+                    {t.services?.duration_minutes ? (
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                        <div style={s.field}><label style={s.label}>Fecha</label><input type="date" value={editTurnoForm.fecha} onChange={e => setEditTurnoForm({...editTurnoForm, fecha: e.target.value})} style={s.input} /></div>
+                        <div style={s.field}><label style={s.label}>Hora</label><input type="time" value={editTurnoForm.hora} onChange={e => setEditTurnoForm({...editTurnoForm, hora: e.target.value})} style={s.input} /></div>
+                      </div>
+                    ) : (
+                      <div style={s.field}><label style={s.label}>Fecha (opcional, "a coordinar")</label><input type="date" value={editTurnoForm.fecha} onChange={e => setEditTurnoForm({...editTurnoForm, fecha: e.target.value})} style={s.input} /></div>
+                    )}
+                    <div style={s.field}>
+                      <label style={s.label}>Modalidad</label>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        {[["presencial","📍 Presencial"],["virtual","📹 Virtual"]].map(([key,label]) => (
+                          <button key={key} onClick={() => setEditTurnoForm({...editTurnoForm, modalidad: key})} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: `0.5px solid ${editTurnoForm.modalidad===key?"#9B72C0":"#E0D0F0"}`, background: editTurnoForm.modalidad===key?"#EDE8FA":"#fff", color: editTurnoForm.modalidad===key?"#5C3F99":"#B89FD0", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={s.field}><label style={s.label}>Notas</label><input type="text" value={editTurnoForm.notas} onChange={e => setEditTurnoForm({...editTurnoForm, notas: e.target.value})} style={s.input} /></div>
+                    {editTurnoError && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{editTurnoError}</div>}
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => setEditandoTurno(false)} style={{ ...s.cancelBtn, flex: 1 }}>Cancelar</button>
+                      <button onClick={guardarEdicionTurno} disabled={savingEditTurno} style={{ ...s.saveBtn, flex: 1 }}>{savingEditTurno ? "Guardando..." : "Guardar"}</button>
+                    </div>
+                  </div>
+                )}
+
                 {t.clients?.phone && (
                   <a href={linkWhatsApp(t.clients.phone)} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
                     <button style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", background: "#25D366", color: "#fff", border: "none", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" }}>

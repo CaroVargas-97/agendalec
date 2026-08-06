@@ -44,6 +44,7 @@ export default function Grupales() {
   const [nuevoError, setNuevoError] = useState("");
 
   const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
+  const [comprobanteAsistente, setComprobanteAsistente] = useState(null);
   const [savingAsistente, setSavingAsistente] = useState(false);
 
   const [editando, setEditando] = useState(false);
@@ -151,15 +152,31 @@ export default function Grupales() {
   const agregarAsistente = async () => {
     if (!asistenteForm.nombre.trim()) return;
     setSavingAsistente(true);
-    const { error } = await supabase.from("group_attendees").insert({
+    const { data: nuevo, error } = await supabase.from("group_attendees").insert({
       event_id: eventoSeleccionado.id,
       full_name: asistenteForm.nombre.trim(),
       phone: asistenteForm.telefono || null,
       email: asistenteForm.mail || null,
       status: "pending",
-    });
+    }).select("id").single();
     if (error) { alert("Error al agregar: " + error.message); setSavingAsistente(false); return; }
+
+    if (comprobanteAsistente) {
+      const ext = comprobanteAsistente.name.split(".").pop();
+      const { data: uploadData, error: errUpload } = await supabase.storage
+        .from("comprobantes")
+        .upload(`grupal-${nuevo.id}.${ext}`, comprobanteAsistente, { contentType: comprobanteAsistente.type, upsert: true });
+      if (errUpload) {
+        alert("La persona se anotó, pero no se pudo subir el comprobante: " + errUpload.message);
+      } else {
+        const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+        const { error: errUpdate } = await supabase.from("group_attendees").update({ receipt_url: publicUrl }).eq("id", nuevo.id);
+        if (errUpdate) alert("La persona se anotó, pero no se pudo guardar el comprobante: " + errUpdate.message);
+      }
+    }
+
     setAsistenteForm({ nombre: "", telefono: "", mail: "" });
+    setComprobanteAsistente(null);
     setSavingAsistente(false);
     await refrescarAsistentes();
   };
@@ -305,6 +322,14 @@ export default function Grupales() {
                   <input type="tel" placeholder="Celular" value={asistenteForm.telefono} onChange={e => setAsistenteForm({...asistenteForm, telefono: e.target.value})} style={{ ...s.input, flex: 1 }} />
                   <input type="email" placeholder="Mail (opcional)" value={asistenteForm.mail} onChange={e => setAsistenteForm({...asistenteForm, mail: e.target.value})} style={{ ...s.input, flex: 1 }} />
                 </div>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobanteAsistente ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobanteAsistente ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
+                  <span style={{ fontSize: "16px" }}>{comprobanteAsistente ? "✅" : "📎"}</span>
+                  <span style={{ fontSize: "12px", color: comprobanteAsistente ? "#5C3F99" : "#B89FD0", flex: 1 }}>
+                    {comprobanteAsistente ? comprobanteAsistente.name : "Adjuntar seña (opcional)"}
+                  </span>
+                  {comprobanteAsistente && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={e => { e.preventDefault(); setComprobanteAsistente(null); }}>✕ quitar</span>}
+                  <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => setComprobanteAsistente(e.target.files[0] || null)} />
+                </label>
                 <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim()} style={{ ...s.saveBtn, padding: "8px" }}>{savingAsistente ? "Agregando..." : "+ Anotar"}</button>
               </div>
             </div>
