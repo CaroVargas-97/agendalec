@@ -261,8 +261,11 @@ export default function Reserva() {
     ? `${anioMes}-${String(mesMes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`
     : "";
 
+  // "6 ago." (agosto abreviado) puede confundirse con la palabra inglesa
+  // "ago" si el celular traduce la página automáticamente — pasó con una
+  // clienta real. Con el mes completo no hay ambigüedad.
   const fechaLabel = dia
-    ? new Date(anioMes, mesMes, dia).toLocaleDateString("es-AR", { day: "numeric", month: "short" })
+    ? new Date(anioMes, mesMes, dia).toLocaleDateString("es-AR", { day: "numeric", month: "long" })
     : "";
 
   const copiarAlias = () => {
@@ -286,8 +289,14 @@ export default function Reserva() {
   };
 
   const confirmarReserva = async () => {
-    setGuardando(true);
     setError("");
+    // El botón queda habilitado siempre: si falta algo se explica acá en
+    // vez de dejarlo atenuado sin feedback, que es como una clienta real
+    // se quedó pensando que había reservado sin haber tocado nada.
+    if (!form.nombre || !form.celular || !form.mail) { setError("Completá tus datos para confirmar."); return; }
+    if (!aceptaTyC) { setError("Tenés que aceptar los Términos y Condiciones."); return; }
+    if (!comprobante && !esCortesia && (aliasActivo || paypalActivo)) { setError("Subí el comprobante de la transferencia para confirmar."); return; }
+    setGuardando(true);
     setComprobanteFallo(false);
     try {
       const { data: clienteId, error: errCliente } = await supabase.rpc("obtener_o_crear_cliente", {
@@ -662,8 +671,8 @@ export default function Reserva() {
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
-            <button style={{ ...s.btnConfirmar, opacity: form.nombre && form.celular && form.mail && aceptaTyC && (comprobante || esCortesia || !(aliasActivo || paypalActivo)) ? 1 : 0.5 }}
-              disabled={!form.nombre || !form.celular || !form.mail || guardando || !aceptaTyC || (!comprobante && !esCortesia && !!(aliasActivo || paypalActivo))}
+            <button style={{ ...s.btnConfirmar, opacity: guardando ? 0.7 : 1 }}
+              disabled={guardando}
               onClick={confirmarReserva}>
               {guardando ? "Confirmando..." : "✓ Confirmar turno"}
             </button>
