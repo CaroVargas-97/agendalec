@@ -80,7 +80,7 @@ export default function Estadisticas() {
         .neq("status", "cancelled"),
       supabase
         .from("group_events")
-        .select("id, name, date, price, currency, group_attendees(full_name, status)")
+        .select("id, name, date, price, currency, group_attendees(full_name, status, custom_price)")
         .eq("professional_id", uid)
         .gte("date", desdeISO)
         .lte("date", hastaISO),
@@ -94,7 +94,7 @@ export default function Estadisticas() {
         .neq("status", "cancelled"),
       supabase
         .from("group_events")
-        .select("price, currency, group_attendees(status)")
+        .select("price, currency, group_attendees(status, custom_price)")
         .eq("professional_id", uid)
         .gt("date", hastaISO),
     ]);
@@ -109,7 +109,7 @@ export default function Estadisticas() {
         evento: ev.name,
         date: ev.date,
         currency: ev.currency || "ARS",
-        monto: a.status === "cortesia" ? 0 : parseFloat(ev.price || 0),
+        monto: a.status === "cortesia" ? 0 : parseFloat(a.custom_price ?? ev.price ?? 0),
       }))
     );
 
@@ -189,7 +189,7 @@ export default function Estadisticas() {
     const asistentesFuturos = (eventosFuturos || []).flatMap(ev =>
       (ev.group_attendees || []).map(a => ({
         currency: ev.currency || "ARS",
-        monto: a.status === "cortesia" ? 0 : parseFloat(ev.price || 0),
+        monto: a.status === "cortesia" ? 0 : parseFloat(a.custom_price ?? ev.price ?? 0),
       }))
     );
     asistentesFuturos.forEach(a => {

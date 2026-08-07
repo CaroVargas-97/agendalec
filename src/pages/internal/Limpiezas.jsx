@@ -213,15 +213,15 @@ export default function Limpiezas() {
     await cargar();
   };
 
-  const subirComprobante = async (l, file) => {
+  const subirComprobante = async (l, file, tipo) => {
     if (!file) return;
-    const pago = l.payments?.find(p => p.type === "seña");
-    if (!pago) { alert("Esta limpieza no tiene un pago asociado."); return; }
-    setSubiendo(l.id);
+    const pago = l.payments?.find(p => p.type === tipo);
+    if (!pago) { alert(`Esta limpieza no tiene un pago de ${tipo} asociado.`); return; }
+    setSubiendo(`${l.id}-${tipo}`);
     const ext = file.name.split(".").pop();
     const { data: uploadData, error: errUpload } = await supabase.storage
       .from("comprobantes")
-      .upload(`${l.id}-sena.${ext}`, file, { contentType: file.type, upsert: true });
+      .upload(`${l.id}-${tipo === "seña" ? "sena" : "saldo"}.${ext}`, file, { contentType: file.type, upsert: true });
     if (errUpload) {
       alert("No se pudo subir el comprobante: " + errUpload.message);
     } else if (uploadData) {
@@ -318,10 +318,18 @@ export default function Limpiezas() {
                     ) : (
                       <button onClick={() => marcarHecha(l)} style={{ padding: "5px 10px", background: "#5C3F99", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✓ Ya la hice</button>
                     )}
-                    <label style={{ padding: "5px 10px", background: sena?.receipt_url ? "#EAF3DE" : "#fff", color: sena?.receipt_url ? "#3B6D11" : "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                      {subiendo === l.id ? "Subiendo..." : sena?.receipt_url ? "✅ Comprobante" : "📎 Adjuntar"}
-                      <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(l, e.target.files[0])} />
-                    </label>
+                    {sena && (
+                      <label style={{ padding: "5px 10px", background: sena.receipt_url ? "#EAF3DE" : "#fff", color: sena.receipt_url ? "#3B6D11" : "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        {subiendo === `${l.id}-seña` ? "Subiendo..." : sena.receipt_url ? "✅ Comp. seña" : "📎 Comp. seña"}
+                        <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(l, e.target.files[0], "seña")} />
+                      </label>
+                    )}
+                    {saldo && (
+                      <label style={{ padding: "5px 10px", background: saldo.receipt_url ? "#EAF3DE" : "#fff", color: saldo.receipt_url ? "#3B6D11" : "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                        {subiendo === `${l.id}-saldo` ? "Subiendo..." : saldo.receipt_url ? "✅ Comp. saldo" : "📎 Comp. saldo"}
+                        <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(l, e.target.files[0], "saldo")} />
+                      </label>
+                    )}
                     {l.clients?.phone && (
                       <a href={linkWhatsApp(l.clients.phone)} target="_blank" rel="noreferrer"><button style={s.btnWA}>💬</button></a>
                     )}

@@ -90,9 +90,9 @@ export default function Cobros() {
     // métricas para que la facturación no quede partida entre pantallas.
     const { data: eventos } = await supabase
       .from("group_events")
-      .select("id, name, date, price, currency, group_attendees(status)");
+      .select("id, name, date, price, currency, group_attendees(status, custom_price)");
     const asistentesGrupales = (eventos || []).flatMap(ev =>
-      (ev.group_attendees || []).map(a => ({ status: a.status, date: ev.date, monto: parseFloat(ev.price || 0) }))
+      (ev.group_attendees || []).map(a => ({ status: a.status, date: ev.date, monto: parseFloat(a.custom_price ?? ev.price ?? 0) }))
     );
     const grupalCobradoHoy = asistentesGrupales.filter(a => a.status === "paid" && a.date === hoy).reduce((s, a) => s + a.monto, 0);
     const grupalEsteMes = asistentesGrupales.filter(a => a.status === "paid" && a.date >= inicioMes).reduce((s, a) => s + a.monto, 0);

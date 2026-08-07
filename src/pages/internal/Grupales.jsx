@@ -43,10 +43,10 @@ export default function Grupales() {
   const [savingNuevo, setSavingNuevo] = useState(false);
   const [nuevoError, setNuevoError] = useState("");
 
-  const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
+  const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "" });
   const [comprobanteAsistente, setComprobanteAsistente] = useState(null);
   const [asistenteEditandoId, setAsistenteEditandoId] = useState(null);
-  const [editAsistenteForm, setEditAsistenteForm] = useState({ nombre: "", telefono: "", mail: "" });
+  const [editAsistenteForm, setEditAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "" });
   const [asistenteDetalleId, setAsistenteDetalleId] = useState(null);
   const [savingEditAsistente, setSavingEditAsistente] = useState(false);
   const [savingAsistente, setSavingAsistente] = useState(false);
@@ -163,6 +163,7 @@ export default function Grupales() {
       full_name: asistenteForm.nombre.trim(),
       phone: asistenteForm.telefono || null,
       email: asistenteForm.mail || null,
+      custom_price: asistenteForm.precioDescuento !== "" ? parseFloat(asistenteForm.precioDescuento) : null,
       status: "pending",
     }).select("id").single();
     if (error) { alert("Error al agregar: " + error.message); setSavingAsistente(false); return; }
@@ -181,7 +182,7 @@ export default function Grupales() {
       }
     }
 
-    setAsistenteForm({ nombre: "", telefono: "", mail: "" });
+    setAsistenteForm({ nombre: "", telefono: "", mail: "", precioDescuento: "" });
     setComprobanteAsistente(null);
     setSavingAsistente(false);
     await refrescarAsistentes();
@@ -193,7 +194,7 @@ export default function Grupales() {
   };
 
   const iniciarEdicionAsistente = (a) => {
-    setEditAsistenteForm({ nombre: a.full_name, telefono: a.phone || "", mail: a.email || "" });
+    setEditAsistenteForm({ nombre: a.full_name, telefono: a.phone || "", mail: a.email || "", precioDescuento: a.custom_price != null ? String(a.custom_price) : "" });
     setAsistenteEditandoId(a.id);
   };
 
@@ -204,6 +205,7 @@ export default function Grupales() {
       full_name: editAsistenteForm.nombre.trim(),
       phone: editAsistenteForm.telefono || null,
       email: editAsistenteForm.mail || null,
+      custom_price: editAsistenteForm.precioDescuento !== "" ? parseFloat(editAsistenteForm.precioDescuento) : null,
     }).eq("id", asistenteEditandoId);
     if (error) { alert("No se pudo guardar: " + error.message); setSavingEditAsistente(false); return; }
     setSavingEditAsistente(false);
@@ -355,6 +357,10 @@ export default function Grupales() {
                       <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={editAsistenteForm.nombre} onChange={e => setEditAsistenteForm({...editAsistenteForm, nombre: e.target.value})} style={s.input} /></div>
                       <div style={s.field}><label style={s.label}>Celular</label><input type="tel" value={editAsistenteForm.telefono} onChange={e => setEditAsistenteForm({...editAsistenteForm, telefono: e.target.value})} style={s.input} /></div>
                       <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={editAsistenteForm.mail} onChange={e => setEditAsistenteForm({...editAsistenteForm, mail: e.target.value})} style={s.input} /></div>
+                      <div style={s.field}>
+                        <label style={s.label}>Precio con descuento (opcional)</label>
+                        <input type="number" min="0" value={editAsistenteForm.precioDescuento} onChange={e => setEditAsistenteForm({...editAsistenteForm, precioDescuento: e.target.value})} placeholder={`Sin descuento: ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price?.toLocaleString("es-AR") || 0}`} style={s.input} />
+                      </div>
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button onClick={() => setAsistenteEditandoId(null)} style={{ ...s.cancelBtn, flex: 1 }}>Cancelar</button>
                         <button onClick={guardarEdicionAsistente} disabled={savingEditAsistente || !editAsistenteForm.nombre.trim()} style={{ ...s.saveBtn, flex: 1 }}>{savingEditAsistente ? "Guardando..." : "Guardar"}</button>
@@ -370,6 +376,10 @@ export default function Grupales() {
                       </div>
                       {a.phone && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.phone}</div>}
                       {a.email && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.email}</div>}
+                      <div style={{ fontSize: "13px", color: "#2A1845", fontWeight: "500" }}>
+                        {symFor(eventoSeleccionado.currency)}{(a.custom_price ?? eventoSeleccionado.price ?? 0).toLocaleString("es-AR")}
+                        {a.custom_price != null && <span style={{ fontSize: "11px", color: "#5C3F99", fontWeight: "400" }}> · con descuento</span>}
+                      </div>
                       {a.receipt_url && (
                         <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#9B72C0", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
                       )}
@@ -422,6 +432,11 @@ export default function Grupales() {
                     </div>
 
                     <div style={s.field}>
+                      <label style={s.label}>Precio con descuento (opcional)</label>
+                      <input type="number" min="0" value={asistenteForm.precioDescuento} onChange={e => setAsistenteForm({...asistenteForm, precioDescuento: e.target.value})} placeholder={`Sin descuento: ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price?.toLocaleString("es-AR") || 0}`} style={s.input} />
+                    </div>
+
+                    <div style={s.field}>
                       <label style={s.label}>Comprobante (opcional)</label>
                       <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobanteAsistente ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobanteAsistente ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
                         <span style={{ fontSize: "16px" }}>{comprobanteAsistente ? "✅" : "📎"}</span>
@@ -458,7 +473,7 @@ export default function Grupales() {
                               <div key={a.id} onClick={() => setAsistenteDetalleId(a.id)}
                                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "10px 12px", cursor: "pointer", borderBottom: i < grupo.length - 1 ? "0.5px solid #F0E8F8" : "none", background: "#fff" }}>
                                 <div>
-                                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
+                                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}{a.custom_price != null && <span style={{ fontSize: "11px", color: "#5C3F99" }}> · ✨ desc.</span>}</div>
                                   {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>{a.phone}</div>}
                                 </div>
                                 <span style={{ fontSize: "13px", color: "#D0B8E8" }}>›</span>
