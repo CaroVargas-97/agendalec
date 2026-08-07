@@ -340,7 +340,11 @@ export default function Reserva() {
           console.error("Error subiendo comprobante:", errUpload.message);
           setComprobanteFallo(true);
         } else if (uploadData) {
-          const { data: { publicUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+          const { data: { publicUrl: rawUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+      // Sin esto, resubir con el mismo nombre de archivo deja el link
+      // idéntico al anterior y el navegador sigue mostrando la imagen vieja
+      // en caché aunque el archivo ya haya cambiado del lado del servidor.
+      const publicUrl = `${rawUrl}?t=${Date.now()}`;
           const { error: errUpdate } = await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
           if (errUpdate) { console.error("Error guardando comprobante:", errUpdate.message); setComprobanteFallo(true); }
         }
