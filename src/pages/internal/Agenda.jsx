@@ -109,33 +109,36 @@ export default function Agenda() {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     const currentUid = session?.user?.id;
-    if (currentUid) {
-      const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", currentUid);
-      setBlockedDates(blocked || []);
-    }
+
+    let turnosQuery;
     if (vista === "dia") {
-      let query = supabase.from("appointments")
+      turnosQuery = supabase.from("appointments")
         .select("*, clients(full_name), services(name, duration_minutes, price), profiles(full_name)")
         .eq("date", toISO(fecha)).order("start_time");
-      if (filtroProf !== "todos") query = query.eq("professional_id", filtroProf);
-      if (filtroMod !== "todas") query = query.eq("modality", filtroMod);
-      const { data } = await query;
-      setTurnos(data || []);
     } else {
       const semana = getSemana(fecha);
-      const desde = toISO(semana[0]);
-      const hasta = toISO(semana[6]);
-      let query = supabase.from("appointments")
+      turnosQuery = supabase.from("appointments")
         .select("*, clients(full_name), services(name, duration_minutes), profiles(full_name)")
-        .gte("date", desde).lte("date", hasta).order("start_time");
-      if (filtroProf !== "todos") query = query.eq("professional_id", filtroProf);
-      if (filtroMod !== "todas") query = query.eq("modality", filtroMod);
-      const { data } = await query;
-      setTurnosSemana(data || []);
+        .gte("date", toISO(semana[0])).lte("date", toISO(semana[6])).order("start_time");
     }
-    const { data: profs } = await supabase.from("profiles").select("id, full_name").eq("role", "professional");
+    if (filtroProf !== "todos") turnosQuery = turnosQuery.eq("professional_id", filtroProf);
+    if (filtroMod !== "todas") turnosQuery = turnosQuery.eq("modality", filtroMod);
+
+    // Ninguna de estas 4 consultas depende de las otras: se disparan todas
+    // juntas en vez de esperar en cadena, para que Agenda cargue de una.
+    const [{ data: blocked }, { data: turnosData }, { data: profs }, { data: svs }] = await Promise.all([
+      currentUid
+        ? supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", currentUid)
+        : Promise.resolve({ data: [] }),
+      turnosQuery,
+      supabase.from("profiles").select("id, full_name").eq("role", "professional"),
+      supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency"),
+    ]);
+
+    setBlockedDates(blocked || []);
+    if (vista === "dia") setTurnos(turnosData || []);
+    else setTurnosSemana(turnosData || []);
     setProfesionales(profs || []);
-    const { data: svs } = await supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency");
     setServicios(svs || []);
     setLoading(false);
   };
@@ -215,27 +218,62 @@ export default function Agenda() {
   const accionPago = async (tipo) => {
     setSavingPago(true);
     const t = turnoSeleccionado;
+    const ahora = new Date().toISOString();
+
     if (tipo === "confirmar_sena") {
       const pago = pagosDelTurno.find(p => p.type === "seña");
-      if (pago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pago.id);
-      const saldo = Math.round(parseFloat(t.total_price) / 2);
-      await supabase.from("payments").insert({ appointment_id: t.id, type: "saldo", amount: saldo, status: "pending" });
-      await supabase.from("appointments").update({ status: "partial" }).eq("id", t.id);
+      if (pago) {
+        const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", pago.id);
+        if (error) { alert("No se pudo confirmar la seña: " + error.message); setSavingPago(false); return; }
+      }
+      // El saldo es total menos la seña real (no la mitad exacta, que se
+      // desviaba $1 con precios especiales impares). Si ya existe uno —
+      // por ejemplo porque "Pagó todo" se usó antes— no se duplica.
+      const saldoExistente = pagosDelTurno.find(p => p.type === "saldo");
+      if (!saldoExistente) {
+        const saldo = Math.round(parseFloat(t.total_price || 0) - parseFloat(pago?.amount || 0));
+        if (saldo > 0) {
+          const { error } = await supabase.from("payments").insert({ appointment_id: t.id, type: "saldo", amount: saldo, status: "pending" });
+          if (error) { alert("No se pudo registrar el saldo: " + error.message); setSavingPago(false); return; }
+        }
+      }
+      const { error: errEstado } = await supabase.from("appointments").update({ status: "partial" }).eq("id", t.id);
+      if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setSavingPago(false); return; }
       fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: t.id }) });
     } else if (tipo === "confirmar_saldo") {
       const pago = pagosDelTurno.find(p => p.type === "saldo");
-      if (pago) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pago.id);
-      await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+      if (pago) {
+        const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", pago.id);
+        if (error) { alert("No se pudo confirmar el saldo: " + error.message); setSavingPago(false); return; }
+      }
+      const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+      if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setSavingPago(false); return; }
     } else if (tipo === "pago_completo") {
       const pagoSena = pagosDelTurno.find(p => p.type === "seña");
-      if (pagoSena) await supabase.from("payments").update({ status: "paid", paid_at: new Date().toISOString() }).eq("id", pagoSena.id);
-      const saldoRestante = Math.round(parseFloat(t.total_price || 0) - parseFloat(pagoSena?.amount || 0));
-      if (saldoRestante > 0) await supabase.from("payments").insert({ appointment_id: t.id, type: "saldo", amount: saldoRestante, status: "paid", paid_at: new Date().toISOString() });
-      await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+      if (pagoSena) {
+        const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", pagoSena.id);
+        if (error) { alert("No se pudo confirmar la seña: " + error.message); setSavingPago(false); return; }
+      }
+      // Igual que arriba: si el saldo ya existe (venía de "Confirmar seña")
+      // se marca pagado en vez de insertar uno segundo.
+      const saldoExistente = pagosDelTurno.find(p => p.type === "saldo");
+      if (saldoExistente) {
+        const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", saldoExistente.id);
+        if (error) { alert("No se pudo confirmar el saldo: " + error.message); setSavingPago(false); return; }
+      } else {
+        const saldoRestante = Math.round(parseFloat(t.total_price || 0) - parseFloat(pagoSena?.amount || 0));
+        if (saldoRestante > 0) {
+          const { error } = await supabase.from("payments").insert({ appointment_id: t.id, type: "saldo", amount: saldoRestante, status: "paid", paid_at: ahora });
+          if (error) { alert("No se pudo registrar el saldo: " + error.message); setSavingPago(false); return; }
+        }
+      }
+      const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+      if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setSavingPago(false); return; }
       fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: t.id }) });
     } else if (tipo === "cancelar_sin_devolucion") {
       if (!window.confirm("¿Cancelar el turno sin devolver la seña?")) { setSavingPago(false); return; }
-      await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
+      const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
+      if (error) { alert("No se pudo cancelar: " + error.message); setSavingPago(false); return; }
       await supabase.from("payments").update({ status: "cancelled" }).eq("appointment_id", t.id);
       cerrarTurno();
       await cargarDatos();
@@ -243,7 +281,8 @@ export default function Agenda() {
       return;
     } else if (tipo === "cancelar_con_devolucion") {
       if (!window.confirm("¿Cancelar el turno y marcar la seña como devuelta?")) { setSavingPago(false); return; }
-      await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
+      const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);
+      if (error) { alert("No se pudo cancelar: " + error.message); setSavingPago(false); return; }
       await supabase.from("payments").update({ status: "refunded" }).eq("appointment_id", t.id);
       cerrarTurno();
       await cargarDatos();
@@ -252,7 +291,8 @@ export default function Agenda() {
     } else if (tipo === "eliminar") {
       if (!window.confirm("¿Eliminar este turno definitivamente? Esta acción no se puede deshacer.")) { setSavingPago(false); return; }
       await supabase.from("payments").delete().eq("appointment_id", t.id);
-      await supabase.from("appointments").delete().eq("id", t.id);
+      const { error } = await supabase.from("appointments").delete().eq("id", t.id);
+      if (error) { alert("No se pudo eliminar: " + error.message); setSavingPago(false); return; }
       cerrarTurno();
       await cargarDatos();
       setSavingPago(false);

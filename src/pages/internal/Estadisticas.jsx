@@ -139,18 +139,24 @@ export default function Estadisticas() {
       + asistentesGrupales.filter(a => a.currency === "ARS").length;
     const promedioSesion = arsCount > 0 ? Math.round(ingresoARS / arsCount) : 0;
 
+    // El total de cada servicio/cliente se guarta por moneda: un servicio
+    // como "Registros Akashicos" se vende en ARS, USD y EUR según el
+    // cliente, así que sumar todo junto daba un número sin sentido
+    // (pesos y dólares mezclados bajo el mismo total).
+    const sumarEn = (obj, cur, monto) => { obj[cur || "ARS"] = (obj[cur || "ARS"] || 0) + monto; };
+
     const servMap = {};
     sesiones.forEach(a => {
       const n = a.services?.name || "Sin servicio";
-      if (!servMap[n]) servMap[n] = { count: 0, total: 0 };
+      if (!servMap[n]) servMap[n] = { count: 0, totalByCurrency: {} };
       servMap[n].count++;
-      servMap[n].total += parseFloat(a.total_price || 0);
+      sumarEn(servMap[n].totalByCurrency, a.services?.currency, parseFloat(a.total_price || 0));
     });
     asistentesGrupales.forEach(a => {
       const n = a.evento || "Evento grupal";
-      if (!servMap[n]) servMap[n] = { count: 0, total: 0 };
+      if (!servMap[n]) servMap[n] = { count: 0, totalByCurrency: {} };
       servMap[n].count++;
-      servMap[n].total += a.monto;
+      sumarEn(servMap[n].totalByCurrency, a.currency, a.monto);
     });
     const servicios = Object.entries(servMap).map(([nombre, v]) => ({ nombre, ...v })).sort((a, b) => b.count - a.count);
 
@@ -161,15 +167,15 @@ export default function Estadisticas() {
     sesiones.forEach(a => {
       const id = a.client_id;
       const n = a.clients?.full_name || "Cliente";
-      if (!cliMap[id]) cliMap[id] = { nombre: n, count: 0, total: 0 };
+      if (!cliMap[id]) cliMap[id] = { nombre: n, count: 0, totalByCurrency: {} };
       cliMap[id].count++;
-      cliMap[id].total += parseFloat(a.total_price || 0);
+      sumarEn(cliMap[id].totalByCurrency, a.services?.currency, parseFloat(a.total_price || 0));
     });
     asistentesGrupales.forEach(a => {
       const id = `grupal:${a.nombre?.trim().toLowerCase()}`;
-      if (!cliMap[id]) cliMap[id] = { nombre: a.nombre || "Sin nombre", count: 0, total: 0 };
+      if (!cliMap[id]) cliMap[id] = { nombre: a.nombre || "Sin nombre", count: 0, totalByCurrency: {} };
       cliMap[id].count++;
-      cliMap[id].total += a.monto;
+      sumarEn(cliMap[id].totalByCurrency, a.currency, a.monto);
     });
     const topClientes = Object.values(cliMap).sort((a, b) => b.count - a.count).slice(0, 5);
 
@@ -237,6 +243,15 @@ export default function Estadisticas() {
 
   const barColors = ["#9B72C0", "#C4A8D8", "#D8B8E8", "#EDE8FA"];
 
+  const fmtMonedas = (byCurrency) => {
+    const entradas = Object.entries(byCurrency || {}).filter(([, v]) => v > 0);
+    if (entradas.length === 0) return "$0";
+    return entradas.map(([cur, val]) => {
+      const sym = cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+      return `${sym}${val.toLocaleString("es-AR")}`;
+    }).join(" · ");
+  };
+
   return (
     <div style={s.main}>
       <div style={s.topbar}>
@@ -282,7 +297,7 @@ export default function Estadisticas() {
                   </div>
                   <div style={{ textAlign: "right", minWidth: "80px" }}>
                     <div style={s.rowValue}>{sv.count} ses.</div>
-                    <div style={s.rowSub}>${sv.total.toLocaleString("es-AR")}</div>
+                    <div style={s.rowSub}>{fmtMonedas(sv.totalByCurrency)}</div>
                   </div>
                 </div>
               ))}
@@ -320,7 +335,7 @@ export default function Estadisticas() {
                   <div style={s.rowName}>{c.nombre}</div>
                   <div style={{ textAlign: "right" }}>
                     <div style={s.rowValue}>{c.count} ses.</div>
-                    <div style={s.rowSub}>${c.total.toLocaleString("es-AR")}</div>
+                    <div style={s.rowSub}>{fmtMonedas(c.totalByCurrency)}</div>
                   </div>
                 </div>
               ))}

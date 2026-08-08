@@ -28,6 +28,8 @@ const s = {
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
 };
 
+const symFor = (cur) => cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+
 const metrics = [
   { key: "cobradoHoy",      label: "Cobrado hoy",       color: "#63B522", prefix: "$", sub: null },
   { key: "saldosPendientes",label: "Saldos pendientes",  color: "#F59E0B", prefix: "$", subKey: "saldosCount" },
@@ -40,7 +42,7 @@ export default function Cobros() {
   const [pendientes, setPendientes] = useState([]);
   const [saldos, setSaldos] = useState([]);
   const [historial, setHistorial] = useState([]);
-  const [stats, setStats] = useState({ cobradoHoy: 0, saldosPendientes: 0, estesMes: 0, cancelaciones: 0 });
+  const [stats, setStats] = useState({ cobradoHoy: {}, saldosPendientes: {}, estesMes: {}, cancelaciones: 0 });
   const [loading, setLoading] = useState(true);
   const [subiendoSaldo, setSubiendoSaldo] = useState(null);
   const [procesando, setProcesando] = useState(null);
@@ -51,58 +53,73 @@ export default function Cobros() {
     const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth()+1).padStart(2,"0")}-${String(ahora.getDate()).padStart(2,"0")}`;
     const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString().split("T")[0];
 
-    // Las limpiezas se gestionan en su propia sección, así que no se
-    // duplican como filas acá. Su plata igual suma en las métricas.
-    const { data: svsLimpieza } = await supabase
-      .from("services")
-      .select("id")
-      .ilike("name", "%limpieza%");
+    // Las 5 consultas no dependen una de otra: se disparan todas juntas en
+    // vez de esperar en cadena, para que la pantalla cargue de una.
+    const [{ data: svsLimpieza }, { data: turnos }, { data: pagosSaldo }, { data: confirmados }, { data: eventos }] = await Promise.all([
+      // Las limpiezas se gestionan en su propia sección, así que no se
+      // duplican como filas acá. Su plata igual suma en las métricas.
+      supabase.from("services").select("id").ilike("name", "%limpieza%"),
+      supabase
+        .from("appointments")
+        .select("id, date, start_time, status, total_price, modality, service_id, clients(full_name), services(name, currency), profiles(full_name), payments(id, receipt_url, type, status)")
+        .in("status", ["pending", "partial"])
+        .order("date", { ascending: true }),
+      supabase
+        .from("payments")
+        .select("id, amount, receipt_url, appointment_id, appointments(id, date, start_time, total_price, service_id, clients(full_name), services(name, currency), profiles(full_name))")
+        .eq("type", "saldo")
+        .eq("status", "pending")
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("appointments")
+        .select("id, date, start_time, status, total_price, service_id, clients(full_name), services(name, currency), payments(receipt_url, type)")
+        .in("status", ["confirmed", "cancelled"])
+        .order("date", { ascending: false })
+        .limit(50),
+      // Los cursos y eventos grupales también son ingresos: se suman a las
+      // métricas para que la facturación no quede partida entre pantallas.
+      supabase.from("group_events").select("id, name, date, price, currency, group_attendees(status, custom_price)"),
+    ]);
+
     const idsLimpieza = new Set((svsLimpieza || []).map(sv => sv.id));
     const noEsLimpieza = (serviceId) => !idsLimpieza.has(serviceId);
 
-    const { data: turnos } = await supabase
-      .from("appointments")
-      .select("id, date, start_time, status, total_price, modality, service_id, clients(full_name), services(name), profiles(full_name), payments(id, receipt_url, type, status)")
-      .in("status", ["pending", "partial"])
-      .order("date", { ascending: true });
     const conSenaPendiente = (turnos || [])
       .filter(t => noEsLimpieza(t.service_id))
       .filter(t => t.payments?.some(p => p.type === "seña" && p.status === "pending"));
     setPendientes(conSenaPendiente);
 
-    const { data: pagosSaldo } = await supabase
-      .from("payments")
-      .select("id, amount, receipt_url, appointment_id, appointments(id, date, start_time, total_price, service_id, clients(full_name), services(name), profiles(full_name))")
-      .eq("type", "saldo")
-      .eq("status", "pending")
-      .order("created_at", { ascending: true });
     setSaldos((pagosSaldo || []).filter(p => noEsLimpieza(p.appointments?.service_id)));
-
-    const { data: confirmados } = await supabase
-      .from("appointments")
-      .select("id, date, start_time, status, total_price, service_id, clients(full_name), services(name), payments(receipt_url, type)")
-      .in("status", ["confirmed", "cancelled"])
-      .order("date", { ascending: false })
-      .limit(50);
     setHistorial((confirmados || []).filter(t => noEsLimpieza(t.service_id)));
 
-    // Los cursos y eventos grupales también son ingresos: se suman a las
-    // métricas para que la facturación no quede partida entre pantallas.
-    const { data: eventos } = await supabase
-      .from("group_events")
-      .select("id, name, date, price, currency, group_attendees(status, custom_price)");
     const asistentesGrupales = (eventos || []).flatMap(ev =>
-      (ev.group_attendees || []).map(a => ({ status: a.status, date: ev.date, monto: parseFloat(a.custom_price ?? ev.price ?? 0) }))
+      (ev.group_attendees || []).map(a => ({ status: a.status, date: ev.date, currency: ev.currency || "ARS", monto: parseFloat(a.custom_price ?? ev.price ?? 0) }))
     );
-    const grupalCobradoHoy = asistentesGrupales.filter(a => a.status === "paid" && a.date === hoy).reduce((s, a) => s + a.monto, 0);
-    const grupalEsteMes = asistentesGrupales.filter(a => a.status === "paid" && a.date >= inicioMes).reduce((s, a) => s + a.monto, 0);
-    const grupalPendiente = asistentesGrupales.filter(a => a.status === "pending").reduce((s, a) => s + a.monto, 0);
 
-    const cobradoHoy = (confirmados || []).filter(t => t.date === hoy && t.status === "confirmed").reduce((sum, t) => sum + parseFloat(t.total_price || 0), 0) + grupalCobradoHoy;
-    const saldosPendientes = (pagosSaldo || []).reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) + grupalPendiente;
-    const estesMes = (confirmados || []).filter(t => t.date >= inicioMes && t.status === "confirmed").reduce((sum, t) => sum + parseFloat(t.total_price || 0), 0) + grupalEsteMes;
+    // Cada total se acumula por moneda: sumar pesos, dólares y euros en un
+    // solo número no significa nada (habíamos armado "$90.065" a partir de
+    // $90.000 + U$S65, mezclando dos monedas como si fueran la misma).
+    const sumarEn = (obj, cur, monto) => { obj[cur || "ARS"] = (obj[cur || "ARS"] || 0) + monto; };
+
+    const cobradoHoy = {};
+    const estesMes = {};
+    (confirmados || []).forEach(t => {
+      if (t.status !== "confirmed") return;
+      const cur = t.services?.currency || "ARS";
+      if (t.date === hoy) sumarEn(cobradoHoy, cur, parseFloat(t.total_price || 0));
+      if (t.date >= inicioMes) sumarEn(estesMes, cur, parseFloat(t.total_price || 0));
+    });
+    asistentesGrupales.forEach(a => {
+      if (a.status !== "paid") return;
+      if (a.date === hoy) sumarEn(cobradoHoy, a.currency, a.monto);
+      if (a.date >= inicioMes) sumarEn(estesMes, a.currency, a.monto);
+    });
+
+    const saldosPendientes = {};
+    (pagosSaldo || []).forEach(p => sumarEn(saldosPendientes, p.appointments?.services?.currency, parseFloat(p.amount || 0)));
+    asistentesGrupales.filter(a => a.status === "pending").forEach(a => sumarEn(saldosPendientes, a.currency, a.monto));
+
     const cancelaciones = (confirmados || []).filter(t => t.status === "cancelled").length;
-
     const grupalPendientesCount = asistentesGrupales.filter(a => a.status === "pending").length;
     // El contador acompaña al monto: cuenta todos los saldos pendientes
     // (incluidas limpiezas, que no se listan acá) más los de grupales.
@@ -223,10 +240,19 @@ export default function Cobros() {
     cargar();
   };
 
+  const fmtMonedas = (byCurrency) => {
+    const entradas = Object.entries(byCurrency || {}).filter(([, v]) => v > 0);
+    if (entradas.length === 0) return "$0";
+    return entradas.map(([cur, val]) => {
+      const sym = cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+      return `${sym}${val.toLocaleString("es-AR")}`;
+    }).join(" · ");
+  };
+
   const metricValues = {
-    cobradoHoy: `$${stats.cobradoHoy.toLocaleString("es-AR")}`,
-    saldosPendientes: `$${stats.saldosPendientes.toLocaleString("es-AR")}`,
-    estesMes: `$${stats.estesMes.toLocaleString("es-AR")}`,
+    cobradoHoy: fmtMonedas(stats.cobradoHoy),
+    saldosPendientes: fmtMonedas(stats.saldosPendientes),
+    estesMes: fmtMonedas(stats.estesMes),
     cancelaciones: stats.cancelaciones,
   };
 
@@ -271,7 +297,7 @@ export default function Cobros() {
                   <div style={{ flex: 1, minWidth: "180px" }}>
                     <div style={s.cobroNombre}>{t.clients?.full_name}</div>
                     <div style={s.cobroDetalle}>{t.services?.name} · {cuando(t.date, t.start_time)}</div>
-                    <div style={{ ...s.cobroDetalle, color: "#D97706", marginTop: "2px", fontWeight: "500" }}>Seña: ${(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</div>
+                    <div style={{ ...s.cobroDetalle, color: "#D97706", marginTop: "2px", fontWeight: "500" }}>Seña: {symFor(t.services?.currency)}{(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</div>
                     {t.payments?.find(p => p.type === "seña")?.receipt_url && (
                       <a href={t.payments.find(p => p.type === "seña").receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                         📎 Ver comprobante
@@ -314,7 +340,7 @@ export default function Cobros() {
                     )}
                   </div>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                    <div style={s.cobroMonto}>${parseFloat(p.amount || 0).toLocaleString("es-AR")}</div>
+                    <div style={s.cobroMonto}>{symFor(p.appointments?.services?.currency)}{parseFloat(p.amount || 0).toLocaleString("es-AR")}</div>
                     <label style={{ display: "flex", alignItems: "center", gap: "4px", padding: "6px 10px", background: p.receipt_url ? "#EAF3DE" : "#fff", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", color: p.receipt_url ? "#3B6D11" : "#9B72C0", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       {subiendoSaldo === p.id ? "Subiendo..." : p.receipt_url ? "✅ Adjunto" : "📎 Adjuntar"}
                       <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(p.id, p.appointment_id, "saldo", e.target.files[0])} />
@@ -346,7 +372,7 @@ export default function Cobros() {
                     {t.status === "confirmed" ? "✓ Confirmado" : "Cancelado"}
                   </span>
                   <div style={{ ...s.cobroMonto, color: t.status === "confirmed" ? "#3B6D11" : "#A32D2D" }}>
-                    ${parseFloat(t.total_price || 0).toLocaleString("es-AR")}
+                    {symFor(t.services?.currency)}{parseFloat(t.total_price || 0).toLocaleString("es-AR")}
                   </div>
                 </div>
               ))
