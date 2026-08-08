@@ -70,7 +70,7 @@ export default function Estadisticas() {
     // los turnos agendados a futuro y se contaban como "sesiones realizadas".
     const hastaISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
 
-    const [{ data: appts }, { data: eventos }, { data: futuros }, { data: eventosFuturos }] = await Promise.all([
+    const [{ data: appts }, { data: eventos }, { data: futuros }, { data: eventosFuturos }, { data: svsLimpieza }] = await Promise.all([
       supabase
         .from("appointments")
         .select("*, clients(full_name), services(name, price, currency)")
@@ -97,9 +97,15 @@ export default function Estadisticas() {
         .select("price, currency, group_attendees(status, custom_price)")
         .eq("professional_id", uid)
         .gt("date", hastaISO),
+      supabase.from("services").select("id").ilike("name", "%limpieza%"),
     ]);
 
-    const sesiones = appts || [];
+    // Una limpieza con fecha pasada pero que todavía no se marcó "hecha" no
+    // es una sesión realizada: sin este filtro sumaba igual que un turno de
+    // Agenda ya dado, inflando el total y la plata aunque el trabajo esté
+    // pendiente.
+    const idsLimpieza = new Set((svsLimpieza || []).map(sv => sv.id));
+    const sesiones = (appts || []).filter(a => !idsLimpieza.has(a.service_id) || a.completed_at);
     // Cada persona anotada a un curso/evento grupal cuenta como una sesión
     // más. La cortesía se cuenta como sesión pero no suma ingreso.
     const asistentesGrupales = (eventos || []).flatMap(ev =>
