@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { enviarWhatsApp } from "./_lib/whatsapp.js";
+import { requireProfesional } from "./_lib/auth.js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -8,6 +9,10 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+  // Solo lo llaman las pantallas internas (Agenda, Cobros, Limpiezas) tras
+  // loguearse; nunca la reserva pública. Antes cualquiera podía mandar un
+  // mensaje real de WhatsApp (con costo) a cualquier appointmentId adivinado.
+  if (!(await requireProfesional(req, supabase))) return res.status(401).json({ error: "No autorizado" });
 
   try {
     const { appointmentId } = req.body;
@@ -26,7 +31,7 @@ export default async function handler(req, res) {
 
     if (error) throw error;
 
-    const celular = turno?.clients?.phone?.replace(/\D/g, "");
+    const celular = turno?.clients?.phone;
     if (!celular) return res.status(200).json({ ok: false, motivo: "Cliente sin celular cargado" });
 
     const fecha = turno.date

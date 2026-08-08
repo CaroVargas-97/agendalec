@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { authHeaders } from "../../utils/apiAuth";
 import { cuando } from "../../utils/fecha";
 
 const s = {
@@ -159,7 +160,7 @@ export default function Cobros() {
     const { error: errEstado } = await supabase.from("appointments").update({ status: "partial" }).eq("id", id);
     if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setProcesando(null); return; }
 
-    fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: id }) });
+    authHeaders().then(headers => fetch("/api/confirmar-turno", { method: "POST", headers, body: JSON.stringify({ appointmentId: id }) }));
     setProcesando(null);
     cargar();
   };
@@ -195,7 +196,7 @@ export default function Cobros() {
     const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", id);
     if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setProcesando(null); return; }
 
-    fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: id }) });
+    authHeaders().then(headers => fetch("/api/confirmar-turno", { method: "POST", headers, body: JSON.stringify({ appointmentId: id }) }));
     setProcesando(null);
     cargar();
   };

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { authHeaders } from "../../utils/apiAuth";
 import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 import { cuando } from "../../utils/fecha";
 
@@ -239,7 +240,7 @@ export default function Agenda() {
       }
       const { error: errEstado } = await supabase.from("appointments").update({ status: "partial" }).eq("id", t.id);
       if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setSavingPago(false); return; }
-      fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: t.id }) });
+      authHeaders().then(headers => fetch("/api/confirmar-turno", { method: "POST", headers, body: JSON.stringify({ appointmentId: t.id }) }));
     } else if (tipo === "confirmar_saldo") {
       const pago = pagosDelTurno.find(p => p.type === "saldo");
       if (pago) {
@@ -269,7 +270,7 @@ export default function Agenda() {
       }
       const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
       if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setSavingPago(false); return; }
-      fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: t.id }) });
+      authHeaders().then(headers => fetch("/api/confirmar-turno", { method: "POST", headers, body: JSON.stringify({ appointmentId: t.id }) }));
     } else if (tipo === "cancelar_sin_devolucion") {
       if (!window.confirm("¿Cancelar el turno sin devolver la seña?")) { setSavingPago(false); return; }
       const { error } = await supabase.from("appointments").update({ status: "cancelled" }).eq("id", t.id);

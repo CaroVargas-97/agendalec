@@ -67,8 +67,9 @@ export default function Registro({ onLogin }) {
     setLoading(true);
     setError("");
 
-    const { data: cfg } = await supabase.from("app_config").select("value").eq("key", "invite_code").maybeSingle();
-    if (!cfg?.value || codigo.trim() !== cfg.value.trim()) {
+    const resCodigo = await fetch("/api/verificar-codigo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ codigo }) });
+    const { valido } = await resCodigo.json();
+    if (!valido) {
       setError("Código de acceso incorrecto.");
       setLoading(false);
       return;

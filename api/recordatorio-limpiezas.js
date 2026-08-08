@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { requireCron } from "./_lib/auth.js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -22,6 +23,7 @@ const listarNombres = (nombres) => {
 };
 
 export default async function handler(req, res) {
+  if (!requireCron(req)) return res.status(401).json({ error: "No autorizado" });
   try {
     if (!process.env.VAPID_PRIVATE_KEY) {
       return res.status(500).json({ error: "Falta configurar VAPID_PRIVATE_KEY" });

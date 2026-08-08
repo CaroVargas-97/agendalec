@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { requireProfesional } from "./_lib/auth.js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -6,6 +7,12 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  // Sin esto, cualquiera que encontrara la URL podía crear una cuenta con
+  // acceso total o borrar la de otro profesional (turnos, pagos, todo) sin
+  // loguearse siquiera.
+  const solicitante = await requireProfesional(req, supabase);
+  if (!solicitante) return res.status(401).json({ error: "No autorizado" });
+
   if (req.method === "POST") {
     const { nombre, email, password } = req.body;
     if (!nombre || !email || !password)

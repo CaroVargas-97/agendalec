@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { authHeaders } from "../../utils/apiAuth";
 import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 
 const s = {
@@ -169,7 +170,7 @@ export default function Limpiezas() {
       if (!yaHaySaldo) await supabase.from("payments").insert({ appointment_id: l.id, type: "saldo", amount: saldo, status: "pending" });
     }
     await supabase.from("appointments").update({ status: "partial" }).eq("id", l.id);
-    fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: l.id }) });
+    authHeaders().then(headers => fetch("/api/confirmar-turno", { method: "POST", headers, body: JSON.stringify({ appointmentId: l.id }) }));
     await cargar();
   };
 
@@ -187,7 +188,7 @@ export default function Limpiezas() {
       if (restante > 0) await supabase.from("payments").insert({ appointment_id: l.id, type: "saldo", amount: restante, status: "paid", paid_at: ahora });
     }
     await supabase.from("appointments").update({ status: "confirmed" }).eq("id", l.id);
-    fetch("/api/confirmar-turno", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ appointmentId: l.id }) });
+    authHeaders().then(headers => fetch("/api/confirmar-turno", { method: "POST", headers, body: JSON.stringify({ appointmentId: l.id }) }));
     await cargar();
   };
 

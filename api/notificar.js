@@ -19,6 +19,19 @@ export default async function handler(req, res) {
 
     const { professionalId, title, body, url } = req.body || {};
     if (!professionalId || !body) return res.status(400).json({ error: "Faltan datos" });
+    // Este endpoint lo llama la reserva pública sin login (así el
+    // profesional se entera al toque de una reserva nueva), así que no se
+    // le puede pedir sesión. Al menos se limita el largo del texto: sin
+    // esto, cualquiera podía mandar contenido arbitrario y del tamaño que
+    // quisiera a las notificaciones de un profesional.
+    if (String(title || "").length > 100 || String(body).length > 300) {
+      return res.status(400).json({ error: "Texto demasiado largo" });
+    }
+
+    // Si el professionalId no corresponde a un profesional real, no hay
+    // nada que notificar — corta acá en vez de seguir con datos inventados.
+    const { data: prof } = await supabase.from("profiles").select("id").eq("id", professionalId).eq("role", "professional").maybeSingle();
+    if (!prof) return res.status(200).json({ ok: true, enviados: 0 });
 
     const { data: subs, error } = await supabase
       .from("push_subscriptions")
