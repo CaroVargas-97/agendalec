@@ -100,7 +100,7 @@ export default function Reserva() {
   const [modalityOverrides, setModalityOverrides] = useState([]);
 
   useEffect(() => {
-    supabase.from("profiles").select("id, full_name, email, address, phone, reservas_pausadas").eq("role", "professional")
+    supabase.from("public_profiles").select("id, full_name, address, phone, reservas_pausadas")
       .then(({ data }) => {
         const profs = data || [];
         setProfesionales(profs);
