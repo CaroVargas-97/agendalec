@@ -73,7 +73,7 @@ export default function Agenda() {
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
   const [editandoTurno, setEditandoTurno] = useState(false);
-  const [editTurnoForm, setEditTurnoForm] = useState({ fecha: "", hora: "", modalidad: "presencial", notas: "" });
+  const [editTurnoForm, setEditTurnoForm] = useState({ fecha: "", hora: "", modalidad: "presencial", notas: "", servicioId: "" });
   const [editTurnoError, setEditTurnoError] = useState("");
   const [savingEditTurno, setSavingEditTurno] = useState(false);
   const [horaActual, setHoraActual] = useState(new Date());
@@ -133,7 +133,7 @@ export default function Agenda() {
         : Promise.resolve({ data: [] }),
       turnosQuery,
       supabase.from("profiles").select("id, full_name").eq("role", "professional"),
-      supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency"),
+      supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency, requires_slot"),
     ]);
 
     setBlockedDates(blocked || []);
@@ -158,7 +158,7 @@ export default function Agenda() {
     setLoadingPagos(true);
     const [{ data: pagos }, { data: turnoCompleto }] = await Promise.all([
       supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at"),
-      supabase.from("appointments").select("*, clients(full_name, phone), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single(),
+      supabase.from("appointments").select("*, clients(full_name, phone, price_type, custom_price), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single(),
     ]);
     setTurnoSeleccionado(turnoCompleto || t);
     setPagosDelTurno(pagos || []);
@@ -174,6 +174,7 @@ export default function Agenda() {
       hora: t.start_time ? t.start_time.slice(0, 5) : "",
       modalidad: t.modality || "presencial",
       notas: t.notes || "",
+      servicioId: t.service_id || "",
     });
     setEditTurnoError("");
     setEditandoTurno(true);
@@ -182,7 +183,9 @@ export default function Agenda() {
   const guardarEdicionTurno = async () => {
     setEditTurnoError("");
     const t = turnoSeleccionado;
-    const esACoordinarTurno = !t.services?.duration_minutes;
+    const nuevoServicio = servicios.find(sv => sv.id === editTurnoForm.servicioId) || t.services;
+    if (!nuevoServicio) { setEditTurnoError("Elegí un tipo de sesión."); return; }
+    const esACoordinarTurno = nuevoServicio.requires_slot === false;
     if (!esACoordinarTurno && (!editTurnoForm.fecha || !editTurnoForm.hora)) {
       setEditTurnoError("Completá fecha y hora."); return;
     }
@@ -191,11 +194,21 @@ export default function Agenda() {
     let endTime = null;
     if (!esACoordinarTurno) {
       const [h, m] = editTurnoForm.hora.split(":").map(Number);
-      const endMin = h * 60 + m + t.services.duration_minutes;
+      const endMin = h * 60 + m + nuevoServicio.duration_minutes;
       endTime = `${String(Math.floor(endMin / 60)).padStart(2, "0")}:${String(endMin % 60).padStart(2, "0")}`;
     }
 
+    // Si cambia el tipo de sesión, el precio total se recalcula con el
+    // mismo precio especial/cortesía del cliente si tiene uno cargado —
+    // los pagos ya registrados (seña/saldo) no se tocan solos.
+    const cliente = t.clients;
+    const precio = cliente?.price_type === "cortesia" ? (cliente.custom_price ?? 0)
+      : cliente?.price_type === "especial" && cliente.custom_price != null ? cliente.custom_price
+      : nuevoServicio.price;
+
     const { error } = await supabase.from("appointments").update({
+      service_id: nuevoServicio.id,
+      total_price: precio,
       date: editTurnoForm.fecha || null,
       start_time: esACoordinarTurno ? null : editTurnoForm.hora,
       end_time: endTime,
@@ -209,7 +222,7 @@ export default function Agenda() {
       return;
     }
 
-    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name, phone), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
+    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name, phone, price_type, custom_price), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
     setTurnoSeleccionado(turnoActualizado);
     setSavingEditTurno(false);
     setEditandoTurno(false);
@@ -300,7 +313,7 @@ export default function Agenda() {
       return;
     }
     const { data: pagosActualizados } = await supabase.from("payments").select("*").eq("appointment_id", t.id).order("created_at");
-    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name, phone), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
+    const { data: turnoActualizado } = await supabase.from("appointments").select("*, clients(full_name, phone, price_type, custom_price), services(name, duration_minutes, price), profiles(full_name)").eq("id", t.id).single();
     setPagosDelTurno(pagosActualizados || []);
     setTurnoSeleccionado(turnoActualizado);
     await cargarDatos();
@@ -610,10 +623,21 @@ export default function Agenda() {
                   </div>
                 </div>
 
-                {editandoTurno && (
+                {editandoTurno && (() => {
+                  const servicioEditSeleccionado = servicios.find(sv => sv.id === editTurnoForm.servicioId);
+                  const esACoordinarEdit = servicioEditSeleccionado?.requires_slot === false;
+                  return (
                   <div style={{ background: "#F8F4FC", borderRadius: "10px", padding: "12px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Editar turno</div>
-                    {t.services?.duration_minutes ? (
+                    <div style={s.field}>
+                      <label style={s.label}>Tipo de sesión</label>
+                      <select value={editTurnoForm.servicioId} onChange={e => setEditTurnoForm({...editTurnoForm, servicioId: e.target.value})} style={s.input}>
+                        {servicios.filter(sv => sv.professional_id === t.professional_id).map(sv => (
+                          <option key={sv.id} value={sv.id}>{sv.name.trim()}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {!esACoordinarEdit ? (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                         <div style={s.field}><label style={s.label}>Fecha</label><input type="date" value={editTurnoForm.fecha} onChange={e => setEditTurnoForm({...editTurnoForm, fecha: e.target.value})} style={s.input} /></div>
                         <div style={s.field}><label style={s.label}>Hora</label><input type="time" value={editTurnoForm.hora} onChange={e => setEditTurnoForm({...editTurnoForm, hora: e.target.value})} style={s.input} /></div>
@@ -636,7 +660,8 @@ export default function Agenda() {
                       <button onClick={guardarEdicionTurno} disabled={savingEditTurno} style={{ ...s.saveBtn, flex: 1 }}>{savingEditTurno ? "Guardando..." : "Guardar"}</button>
                     </div>
                   </div>
-                )}
+                  );
+                })()}
 
                 {t.clients?.phone && (
                   <a href={linkWhatsApp(t.clients.phone)} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}>
