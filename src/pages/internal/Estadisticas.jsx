@@ -231,9 +231,9 @@ export default function Estadisticas() {
     const hastaISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
 
     const [{ data: appts }, { data: eventos }, { data: svsLimpieza }] = await Promise.all([
-      supabase.from("appointments").select("date, total_price, service_id, completed_at, services(name, currency)")
+      supabase.from("appointments").select("date, total_price, service_id, client_id, modality, completed_at, services(name, currency)")
         .eq("professional_id", uid).gte("date", desdeISO).lte("date", hastaISO).neq("status", "cancelled"),
-      supabase.from("group_events").select("name, date, price, currency, group_attendees(status, custom_price)")
+      supabase.from("group_events").select("name, date, price, currency, group_attendees(full_name, status, custom_price)")
         .eq("professional_id", uid).gte("date", desdeISO).lte("date", hastaISO),
       supabase.from("services").select("id").ilike("name", "%limpieza%"),
     ]);
@@ -242,27 +242,35 @@ export default function Estadisticas() {
     const sesiones = (appts || []).filter(a => !idsLimpieza.has(a.service_id) || a.completed_at);
 
     const meses = {};
-    const sumar = (mesKey, servicio, currency, monto) => {
-      if (!meses[mesKey]) meses[mesKey] = { sesiones: 0, ingresos: {}, servicios: {} };
-      meses[mesKey].sesiones++;
-      meses[mesKey].ingresos[currency] = (meses[mesKey].ingresos[currency] || 0) + monto;
-      meses[mesKey].servicios[servicio] = (meses[mesKey].servicios[servicio] || 0) + 1;
+    const sumar = (mesKey, servicio, currency, monto, clienteId, esCortesia, modality) => {
+      if (!meses[mesKey]) meses[mesKey] = { sesiones: 0, ingresos: {}, servicios: {}, clientes: new Set(), cortesias: 0, virtual: 0, presencial: 0 };
+      const mes = meses[mesKey];
+      mes.sesiones++;
+      mes.ingresos[currency] = (mes.ingresos[currency] || 0) + monto;
+      mes.servicios[servicio] = (mes.servicios[servicio] || 0) + 1;
+      if (clienteId) mes.clientes.add(clienteId);
+      if (esCortesia) mes.cortesias++;
+      if (modality === "virtual") mes.virtual++;
+      else if (modality === "presencial") mes.presencial++;
     };
 
     sesiones.forEach(a => {
-      sumar(a.date.slice(0, 7), a.services?.name?.trim() || "Sin servicio", a.services?.currency || "ARS", parseFloat(a.total_price || 0));
+      sumar(a.date.slice(0, 7), a.services?.name?.trim() || "Sin servicio", a.services?.currency || "ARS", parseFloat(a.total_price || 0), a.client_id, parseFloat(a.total_price || 0) === 0, a.modality);
     });
     (eventos || []).forEach(ev => {
       if (!ev.date) return;
       (ev.group_attendees || []).forEach(at => {
         const monto = at.status === "cortesia" ? 0 : parseFloat(at.custom_price ?? ev.price ?? 0);
-        sumar(ev.date.slice(0, 7), ev.name, ev.currency || "ARS", monto);
+        sumar(ev.date.slice(0, 7), ev.name, ev.currency || "ARS", monto, `grupal:${at.full_name?.trim().toLowerCase()}`, at.status === "cortesia", null);
       });
     });
 
     const filas = Object.entries(meses).map(([mesKey, v]) => {
       const servicioTop = Object.entries(v.servicios).sort((a, b) => b[1] - a[1])[0];
-      return { mesKey, sesiones: v.sesiones, ingresos: v.ingresos, servicioTop: servicioTop?.[0] || "—" };
+      return {
+        mesKey, sesiones: v.sesiones, ingresos: v.ingresos, servicioTop: servicioTop?.[0] || "—",
+        clientesUnicos: v.clientes.size, cortesias: v.cortesias, virtual: v.virtual, presencial: v.presencial,
+      };
     }).sort((a, b) => b.mesKey.localeCompare(a.mesKey));
 
     setResumenMensual(filas);
@@ -277,12 +285,22 @@ export default function Estadisticas() {
   };
 
   const exportarCSV = () => {
-    const filas = [["Mes", "Sesiones", "Ingresos", "Servicio más solicitado"]];
+    // Excel en configuración regional Argentina/España espera ";" como
+    // separador de listas en un CSV, no ",": si se usa coma, Excel no
+    // reconoce las columnas y vuelca todo en una sola celda por fila. Los
+    // montos van como números simples (sin puntos de miles) por la misma
+    // razón — un separador de miles ambiguo según la configuración de
+    // cada Excel puede hacer que interprete mal la cifra.
+    const encabezado = ["Mes", "Sesiones", "Clientes únicos", "Cortesías", "Virtual", "Presencial", "Ingresos ARS", "Ingresos USD", "Ingresos EUR", "Servicio más solicitado"];
+    const filas = [encabezado];
     resumenMensual.forEach(m => {
-      const ingresosTxt = Object.entries(m.ingresos).map(([cur, val]) => `${cur} ${val.toLocaleString("es-AR")}`).join(" / ") || "0";
-      filas.push([nombreMes(m.mesKey), m.sesiones, ingresosTxt, m.servicioTop]);
+      filas.push([
+        nombreMes(m.mesKey), m.sesiones, m.clientesUnicos, m.cortesias, m.virtual, m.presencial,
+        Math.round(m.ingresos.ARS || 0), Math.round(m.ingresos.USD || 0), Math.round(m.ingresos.EUR || 0),
+        m.servicioTop,
+      ]);
     });
-    const csv = filas.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const csv = filas.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -451,8 +469,8 @@ export default function Estadisticas() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
-                      {["Mes", "Sesiones", "Ingresos", "Servicio más solicitado"].map(h => (
-                        <th key={h} style={{ fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "8px 10px", textAlign: h === "Mes" ? "left" : h === "Servicio más solicitado" ? "left" : "right", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                      {["Mes", "Sesiones", "Clientes únicos", "Cortesías", "Modalidad", "Ingresos", "Servicio más solicitado"].map(h => (
+                        <th key={h} style={{ fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "8px 10px", textAlign: h === "Mes" || h === "Servicio más solicitado" ? "left" : "right", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -461,6 +479,9 @@ export default function Estadisticas() {
                       <tr key={m.mesKey}>
                         <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textTransform: "capitalize", whiteSpace: "nowrap" }}>{nombreMes(m.mesKey)}</td>
                         <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{m.sesiones}</td>
+                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{m.clientesUnicos}</td>
+                        <td style={{ fontSize: "13px", color: "#A0407A", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{m.cortesias || "—"}</td>
+                        <td style={{ fontSize: "12px", color: "#B89FD0", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>📹{m.virtual} · 📍{m.presencial}</td>
                         <td style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{fmtMonedas(m.ingresos)}</td>
                         <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{m.servicioTop}</td>
                       </tr>
