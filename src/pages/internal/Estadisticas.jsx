@@ -52,6 +52,8 @@ export default function Estadisticas() {
     modalidad: { virtual: 0, presencial: 0 }, topClientes: [], diasPopulares: [],
     futuroByCurrency: {}, futuroCount: 0,
   });
+  const [resumenMensual, setResumenMensual] = useState([]);
+  const [loadingMensual, setLoadingMensual] = useState(true);
 
   const cargar = async () => {
     setLoading(true);
@@ -215,6 +217,81 @@ export default function Estadisticas() {
 
   useEffect(() => { cargar(); }, [periodo]);
 
+  // Resumen mes a mes: independiente del selector de período de arriba,
+  // siempre muestra los últimos 12 meses completos.
+  const cargarResumenMensual = async () => {
+    setLoadingMensual(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setLoadingMensual(false); return; }
+    const uid = session.user.id;
+
+    const hoy = new Date();
+    const desde = new Date(hoy.getFullYear(), hoy.getMonth() - 11, 1);
+    const desdeISO = `${desde.getFullYear()}-${String(desde.getMonth()+1).padStart(2,"0")}-01`;
+    const hastaISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
+
+    const [{ data: appts }, { data: eventos }, { data: svsLimpieza }] = await Promise.all([
+      supabase.from("appointments").select("date, total_price, service_id, completed_at, services(name, currency)")
+        .eq("professional_id", uid).gte("date", desdeISO).lte("date", hastaISO).neq("status", "cancelled"),
+      supabase.from("group_events").select("name, date, price, currency, group_attendees(status, custom_price)")
+        .eq("professional_id", uid).gte("date", desdeISO).lte("date", hastaISO),
+      supabase.from("services").select("id").ilike("name", "%limpieza%"),
+    ]);
+
+    const idsLimpieza = new Set((svsLimpieza || []).map(sv => sv.id));
+    const sesiones = (appts || []).filter(a => !idsLimpieza.has(a.service_id) || a.completed_at);
+
+    const meses = {};
+    const sumar = (mesKey, servicio, currency, monto) => {
+      if (!meses[mesKey]) meses[mesKey] = { sesiones: 0, ingresos: {}, servicios: {} };
+      meses[mesKey].sesiones++;
+      meses[mesKey].ingresos[currency] = (meses[mesKey].ingresos[currency] || 0) + monto;
+      meses[mesKey].servicios[servicio] = (meses[mesKey].servicios[servicio] || 0) + 1;
+    };
+
+    sesiones.forEach(a => {
+      sumar(a.date.slice(0, 7), a.services?.name?.trim() || "Sin servicio", a.services?.currency || "ARS", parseFloat(a.total_price || 0));
+    });
+    (eventos || []).forEach(ev => {
+      if (!ev.date) return;
+      (ev.group_attendees || []).forEach(at => {
+        const monto = at.status === "cortesia" ? 0 : parseFloat(at.custom_price ?? ev.price ?? 0);
+        sumar(ev.date.slice(0, 7), ev.name, ev.currency || "ARS", monto);
+      });
+    });
+
+    const filas = Object.entries(meses).map(([mesKey, v]) => {
+      const servicioTop = Object.entries(v.servicios).sort((a, b) => b[1] - a[1])[0];
+      return { mesKey, sesiones: v.sesiones, ingresos: v.ingresos, servicioTop: servicioTop?.[0] || "—" };
+    }).sort((a, b) => b.mesKey.localeCompare(a.mesKey));
+
+    setResumenMensual(filas);
+    setLoadingMensual(false);
+  };
+
+  useEffect(() => { cargarResumenMensual(); }, []);
+
+  const nombreMes = (mesKey) => {
+    const [y, m] = mesKey.split("-").map(Number);
+    return new Date(y, m - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  };
+
+  const exportarCSV = () => {
+    const filas = [["Mes", "Sesiones", "Ingresos", "Servicio más solicitado"]];
+    resumenMensual.forEach(m => {
+      const ingresosTxt = Object.entries(m.ingresos).map(([cur, val]) => `${cur} ${val.toLocaleString("es-AR")}`).join(" / ") || "0";
+      filas.push([nombreMes(m.mesKey), m.sesiones, ingresosTxt, m.servicioTop]);
+    });
+    const csv = filas.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `estadisticas-mensuales-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const totalMod = stats.modalidad.virtual + stats.modalidad.presencial;
   const pctV = totalMod > 0 ? Math.round((stats.modalidad.virtual / totalMod) * 100) : 0;
   const pctP = totalMod > 0 ? Math.round((stats.modalidad.presencial / totalMod) * 100) : 0;
@@ -355,6 +432,43 @@ export default function Estadisticas() {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div style={s.card}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <div style={s.cardTitle}>Resumen mes a mes (últimos 12 meses)</div>
+              <button onClick={exportarCSV} disabled={loadingMensual || resumenMensual.length === 0}
+                style={{ padding: "6px 14px", background: "#EDE8FA", color: "#5C3F99", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: "nowrap" }}>
+                ⬇ Exportar CSV
+              </button>
+            </div>
+            {loadingMensual ? (
+              <div style={s.emptyText}>Cargando...</div>
+            ) : resumenMensual.length === 0 ? (
+              <div style={s.emptyText}>Sin datos</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      {["Mes", "Sesiones", "Ingresos", "Servicio más solicitado"].map(h => (
+                        <th key={h} style={{ fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "8px 10px", textAlign: h === "Mes" ? "left" : h === "Servicio más solicitado" ? "left" : "right", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resumenMensual.map(m => (
+                      <tr key={m.mesKey}>
+                        <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textTransform: "capitalize", whiteSpace: "nowrap" }}>{nombreMes(m.mesKey)}</td>
+                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{m.sesiones}</td>
+                        <td style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{fmtMonedas(m.ingresos)}</td>
+                        <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{m.servicioTop}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}
