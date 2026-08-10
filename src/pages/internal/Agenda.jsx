@@ -612,8 +612,16 @@ export default function Agenda() {
             return (
               <div style={isMobile ? { ...s.panel, position: "fixed", inset: 0, maxWidth: "100%", borderRadius: 0, zIndex: 300, boxShadow: "none" } : s.panel}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>
-                    {isVirtual ? "📹" : "📍"} {t.clients?.full_name}
+                  <div>
+                    <div style={{ fontSize: "15px", fontWeight: "500", color: "#2A1845" }}>
+                      {isVirtual ? "📹" : "📍"} {t.clients?.full_name}
+                    </div>
+                    {t.clients?.price_type === "cortesia" && (
+                      <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FDE8F0", color: "#A0407A", marginTop: "4px", display: "inline-block" }}>🎁 Cortesía</span>
+                    )}
+                    {t.clients?.price_type === "especial" && (
+                      <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99", marginTop: "4px", display: "inline-block" }}>✨ Precio especial</span>
+                    )}
                   </div>
                   <div style={{ display: "flex", gap: "6px" }}>
                     {!isCancelled && !editandoTurno && (
