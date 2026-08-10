@@ -44,6 +44,7 @@ export default function Clientes() {
   const [busqueda, setBusqueda] = useState("");
   const [clientes, setClientes] = useState([]);
   const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [editDatos, setEditDatos] = useState({ nombre: "", celular: "", mail: "" });
   const [precioTipo, setPrecioTipo] = useState("normal");
   const [customPrice, setCustomPrice] = useState("");
   const [loading, setLoading] = useState(true);
@@ -72,6 +73,7 @@ export default function Clientes() {
 
   const abrirCliente = (c) => {
     setClienteSeleccionado(c);
+    setEditDatos({ nombre: c.full_name || "", celular: c.phone || "", mail: c.email || "" });
     setPrecioTipo(c.price_type || "normal");
     setCustomPrice(c.custom_price != null ? String(c.custom_price) : "");
   };
@@ -111,9 +113,21 @@ export default function Clientes() {
   };
 
   const guardarCliente = async () => {
+    if (!editDatos.nombre.trim()) { alert("Falta el nombre."); return; }
     setSaving(true);
-    const updates = { price_type: precioTipo, custom_price: (precioTipo === "especial" || precioTipo === "cortesia") && customPrice ? parseFloat(customPrice) : null };
-    await supabase.from("clients").update(updates).eq("id", clienteSeleccionado.id);
+    // El mail se normaliza igual que en la reserva pública (minúsculas,
+    // sin espacios): así el reconocimiento automático de cliente —y la
+    // cortesía/precio especial que depende de matchear el mail— no se
+    // rompe por una mayúscula o un espacio de más al cargarlo acá.
+    const updates = {
+      full_name: editDatos.nombre.trim(),
+      phone: editDatos.celular.trim() || null,
+      email: editDatos.mail.trim().toLowerCase() || null,
+      price_type: precioTipo,
+      custom_price: (precioTipo === "especial" || precioTipo === "cortesia") && customPrice ? parseFloat(customPrice) : null,
+    };
+    const { error } = await supabase.from("clients").update(updates).eq("id", clienteSeleccionado.id);
+    if (error) { alert("No se pudo guardar: " + (error.message.includes("duplicate") ? "Ya existe otro cliente con ese mail." : error.message)); setSaving(false); return; }
     await cargar();
     setSaving(false);
     setClienteSeleccionado(null);
@@ -250,19 +264,28 @@ export default function Clientes() {
               </a>
             )}
 
-            <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
-              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Datos personales</div>
-              {[
-                { label: "Nombre", valor: clienteSeleccionado.full_name },
-                { label: "Celular", valor: clienteSeleccionado.phone ? (celularValido(clienteSeleccionado.phone) ? clienteSeleccionado.phone : `${clienteSeleccionado.phone} ⚠️ revisar`) : null },
-                { label: "Mail", valor: clienteSeleccionado.email },
-                { label: "Sesiones", valor: `${clienteSeleccionado.appointments?.[0]?.count || 0} sesiones` },
-              ].map(f => (
-                <div key={f.label} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: "0.5px solid #F0E8F8", fontSize: "13px" }}>
-                  <span style={{ color: "#B89FD0" }}>{f.label}</span>
-                  <span style={{ color: "#2A1845", fontWeight: "500" }}>{f.valor || "—"}</span>
-                </div>
-              ))}
+            <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ fontSize: "12px", fontWeight: "500", color: "#9B72C0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Datos personales</div>
+              <div style={s.field}>
+                <label style={s.label}>Nombre y apellido</label>
+                <input type="text" value={editDatos.nombre} onChange={e => setEditDatos({...editDatos, nombre: e.target.value})} style={s.input} />
+              </div>
+              <div style={s.field}>
+                <label style={s.label}>Celular</label>
+                <input type="tel" value={editDatos.celular} onChange={e => setEditDatos({...editDatos, celular: e.target.value})} style={s.input} />
+                {editDatos.celular && !celularValido(editDatos.celular) && (
+                  <span style={{ fontSize: "11px", color: "#A32D2D" }}>⚠️ No parece un celular argentino válido</span>
+                )}
+              </div>
+              <div style={s.field}>
+                <label style={s.label}>Mail</label>
+                <input type="email" value={editDatos.mail} onChange={e => setEditDatos({...editDatos, mail: e.target.value})} style={s.input} />
+                <span style={{ fontSize: "11px", color: "#B89FD0" }}>Tiene que ser igual al que use para reservar, así se reconoce solo.</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+                <span style={{ color: "#B89FD0" }}>Sesiones</span>
+                <span style={{ color: "#2A1845", fontWeight: "500" }}>{clienteSeleccionado.appointments?.[0]?.count || 0}</span>
+              </div>
             </div>
 
             <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>
