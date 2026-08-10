@@ -640,9 +640,10 @@ export default function Agenda() {
                     <div style={s.field}>
                       <label style={s.label}>Tipo de sesión</label>
                       <select value={editTurnoForm.servicioId} onChange={e => setEditTurnoForm({...editTurnoForm, servicioId: e.target.value})} style={s.input}>
-                        {servicios.filter(sv => sv.professional_id === t.professional_id).map(sv => (
-                          <option key={sv.id} value={sv.id}>{sv.name.trim()}</option>
-                        ))}
+                        {servicios.filter(sv => sv.professional_id === t.professional_id).map(sv => {
+                          const sym = sv.currency === "USD" ? "U$S " : sv.currency === "EUR" ? "€" : "$";
+                          return <option key={sv.id} value={sv.id}>{sv.name.trim()} · {sym}{sv.price?.toLocaleString("es-AR")}</option>;
+                        })}
                       </select>
                     </div>
                     {!esACoordinarEdit ? (
