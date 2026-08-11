@@ -345,8 +345,11 @@ export default function Reserva() {
       // idéntico al anterior y el navegador sigue mostrando la imagen vieja
       // en caché aunque el archivo ya haya cambiado del lado del servidor.
       const publicUrl = `${rawUrl}?t=${Date.now()}`;
-          const { error: errUpdate } = await supabase.from("payments").update({ receipt_url: publicUrl }).eq("id", pagoId);
-          if (errUpdate) { console.error("Error guardando comprobante:", errUpdate.message); setComprobanteFallo(true); }
+          // Se usa una función de servidor en vez de un update directo: la
+          // policy de RLS para esto venía fallando en silencio (200 OK,
+          // pero sin escribir nada) para el rol anónimo en esta instancia.
+          const { data: ok, error: errUpdate } = await supabase.rpc("adjuntar_comprobante", { p_payment_id: pagoId, p_receipt_url: publicUrl });
+          if (errUpdate || !ok) { console.error("Error guardando comprobante:", errUpdate?.message || "no se encontró el pago"); setComprobanteFallo(true); }
         }
       }
 
