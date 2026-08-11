@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 import { authHeaders } from "../../utils/apiAuth";
 import { cuando } from "../../utils/fecha";
+import { calcularSaldoPendiente } from "../../utils/pagos";
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -139,22 +140,17 @@ export default function Cobros() {
       .from("payments").select("id, type, amount").eq("appointment_id", id);
     if (errLeer) { alert("No se pudo leer el pago: " + errLeer.message); setProcesando(null); return; }
 
-    const sena = pagos?.find(p => p.type === "seña");
+    const { sena, saldoExistente, monto: saldo } = calcularSaldoPendiente(pagos, totalPrice);
     if (sena) {
       const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", sena.id);
       if (error) { alert("No se pudo confirmar la seña: " + error.message); setProcesando(null); return; }
     }
 
-    // El saldo es lo que queda del total menos la seña real (no la mitad
-    // exacta, que se desviaba con precios especiales). Si ya existe uno no
-    // se crea otro: al tocar dos veces se duplicaba y "Saldos pendientes"
-    // mostraba plata que no existía.
-    if (!pagos?.some(p => p.type === "saldo")) {
-      const saldo = Math.round(parseFloat(totalPrice || 0) - parseFloat(sena?.amount || 0));
-      if (saldo > 0) {
-        const { error } = await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "pending" });
-        if (error) { alert("No se pudo registrar el saldo: " + error.message); setProcesando(null); return; }
-      }
+    // Si ya existe un saldo no se crea otro: al tocar dos veces se
+    // duplicaba y "Saldos pendientes" mostraba plata que no existía.
+    if (!saldoExistente && saldo > 0) {
+      const { error } = await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "pending" });
+      if (error) { alert("No se pudo registrar el saldo: " + error.message); setProcesando(null); return; }
     }
 
     const { error: errEstado } = await supabase.from("appointments").update({ status: "partial" }).eq("id", id);
@@ -173,7 +169,7 @@ export default function Cobros() {
       .from("payments").select("id, type, amount").eq("appointment_id", id);
     if (errLeer) { alert("No se pudo leer el pago: " + errLeer.message); setProcesando(null); return; }
 
-    const sena = pagos?.find(p => p.type === "seña");
+    const { sena, saldoExistente, monto: saldo } = calcularSaldoPendiente(pagos, totalPrice);
     if (sena) {
       const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", sena.id);
       if (error) { alert("No se pudo confirmar la seña: " + error.message); setProcesando(null); return; }
@@ -181,16 +177,12 @@ export default function Cobros() {
 
     // Si el saldo ya existe (porque antes se confirmó solo la seña) se marca
     // pagado; crear otro dejaba uno pendiente fantasma sumando de más.
-    const saldoExistente = pagos?.find(p => p.type === "saldo");
     if (saldoExistente) {
       const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", saldoExistente.id);
       if (error) { alert("No se pudo confirmar el saldo: " + error.message); setProcesando(null); return; }
-    } else {
-      const saldo = Math.round(parseFloat(totalPrice || 0) - parseFloat(sena?.amount || 0));
-      if (saldo > 0) {
-        const { error } = await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "paid", paid_at: ahora });
-        if (error) { alert("No se pudo registrar el saldo: " + error.message); setProcesando(null); return; }
-      }
+    } else if (saldo > 0) {
+      const { error } = await supabase.from("payments").insert({ appointment_id: id, type: "saldo", amount: saldo, status: "paid", paid_at: ahora });
+      if (error) { alert("No se pudo registrar el saldo: " + error.message); setProcesando(null); return; }
     }
 
     const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", id);
