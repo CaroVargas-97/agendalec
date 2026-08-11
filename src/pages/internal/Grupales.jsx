@@ -32,6 +32,8 @@ const getUid = async () => {
 export default function Grupales() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [eventos, setEventos] = useState([]);
+  const [profesionales, setProfesionales] = useState([]);
+  const [filtroProf, setFiltroProf] = useState("todos");
   const [loading, setLoading] = useState(true);
   const [eventoSeleccionado, setEventoSeleccionado] = useState(null);
   const [asistentes, setAsistentes] = useState([]);
@@ -58,12 +60,18 @@ export default function Grupales() {
 
   const cargar = async () => {
     setLoading(true);
-    const { data } = await supabase.from("group_events").select("*, group_attendees(id, status)").order("date", { ascending: true });
+    let query = supabase.from("group_events").select("*, group_attendees(id, status)").order("date", { ascending: true });
+    if (filtroProf !== "todos") query = query.eq("professional_id", filtroProf);
+    const { data } = await query;
     setEventos(data || []);
     setLoading(false);
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); }, [filtroProf]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    supabase.from("profiles").select("id, full_name").eq("role", "professional").then(({ data }) => setProfesionales(data || []));
+  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -254,7 +262,16 @@ export default function Grupales() {
           <div style={s.title}>Cursos y grupales</div>
           <div style={s.titleSub}>{eventos.length} eventos cargados</div>
         </div>
-        <button onClick={() => setNuevoAbierto(true)} style={{ padding: "8px 16px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" }}>+ Nuevo evento</button>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {profesionales.length > 1 && (
+            <select value={filtroProf} onChange={e => setFiltroProf(e.target.value)}
+              style={{ fontSize: "12px", padding: "6px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#5C3F99", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              <option value="todos">Todos los profesionales</option>
+              {profesionales.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+            </select>
+          )}
+          <button onClick={() => setNuevoAbierto(true)} style={{ padding: "8px 16px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: "nowrap", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" }}>+ Nuevo evento</button>
+        </div>
       </div>
 
       {loading ? (
