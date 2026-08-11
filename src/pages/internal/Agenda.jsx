@@ -229,7 +229,7 @@ export default function Agenda() {
     await cargarDatos();
   };
 
-  const accionPago = async (tipo) => {
+  const accionPago = async (tipo, montoOverride) => {
     setSavingPago(true);
     const t = turnoSeleccionado;
     const ahora = new Date().toISOString();
@@ -259,6 +259,18 @@ export default function Agenda() {
       if (pago) {
         const { error } = await supabase.from("payments").update({ status: "paid", paid_at: ahora }).eq("id", pago.id);
         if (error) { alert("No se pudo confirmar el saldo: " + error.message); setSavingPago(false); return; }
+      }
+      const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
+      if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setSavingPago(false); return; }
+    } else if (tipo === "regalar_saldo" || tipo === "saldo_especial") {
+      // Para cuando la seña ya se cobró y después se decide regalar o
+      // rebajar lo que quedaba pendiente. El total del turno no se toca
+      // (queda el precio de referencia real), solo el monto del saldo.
+      const nuevoMonto = tipo === "regalar_saldo" ? 0 : montoOverride;
+      const pago = pagosDelTurno.find(p => p.type === "saldo");
+      if (pago) {
+        const { error } = await supabase.from("payments").update({ amount: nuevoMonto, status: "paid", paid_at: ahora }).eq("id", pago.id);
+        if (error) { alert("No se pudo guardar: " + error.message); setSavingPago(false); return; }
       }
       const { error: errEstado } = await supabase.from("appointments").update({ status: "confirmed" }).eq("id", t.id);
       if (errEstado) { alert("No se pudo actualizar el turno: " + errEstado.message); setSavingPago(false); return; }
@@ -737,9 +749,27 @@ export default function Agenda() {
                       </>
                     )}
                     {isPartial && (
-                      <button disabled={savingPago} onClick={() => accionPago("confirmar_saldo")} style={{ padding: "10px", background: "#5C3F99", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                        {savingPago ? "..." : "✓ Cobrar saldo"}
-                      </button>
+                      <>
+                        <button disabled={savingPago} onClick={() => accionPago("confirmar_saldo")} style={{ padding: "10px", background: "#5C3F99", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {savingPago ? "..." : "✓ Cobrar saldo"}
+                        </button>
+                        <button disabled={savingPago}
+                          onClick={() => { if (window.confirm(`¿Regalar el saldo de ${t.clients?.full_name}? Queda marcado como cobrado, sin costo.`)) accionPago("regalar_saldo"); }}
+                          style={{ padding: "10px", background: "#FDE8F0", color: "#A0407A", border: "0.5px solid #E88BB0", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          🎁 Regalar saldo
+                        </button>
+                        <button disabled={savingPago}
+                          onClick={() => {
+                            const texto = prompt(`¿Cuánto le cobrás de saldo a ${t.clients?.full_name}? (precio especial)`, saldo ? String(saldo.amount) : "");
+                            if (texto === null) return;
+                            const monto = parseFloat(texto);
+                            if (isNaN(monto) || monto < 0) { alert("Monto inválido."); return; }
+                            accionPago("saldo_especial", monto);
+                          }}
+                          style={{ padding: "10px", background: "#EDE8FA", color: "#5C3F99", border: "0.5px solid #D0B8E8", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          ✨ Precio especial en el saldo
+                        </button>
+                      </>
                     )}
                     <button disabled={savingPago} onClick={() => accionPago("cancelar_con_devolucion")} style={{ padding: "10px", background: "#FCEBEB", color: "#A32D2D", border: "0.5px solid #F4C4C4", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                       ↩ Cancelar con devolución
