@@ -72,7 +72,8 @@ export default async function handler(req, res) {
         const alias = (esUSD ? settings?.alias_usd : null) || settings?.alias || "consultar con el profesional";
         const sym = esUSD ? "U$S " : "$";
 
-        const mensaje = `Hola ${turno.clients.full_name}! Tu turno es mañana ✨\n\n🕐 Horario: ${turno.start_time.slice(0,5)} hs\n🌿 Servicio: ${turno.services.name}\n💜 Profesional: ${turno.profiles.full_name}\n\nPara confirmar tu lugar, te recordamos abonar el saldo pendiente de ${sym}${parseInt(pago.amount).toLocaleString("es-AR")} al alias: *${alias}* 💜\n\nCon amor, Espacio LEC 🤍\n¡Te esperamos!\n\n⚠️ Este número es únicamente para confirmación de turnos. No recibe mensajes ni consultas.`;
+        const linkSaldo = `https://agendalec.vercel.app/saldo?id=${pago.id}`;
+        const mensaje = `Hola ${turno.clients.full_name}! Tu turno es mañana ✨\n\n🕐 Horario: ${turno.start_time.slice(0,5)} hs\n🌿 Servicio: ${turno.services.name}\n💜 Profesional: ${turno.profiles.full_name}\n\nPara confirmar tu lugar, te recordamos abonar el saldo pendiente de ${sym}${parseInt(pago.amount).toLocaleString("es-AR")} al alias: *${alias}*.\n\nCuando transfieras, subí el comprobante acá: ${linkSaldo}\n\nCon amor, Espacio LEC 🤍\n¡Te esperamos!\n\n⚠️ Este número es únicamente para confirmación de turnos. No recibe mensajes ni consultas.`;
 
         await enviarWhatsApp(celular, mensaje);
         resultados.push({ cliente: turno.clients.full_name, estado: "enviado" });

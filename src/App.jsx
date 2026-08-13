@@ -11,6 +11,7 @@ import Estadisticas from "./pages/internal/Estadisticas";
 import Grupales from "./pages/internal/Grupales";
 import Limpiezas from "./pages/internal/Limpiezas";
 import Reserva from "./pages/public/Reserva";
+import Saldo from "./pages/public/Saldo";
 import Terminos from "./pages/public/Terminos";
 import ResetPassword from "./pages/internal/ResetPassword";
 import Layout from "./components/internal/Layout";
@@ -35,6 +36,7 @@ function App() {
 
   const path = window.location.pathname;
   if (path === "/reservar") return <Reserva />;
+  if (path === "/saldo") return <Saldo />;
   if (path === "/terminos") return <Terminos />;
   if (path === "/reset-password") return <ResetPassword />;
 

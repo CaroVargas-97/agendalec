@@ -48,6 +48,13 @@ export default function Cobros() {
   const [loading, setLoading] = useState(true);
   const [subiendoSaldo, setSubiendoSaldo] = useState(null);
   const [procesando, setProcesando] = useState(null);
+  const [linkCopiado, setLinkCopiado] = useState(null);
+
+  const copiarLinkSaldo = (pagoId) => {
+    navigator.clipboard.writeText(`https://agendalec.vercel.app/saldo?id=${pagoId}`);
+    setLinkCopiado(pagoId);
+    setTimeout(() => setLinkCopiado(null), 2000);
+  };
 
   const cargar = async () => {
     setLoading(true);
@@ -338,6 +345,9 @@ export default function Cobros() {
                       {subiendoSaldo === p.id ? "Subiendo..." : p.receipt_url ? "✅ Adjunto" : "📎 Adjuntar"}
                       <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(p.id, p.appointment_id, "saldo", e.target.files[0])} />
                     </label>
+                    <button style={{ padding: "6px 10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => copiarLinkSaldo(p.id)}>
+                      {linkCopiado === p.id ? "✓ Copiado" : "🔗 Copiar link"}
+                    </button>
                     <button style={s.btnSaldo} disabled={subiendoSaldo === p.id} onClick={() => confirmarSaldo(p.id, p.appointment_id)}>{subiendoSaldo === p.id ? "..." : "✓ Cobrado"}</button>
                     <button style={{ padding: "6px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => cancelarTurno(p.appointment_id)}>✗</button>
                   </div>
