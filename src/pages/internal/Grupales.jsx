@@ -22,6 +22,8 @@ const s = {
   tagPendiente: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FAEEDA", color: "#854F0B" },
   tagCortesia: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FDE8F0", color: "#A0407A" },
   btnWA: { display: "inline-flex", alignItems: "center", gap: "4px", padding: "5px 8px", background: "#25D366", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  tab: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  tabActive: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#EDE8FA", color: "#3B2460", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
 };
 
 const getUid = async () => {
@@ -34,6 +36,7 @@ export default function Grupales() {
   const [eventos, setEventos] = useState([]);
   const [profesionales, setProfesionales] = useState([]);
   const [filtroProf, setFiltroProf] = useState("todos");
+  const [tab, setTab] = useState("proximos");
   const [loading, setLoading] = useState(true);
   const [eventoSeleccionado, setEventoSeleccionado] = useState(null);
   const [asistentes, setAsistentes] = useState([]);
@@ -255,6 +258,13 @@ export default function Grupales() {
   const symFor = (cur) => cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
   const modLabel = (m) => m === "virtual" ? "📹 Virtual" : m === "presencial" ? "📍 Presencial" : "🔀 Virtual y presencial";
 
+  const hoyISO = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+  // Un evento pasa solo a Historial cuando ya tuvo lugar: sin fecha
+  // asignada, o con fecha de hoy en adelante, sigue en Próximos.
+  const proximos = eventos.filter(ev => !ev.date || ev.date >= hoyISO);
+  const historial = eventos.filter(ev => ev.date && ev.date < hoyISO).sort((a, b) => b.date.localeCompare(a.date));
+  const eventosVisibles = tab === "proximos" ? proximos : historial;
+
   return (
     <div style={{ ...s.main, padding: isMobile ? "1rem" : "1.5rem" }}>
       <div style={{ ...s.topbar, flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "stretch" : "flex-start", gap: isMobile ? "10px" : 0 }}>
@@ -274,13 +284,24 @@ export default function Grupales() {
         </div>
       </div>
 
+      <div style={{ display: "flex", gap: "6px" }}>
+        <button style={tab === "proximos" ? s.tabActive : s.tab} onClick={() => setTab("proximos")}>
+          Próximos {proximos.length > 0 && <span style={{ marginLeft: "4px", background: "#9B72C0", color: "#fff", borderRadius: "10px", padding: "1px 6px", fontSize: "11px" }}>{proximos.length}</span>}
+        </button>
+        <button style={tab === "historial" ? s.tabActive : s.tab} onClick={() => setTab("historial")}>
+          Historial {historial.length > 0 && <span style={{ marginLeft: "4px", background: "#B89FD0", color: "#fff", borderRadius: "10px", padding: "1px 6px", fontSize: "11px" }}>{historial.length}</span>}
+        </button>
+      </div>
+
       {loading ? (
         <div style={{ ...s.card, ...s.emptyText }}>Cargando...</div>
-      ) : eventos.length === 0 ? (
-        <div style={{ ...s.card, ...s.emptyText }}>No hay cursos ni eventos grupales cargados aún</div>
+      ) : eventosVisibles.length === 0 ? (
+        <div style={{ ...s.card, ...s.emptyText }}>
+          {tab === "proximos" ? "No hay cursos ni eventos grupales por venir" : "Todavía no hay eventos en el historial"}
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {eventos.map((ev, i) => {
+          {eventosVisibles.map((ev, i) => {
             const total = ev.group_attendees?.length || 0;
             const pagados = ev.group_attendees?.filter(a => a.status === "paid").length || 0;
             const cortesias = ev.group_attendees?.filter(a => a.status === "cortesia").length || 0;
