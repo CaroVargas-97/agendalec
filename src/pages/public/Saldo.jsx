@@ -73,6 +73,17 @@ export default function Saldo() {
     const { data: ok, error: errRpc } = await supabase.rpc("adjuntar_comprobante", { p_payment_id: pagoId, p_receipt_url: publicUrl });
     if (errRpc || !ok) { setError("No se pudo guardar el comprobante. Probá de nuevo."); setSubiendo(false); return; }
 
+    fetch("/api/notificar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        professionalId: info.professional_id,
+        title: "💰 Comprobante de saldo",
+        body: `${info.cliente} · ${info.servicio} · adjuntó el comprobante del saldo`,
+        url: "/",
+      }),
+    }).catch(() => {});
+
     setListo(true);
     setSubiendo(false);
   };
