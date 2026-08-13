@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 import { requireCron } from "./_lib/auth.js";
+import { enviarWhatsApp } from "./_lib/whatsapp.js";
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -82,12 +83,25 @@ export default async function handler(req, res) {
         .eq("professional_id", profId);
       if (!subs || subs.length === 0) continue;
 
+      const resumen = `Tenés ${partes.join(" · ")}`;
+
       const payload = JSON.stringify({
         title: "🌿 Limpiezas energéticas",
-        body: `Tenés ${partes.join(" · ")}`,
+        body: resumen,
         url: "/",
         tag: "limpiezas-recordatorio",
       });
+
+      // Además del push (que depende de tener el navegador/app abierta),
+      // se manda el mismo aviso por WhatsApp al celular de la profesional,
+      // que es más difícil de pasar por alto.
+      if (process.env.WHATSAPP_LIMPIEZAS_TO) {
+        try {
+          await enviarWhatsApp(process.env.WHATSAPP_LIMPIEZAS_TO, `🌿 Limpiezas energéticas\n\n${resumen}`);
+        } catch (err) {
+          console.error("Error WhatsApp limpiezas:", err.message);
+        }
+      }
 
       for (const s of subs) {
         try {

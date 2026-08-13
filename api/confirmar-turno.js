@@ -39,12 +39,10 @@ export default async function handler(req, res) {
       : "a coordinar";
     const hora = turno.start_time ? turno.start_time.slice(0, 5) + " hs" : "a coordinar";
     const esVirtual = turno.modality === "virtual";
-    const modalidad = esVirtual ? "Virtual" : "Presencial";
-    const lineaUbicacion = !esVirtual && turno.profiles.address
-      ? `📍 ${modalidad} — ${turno.profiles.address}`
-      : `📍 ${modalidad}`;
+    const modalidad = esVirtual ? "🌿 Modalidad: Virtual" : "🌿 Modalidad: Presencial";
+    const lineaDireccion = !esVirtual && turno.profiles.address ? `📍 Dirección: ${turno.profiles.address}\n` : "";
 
-    const mensaje = `Hola ${turno.clients.full_name}! 👋 Tu turno quedó *confirmado*.\n\n📌 Servicio: ${turno.services.name}\n🧑‍⚕️ Profesional: ${turno.profiles.full_name}\n📅 Fecha: ${fecha}\n🕐 Hora: ${hora}\n${lineaUbicacion}\n\n¡Te esperamos en Espacio Lec! 🪷`;
+    const mensaje = `Hola ${turno.clients.full_name}! Tu turno quedó confirmado ✨\n\n📅 Día: ${fecha}\n🕐 Horario: ${hora}\n${lineaDireccion}${modalidad}\n💜 Profesional: ${turno.profiles.full_name}\n\n${turno.profiles.full_name} te espera para compartir un momento de conexión y armonía ✨\n\nCon amor, Espacio LEC 🤍\n¡Te esperamos!\n\n⚠️ Este número es únicamente para confirmación de turnos. No recibe mensajes ni consultas.`;
 
     await enviarWhatsApp(celular, mensaje);
     return res.status(200).json({ ok: true });
