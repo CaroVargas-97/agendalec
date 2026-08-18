@@ -319,7 +319,11 @@ export default function Reserva() {
         date: esACoorinar ? null : fechaStr,
         start_time: esACoorinar ? null : hora,
         end_time: endTime,
-        modality: modalidad || srv.modality, status: "pending", total_price: total
+        // Una cortesía no tiene nada pendiente de cobrar: si se deja en
+        // "pending" como cualquier otro turno, queda invisible para Cobros
+        // (no aparece en "señas a confirmar" porque el pago ya está paid,
+        // ni en "historial" porque nunca pasa a confirmed).
+        modality: modalidad || srv.modality, status: esCortesia ? "confirmed" : "pending", total_price: total
       });
       if (errTurno) throw errTurno;
 
