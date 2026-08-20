@@ -48,10 +48,10 @@ export default function Grupales() {
   const [savingNuevo, setSavingNuevo] = useState(false);
   const [nuevoError, setNuevoError] = useState("");
 
-  const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "" });
+  const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "", modalidad: "" });
   const [comprobanteAsistente, setComprobanteAsistente] = useState(null);
   const [asistenteEditandoId, setAsistenteEditandoId] = useState(null);
-  const [editAsistenteForm, setEditAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "" });
+  const [editAsistenteForm, setEditAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "", modalidad: "" });
   const [asistenteDetalleId, setAsistenteDetalleId] = useState(null);
   const [savingEditAsistente, setSavingEditAsistente] = useState(false);
   const [savingAsistente, setSavingAsistente] = useState(false);
@@ -175,6 +175,7 @@ export default function Grupales() {
       phone: asistenteForm.telefono || null,
       email: asistenteForm.mail || null,
       custom_price: asistenteForm.precioDescuento !== "" ? parseFloat(asistenteForm.precioDescuento) : null,
+      modality: eventoSeleccionado.modality === "ambas" ? (asistenteForm.modalidad || null) : eventoSeleccionado.modality,
       status: "pending",
     }).select("id").single();
     if (error) { alert("Error al agregar: " + error.message); setSavingAsistente(false); return; }
@@ -197,7 +198,7 @@ export default function Grupales() {
       }
     }
 
-    setAsistenteForm({ nombre: "", telefono: "", mail: "", precioDescuento: "" });
+    setAsistenteForm({ nombre: "", telefono: "", mail: "", precioDescuento: "", modalidad: "" });
     setComprobanteAsistente(null);
     setSavingAsistente(false);
     await refrescarAsistentes();
@@ -209,7 +210,7 @@ export default function Grupales() {
   };
 
   const iniciarEdicionAsistente = (a) => {
-    setEditAsistenteForm({ nombre: a.full_name, telefono: a.phone || "", mail: a.email || "", precioDescuento: a.custom_price != null ? String(a.custom_price) : "" });
+    setEditAsistenteForm({ nombre: a.full_name, telefono: a.phone || "", mail: a.email || "", precioDescuento: a.custom_price != null ? String(a.custom_price) : "", modalidad: a.modality || "" });
     setAsistenteEditandoId(a.id);
   };
 
@@ -221,6 +222,7 @@ export default function Grupales() {
       phone: editAsistenteForm.telefono || null,
       email: editAsistenteForm.mail || null,
       custom_price: editAsistenteForm.precioDescuento !== "" ? parseFloat(editAsistenteForm.precioDescuento) : null,
+      modality: eventoSeleccionado.modality === "ambas" ? (editAsistenteForm.modalidad || null) : eventoSeleccionado.modality,
     }).eq("id", asistenteEditandoId);
     if (error) { alert("No se pudo guardar: " + error.message); setSavingEditAsistente(false); return; }
     setSavingEditAsistente(false);
@@ -407,6 +409,16 @@ export default function Grupales() {
                         <label style={s.label}>Precio con descuento (opcional)</label>
                         <input type="number" min="0" value={editAsistenteForm.precioDescuento} onChange={e => setEditAsistenteForm({...editAsistenteForm, precioDescuento: e.target.value})} placeholder={`Sin descuento: ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price?.toLocaleString("es-AR") || 0}`} style={s.input} />
                       </div>
+                      {eventoSeleccionado.modality === "ambas" && (
+                        <div style={s.field}>
+                          <label style={s.label}>Modalidad</label>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            {[["presencial","📍 Presencial"],["virtual","📹 Virtual"]].map(([key,label]) => (
+                              <button key={key} onClick={() => setEditAsistenteForm({...editAsistenteForm, modalidad: key})} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: `0.5px solid ${editAsistenteForm.modalidad===key?"#9B72C0":"#E0D0F0"}`, background: editAsistenteForm.modalidad===key?"#EDE8FA":"#fff", color: editAsistenteForm.modalidad===key?"#5C3F99":"#B89FD0", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       <div style={{ display: "flex", gap: "8px" }}>
                         <button onClick={() => setAsistenteEditandoId(null)} style={{ ...s.cancelBtn, flex: 1 }}>Cancelar</button>
                         <button onClick={guardarEdicionAsistente} disabled={savingEditAsistente || !editAsistenteForm.nombre.trim()} style={{ ...s.saveBtn, flex: 1 }}>{savingEditAsistente ? "Guardando..." : "Guardar"}</button>
@@ -422,6 +434,7 @@ export default function Grupales() {
                       </div>
                       {a.phone && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.phone}</div>}
                       {a.email && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.email}</div>}
+                      {a.modality && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.modality === "virtual" ? "📹 Virtual" : "📍 Presencial"}</div>}
                       <div style={{ fontSize: "13px", color: "#2A1845", fontWeight: "500" }}>
                         {symFor(eventoSeleccionado.currency)}{(a.custom_price ?? eventoSeleccionado.price ?? 0).toLocaleString("es-AR")}
                         {a.custom_price != null && <span style={{ fontSize: "11px", color: "#5C3F99", fontWeight: "400" }}> · con descuento</span>}
@@ -482,6 +495,17 @@ export default function Grupales() {
                       <input type="number" min="0" value={asistenteForm.precioDescuento} onChange={e => setAsistenteForm({...asistenteForm, precioDescuento: e.target.value})} placeholder={`Sin descuento: ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price?.toLocaleString("es-AR") || 0}`} style={s.input} />
                     </div>
 
+                    {eventoSeleccionado.modality === "ambas" && (
+                      <div style={s.field}>
+                        <label style={s.label}>Modalidad</label>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          {[["presencial","📍 Presencial"],["virtual","📹 Virtual"]].map(([key,label]) => (
+                            <button key={key} onClick={() => setAsistenteForm({...asistenteForm, modalidad: key})} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: `0.5px solid ${asistenteForm.modalidad===key?"#9B72C0":"#E0D0F0"}`, background: asistenteForm.modalidad===key?"#EDE8FA":"#fff", color: asistenteForm.modalidad===key?"#5C3F99":"#B89FD0", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     <div style={s.field}>
                       <label style={s.label}>Comprobante (opcional)</label>
                       <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobanteAsistente ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobanteAsistente ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
@@ -519,7 +543,11 @@ export default function Grupales() {
                               <div key={a.id} onClick={() => setAsistenteDetalleId(a.id)}
                                 style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "10px 12px", cursor: "pointer", borderBottom: i < grupo.length - 1 ? "0.5px solid #F0E8F8" : "none", background: "#fff" }}>
                                 <div>
-                                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}{a.custom_price != null && <span style={{ fontSize: "11px", color: "#5C3F99" }}> · ✨ desc.</span>}</div>
+                                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>
+                                    {a.full_name}
+                                    {a.modality && <span style={{ fontSize: "11px", color: "#9B72C0" }}> · {a.modality === "virtual" ? "📹" : "📍"}</span>}
+                                    {a.custom_price != null && <span style={{ fontSize: "11px", color: "#5C3F99" }}> · ✨ desc.</span>}
+                                  </div>
                                   {a.phone && <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "1px" }}>{a.phone}</div>}
                                 </div>
                                 <span style={{ fontSize: "13px", color: "#D0B8E8" }}>›</span>
