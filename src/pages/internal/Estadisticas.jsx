@@ -45,6 +45,8 @@ const periodos = [
 
 export default function Estadisticas() {
   const [periodo, setPeriodo] = useState("mes");
+  const [modoMes, setModoMes] = useState(false);
+  const [mesSeleccionado, setMesSeleccionado] = useState(() => { const d = new Date(); return { anio: d.getFullYear(), mes: d.getMonth() }; });
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalSesiones: 0, sesionesIndividuales: 0, sesionesGrupales: 0, ingresoTotal: 0, ingresoByCurrency: {},
@@ -62,15 +64,29 @@ export default function Estadisticas() {
     const uid = session.user.id;
 
     const hoy = new Date();
-    let desde = new Date();
-    if (periodo === "semana") desde.setDate(hoy.getDate() - 7);
-    else if (periodo === "mes") desde.setMonth(hoy.getMonth() - 1);
-    else if (periodo === "trimestre") desde.setMonth(hoy.getMonth() - 3);
-    else if (periodo === "año") desde.setFullYear(hoy.getFullYear() - 1);
-    const desdeISO = `${desde.getFullYear()}-${String(desde.getMonth()+1).padStart(2,"0")}-${String(desde.getDate()).padStart(2,"0")}`;
-    // Tope hasta hoy: son estadísticas de lo que YA pasó. Sin esto entraban
-    // los turnos agendados a futuro y se contaban como "sesiones realizadas".
-    const hastaISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
+    // "hoyISO" es siempre HOY de verdad — lo necesita la consulta de "a
+    // futuro", que tiene que seguir siendo relativa a hoy aunque se esté
+    // mirando un mes específico ya pasado. "desdeISO"/"hastaISO" son el
+    // rango que se está mirando, que si cambia según el mes elegido.
+    const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,"0")}-${String(hoy.getDate()).padStart(2,"0")}`;
+
+    let desdeISO, hastaISO;
+    if (modoMes) {
+      const { anio, mes } = mesSeleccionado;
+      desdeISO = `${anio}-${String(mes+1).padStart(2,"0")}-01`;
+      const ultimoDia = new Date(anio, mes + 1, 0).getDate();
+      hastaISO = `${anio}-${String(mes+1).padStart(2,"0")}-${String(ultimoDia).padStart(2,"0")}`;
+    } else {
+      let desde = new Date();
+      if (periodo === "semana") desde.setDate(hoy.getDate() - 7);
+      else if (periodo === "mes") desde.setMonth(hoy.getMonth() - 1);
+      else if (periodo === "trimestre") desde.setMonth(hoy.getMonth() - 3);
+      else if (periodo === "año") desde.setFullYear(hoy.getFullYear() - 1);
+      desdeISO = `${desde.getFullYear()}-${String(desde.getMonth()+1).padStart(2,"0")}-${String(desde.getDate()).padStart(2,"0")}`;
+      // Tope hasta hoy: son estadísticas de lo que YA pasó. Sin esto entraban
+      // los turnos agendados a futuro y se contaban como "sesiones realizadas".
+      hastaISO = hoyISO;
+    }
 
     const [{ data: appts }, { data: eventos }, { data: futuros }, { data: eventosFuturos }, { data: svsLimpieza }] = await Promise.all([
       supabase
@@ -92,13 +108,13 @@ export default function Estadisticas() {
         .from("appointments")
         .select("total_price, services(currency)")
         .eq("professional_id", uid)
-        .gt("date", hastaISO)
+        .gt("date", hoyISO)
         .neq("status", "cancelled"),
       supabase
         .from("group_events")
         .select("price, currency, group_attendees(status, custom_price)")
         .eq("professional_id", uid)
-        .gt("date", hastaISO),
+        .gt("date", hoyISO),
       supabase.from("services").select("id").ilike("name", "%limpieza%"),
     ]);
 
@@ -222,7 +238,7 @@ export default function Estadisticas() {
     setLoading(false);
   };
 
-  useEffect(() => { cargar(); }, [periodo]);
+  useEffect(() => { cargar(); }, [periodo, modoMes, mesSeleccionado]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resumen mes a mes: independiente del selector de período de arriba,
   // siempre muestra los últimos 12 meses completos.
@@ -342,7 +358,15 @@ export default function Estadisticas() {
   const maxServ = Math.max(...stats.servicios.map(s => s.count), 1);
   const maxDia = Math.max(...stats.diasPopulares.map(d => d.count), 1);
 
-  const periodoLabel = { semana: "última semana", mes: "último mes", trimestre: "últimos 3 meses", año: "último año" }[periodo];
+  const nombreMesSel = new Date(mesSeleccionado.anio, mesSeleccionado.mes, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const periodoLabel = modoMes ? nombreMesSel : { semana: "última semana", mes: "último mes", trimestre: "últimos 3 meses", año: "último año" }[periodo];
+
+  const cambiarMesSeleccionado = (delta) => {
+    setMesSeleccionado(({ anio, mes }) => {
+      const d = new Date(anio, mes + delta, 1);
+      return { anio: d.getFullYear(), mes: d.getMonth() };
+    });
+  };
 
   const metricValues = {
     totalSesiones: stats.totalSesiones,
@@ -382,12 +406,23 @@ export default function Estadisticas() {
         </div>
       </div>
 
-      <div style={s.tabs}>
-        {periodos.map(p => (
-          <button key={p.key} style={periodo === p.key ? s.tabActive : s.tab} onClick={() => setPeriodo(p.key)}>
-            {p.label}
-          </button>
-        ))}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <div style={s.tabs}>
+          {periodos.map(p => (
+            <button key={p.key} style={!modoMes && periodo === p.key ? s.tabActive : s.tab} onClick={() => { setModoMes(false); setPeriodo(p.key); }}>
+              {p.label}
+            </button>
+          ))}
+          <button style={modoMes ? s.tabActive : s.tab} onClick={() => setModoMes(true)}>📅 Mes específico</button>
+        </div>
+
+        {modoMes && (
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <button onClick={() => cambiarMesSeleccionado(-1)} style={{ width: "28px", height: "28px", borderRadius: "8px", border: "0.5px solid #E0D0F0", background: "#fff", cursor: "pointer", color: "#9B72C0", fontSize: "14px" }}>‹</button>
+            <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", minWidth: "130px", textAlign: "center", textTransform: "capitalize" }}>{nombreMesSel}</div>
+            <button onClick={() => cambiarMesSeleccionado(1)} style={{ width: "28px", height: "28px", borderRadius: "8px", border: "0.5px solid #E0D0F0", background: "#fff", cursor: "pointer", color: "#9B72C0", fontSize: "14px" }}>›</button>
+          </div>
+        )}
       </div>
 
       {loading ? (
