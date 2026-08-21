@@ -430,7 +430,7 @@ export default function Estadisticas() {
       ) : (
         <>
           <div style={s.metrics}>
-            {metricsDef.map(m => (
+            {metricsDef.filter(m => m.key !== "aFuturo" || !modoMes).map(m => (
               <div key={m.key} style={s.metricCard}>
                 <div style={{ fontSize: "11px", color: m.color, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</div>
                 <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
