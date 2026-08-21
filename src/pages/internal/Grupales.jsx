@@ -21,6 +21,7 @@ const s = {
   tagPagado: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EAF3DE", color: "#3B6D11" },
   tagPendiente: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FAEEDA", color: "#854F0B" },
   tagCortesia: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FDE8F0", color: "#A0407A" },
+  tagParcial: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99" },
   btnWA: { display: "inline-flex", alignItems: "center", gap: "4px", padding: "5px 8px", background: "#25D366", color: "#fff", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   tab: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   tabActive: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#EDE8FA", color: "#3B2460", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -181,21 +182,10 @@ export default function Grupales() {
     if (error) { alert("Error al agregar: " + error.message); setSavingAsistente(false); return; }
 
     if (comprobanteAsistente) {
-      const ext = comprobanteAsistente.name.split(".").pop();
-      const { data: uploadData, error: errUpload } = await supabase.storage
-        .from("comprobantes")
-        .upload(`grupal-${nuevo.id}.${ext}`, comprobanteAsistente, { contentType: comprobanteAsistente.type, upsert: true });
-      if (errUpload) {
-        alert("La persona se anotó, pero no se pudo subir el comprobante: " + errUpload.message);
-      } else {
-        const { data: { publicUrl: rawUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
-      // Sin esto, resubir con el mismo nombre de archivo deja el link
-      // idéntico al anterior y el navegador sigue mostrando la imagen vieja
-      // en caché aunque el archivo ya haya cambiado del lado del servidor.
-      const publicUrl = `${rawUrl}?t=${Date.now()}`;
-        const { error: errUpdate } = await supabase.from("group_attendees").update({ receipt_url: publicUrl }).eq("id", nuevo.id);
-        if (errUpdate) alert("La persona se anotó, pero no se pudo guardar el comprobante: " + errUpdate.message);
-      }
+      // El comprobante que se adjunta al anotar es siempre el de la seña —
+      // el del saldo se adjunta después, cuando llega, desde la fila de la
+      // persona ya anotada.
+      await subirComprobante(nuevo.id, comprobanteAsistente, "sena");
     }
 
     setAsistenteForm({ nombre: "", telefono: "", mail: "", precioDescuento: "", modalidad: "" });
@@ -235,13 +225,16 @@ export default function Grupales() {
     await refrescarAsistentes();
   };
 
-  const subirComprobante = async (asistenteId, file) => {
+  // tipo: "sena" o "saldo" — cada uno tiene su propio archivo y su propia
+  // columna. Antes compartían un solo nombre de archivo (mismo slot), así
+  // que subir el segundo comprobante pisaba al primero sin dejar rastro.
+  const subirComprobante = async (asistenteId, file, tipo) => {
     if (!file) return;
-    setSubiendo(asistenteId);
+    setSubiendo(`${asistenteId}-${tipo}`);
     const ext = file.name.split(".").pop();
     const { data: uploadData, error: errUpload } = await supabase.storage
       .from("comprobantes")
-      .upload(`grupal-${asistenteId}.${ext}`, file, { contentType: file.type, upsert: true });
+      .upload(`grupal-${asistenteId}-${tipo}.${ext}`, file, { contentType: file.type, upsert: true });
     if (errUpload) {
       alert("No se pudo subir el comprobante: " + errUpload.message);
     } else if (uploadData) {
@@ -250,7 +243,8 @@ export default function Grupales() {
       // idéntico al anterior y el navegador sigue mostrando la imagen vieja
       // en caché aunque el archivo ya haya cambiado del lado del servidor.
       const publicUrl = `${rawUrl}?t=${Date.now()}`;
-      const { error: errUpdate } = await supabase.from("group_attendees").update({ receipt_url: publicUrl }).eq("id", asistenteId);
+      const campo = tipo === "saldo" ? "saldo_receipt_url" : "receipt_url";
+      const { error: errUpdate } = await supabase.from("group_attendees").update({ [campo]: publicUrl }).eq("id", asistenteId);
       if (errUpdate) alert("No se pudo guardar el comprobante: " + errUpdate.message);
     }
     setSubiendo(null);
@@ -259,6 +253,10 @@ export default function Grupales() {
 
   const symFor = (cur) => cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
   const modLabel = (m) => m === "virtual" ? "📹 Virtual" : m === "presencial" ? "📍 Presencial" : "🔀 Virtual y presencial";
+  // Igual que en Agenda/Cobros: pending → partial (seña pagada, falta
+  // saldo) → paid (todo pagado). Cortesía es aparte, no debe nada.
+  const estadoTag = (status) => status === "paid" ? s.tagPagado : status === "partial" ? s.tagParcial : status === "cortesia" ? s.tagCortesia : s.tagPendiente;
+  const estadoLabel = (status) => status === "paid" ? "✓ Pagó todo" : status === "partial" ? "💜 Seña pagada" : status === "cortesia" ? "🎁 Cortesía" : "⏳ Pendiente";
 
   const hoyISO = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
   // Un evento pasa solo a Historial cuando ya tuvo lugar: sin fecha
@@ -306,6 +304,7 @@ export default function Grupales() {
           {eventosVisibles.map((ev, i) => {
             const total = ev.group_attendees?.length || 0;
             const pagados = ev.group_attendees?.filter(a => a.status === "paid").length || 0;
+            const parciales = ev.group_attendees?.filter(a => a.status === "partial").length || 0;
             const cortesias = ev.group_attendees?.filter(a => a.status === "cortesia").length || 0;
             return (
               <div key={i} style={s.eventoCard} onClick={() => abrirEvento(ev)}>
@@ -322,6 +321,7 @@ export default function Grupales() {
                     <span style={s.modPill}>{modLabel(ev.modality)}</span>
                     <span style={{ fontSize: "12px", color: "#5C3F99", fontWeight: "500" }}>{total}{ev.capacity ? `/${ev.capacity}` : ""} anotados</span>
                     <span style={s.tagPagado}>{pagados} pagó</span>
+                    {parciales > 0 && <span style={s.tagParcial}>💜 {parciales} seña</span>}
                     {cortesias > 0 && <span style={s.tagCortesia}>🎁 {cortesias}</span>}
                   </div>
                 </div>
@@ -428,9 +428,7 @@ export default function Grupales() {
                     <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1.1rem", display: "flex", flexDirection: "column", gap: "12px" }}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <div style={{ fontSize: "16px", fontWeight: "500", color: "#2A1845" }}>{a.full_name}</div>
-                        <span style={a.status === "paid" ? s.tagPagado : a.status === "cortesia" ? s.tagCortesia : s.tagPendiente}>
-                          {a.status === "paid" ? "✓ Pagó" : a.status === "cortesia" ? "🎁 Cortesía" : "⏳ Pendiente"}
-                        </span>
+                        <span style={estadoTag(a.status)}>{estadoLabel(a.status)}</span>
                       </div>
                       {a.phone && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.phone}</div>}
                       {a.email && <div style={{ fontSize: "13px", color: "#9B72C0" }}>{a.email}</div>}
@@ -439,24 +437,38 @@ export default function Grupales() {
                         {symFor(eventoSeleccionado.currency)}{(a.custom_price ?? eventoSeleccionado.price ?? 0).toLocaleString("es-AR")}
                         {a.custom_price != null && <span style={{ fontSize: "11px", color: "#5C3F99", fontWeight: "400" }}> · con descuento</span>}
                       </div>
-                      {a.receipt_url && (
-                        <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#9B72C0", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Ver comprobante</a>
+                      {(a.receipt_url || a.saldo_receipt_url) && (
+                        <div style={{ display: "flex", gap: "12px" }}>
+                          {a.receipt_url && (
+                            <a href={a.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#9B72C0", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Seña</a>
+                          )}
+                          {a.saldo_receipt_url && (
+                            <a href={a.saldo_receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "12px", color: "#9B72C0", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}>📎 Saldo</a>
+                          )}
+                        </div>
                       )}
 
                       <div style={{ borderTop: "0.5px solid #F0E8F8", paddingTop: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
                         <div style={{ fontSize: "11px", fontWeight: "500", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>Estado</div>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                          {[["pending","⏳ Pendiente"],["paid","✓ Pagó"],["cortesia","🎁 Cortesía"]].map(([key,label]) => (
-                            <button key={key} onClick={() => cambiarEstadoAsistente(a, key)} style={{ flex: 1, padding: "8px 4px", borderRadius: "8px", border: `0.5px solid ${a.status===key?"#9B72C0":"#E0D0F0"}`, background: a.status===key?"#EDE8FA":"#fff", color: a.status===key?"#5C3F99":"#B89FD0", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                          {[["pending","⏳ Pendiente"],["partial","💜 Seña"],["paid","✓ Todo"],["cortesia","🎁 Cortesía"]].map(([key,label]) => (
+                            <button key={key} onClick={() => cambiarEstadoAsistente(a, key)} style={{ flex: 1, minWidth: "70px", padding: "8px 4px", borderRadius: "8px", border: `0.5px solid ${a.status===key?"#9B72C0":"#E0D0F0"}`, background: a.status===key?"#EDE8FA":"#fff", color: a.status===key?"#5C3F99":"#B89FD0", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{label}</button>
                           ))}
                         </div>
                       </div>
 
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <label style={{ flex: 1, minWidth: "120px", textAlign: "center", padding: "9px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
-                          {subiendo === a.id ? "Subiendo..." : "📎 Adjuntar comprobante"}
-                          <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0])} />
+                        <label style={{ flex: 1, minWidth: "120px", textAlign: "center", padding: "9px", background: a.receipt_url ? "#F3EEFA" : "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {subiendo === `${a.id}-sena` ? "Subiendo..." : a.receipt_url ? "✅ Comp. seña" : "📎 Comp. seña"}
+                          <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0], "sena")} />
                         </label>
+                        <label style={{ flex: 1, minWidth: "120px", textAlign: "center", padding: "9px", background: a.saldo_receipt_url ? "#F3EEFA" : "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          {subiendo === `${a.id}-saldo` ? "Subiendo..." : a.saldo_receipt_url ? "✅ Comp. saldo" : "📎 Comp. saldo"}
+                          <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={e => subirComprobante(a.id, e.target.files[0], "saldo")} />
+                        </label>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {a.phone && (
                           <a href={linkWhatsApp(a.phone)} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: "100px" }}><button style={{ ...s.btnWA, width: "100%", justifyContent: "center", padding: "9px" }}>💬 WhatsApp</button></a>
                         )}
@@ -530,7 +542,8 @@ export default function Grupales() {
                   ) : (
                     [
                       ["pending", "⏳ Pendientes"],
-                      ["paid", "✓ Pagaron"],
+                      ["partial", "💜 Seña pagada"],
+                      ["paid", "✓ Pagaron todo"],
                       ["cortesia", "🎁 Cortesía"],
                     ].map(([estado, titulo]) => {
                       const grupo = asistentes.filter(a => a.status === estado);

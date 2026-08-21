@@ -118,18 +118,27 @@ export default function Cobros() {
       if (t.date === hoy) sumarEn(cobradoHoy, cur, parseFloat(t.total_price || 0));
       if (t.date >= inicioMes) sumarEn(estesMes, cur, parseFloat(t.total_price || 0));
     });
+    // "partial" en un asistente grupal es lo mismo que en un turno: la seña
+    // (la mitad) ya está cobrada, el resto sigue pendiente. Antes esto caía
+    // directo al "else" y no sumaba a ningún lado.
     asistentesGrupales.forEach(a => {
-      if (a.status !== "paid") return;
-      if (a.date === hoy) sumarEn(cobradoHoy, a.currency, a.monto);
-      if (a.date >= inicioMes) sumarEn(estesMes, a.currency, a.monto);
+      if (a.status === "paid") {
+        if (a.date === hoy) sumarEn(cobradoHoy, a.currency, a.monto);
+        if (a.date >= inicioMes) sumarEn(estesMes, a.currency, a.monto);
+      } else if (a.status === "partial") {
+        const sena = Math.round(a.monto / 2);
+        if (a.date === hoy) sumarEn(cobradoHoy, a.currency, sena);
+        if (a.date >= inicioMes) sumarEn(estesMes, a.currency, sena);
+      }
     });
 
     const saldosPendientes = {};
     (pagosSaldo || []).forEach(p => sumarEn(saldosPendientes, p.appointments?.services?.currency, parseFloat(p.amount || 0)));
     asistentesGrupales.filter(a => a.status === "pending").forEach(a => sumarEn(saldosPendientes, a.currency, a.monto));
+    asistentesGrupales.filter(a => a.status === "partial").forEach(a => sumarEn(saldosPendientes, a.currency, Math.round(a.monto / 2)));
 
     const cancelaciones = (confirmados || []).filter(t => t.status === "cancelled").length;
-    const grupalPendientesCount = asistentesGrupales.filter(a => a.status === "pending").length;
+    const grupalPendientesCount = asistentesGrupales.filter(a => a.status === "pending" || a.status === "partial").length;
     // El contador acompaña al monto: cuenta todos los saldos pendientes
     // (incluidas limpiezas, que no se listan acá) más los de grupales.
     const saldosCount = (pagosSaldo || []).length + grupalPendientesCount;
