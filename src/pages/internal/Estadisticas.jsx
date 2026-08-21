@@ -47,9 +47,9 @@ export default function Estadisticas() {
   const [periodo, setPeriodo] = useState("mes");
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalSesiones: 0, ingresoTotal: 0, ingresoByCurrency: {},
+    totalSesiones: 0, sesionesIndividuales: 0, sesionesGrupales: 0, ingresoTotal: 0, ingresoByCurrency: {},
     clientesUnicos: 0, promedioSesion: 0, servicios: [],
-    modalidad: { virtual: 0, presencial: 0 }, topClientes: [], diasPopulares: [],
+    modalidad: { virtual: 0, presencial: 0 }, topClientes: [], todosLosClientes: [], diasPopulares: [],
     futuroByCurrency: {}, futuroCount: 0,
   });
   const [resumenMensual, setResumenMensual] = useState([]);
@@ -121,7 +121,9 @@ export default function Estadisticas() {
       }))
     );
 
-    const totalSesiones = sesiones.length + asistentesGrupales.length;
+    const sesionesIndividuales = sesiones.length;
+    const sesionesGrupales = asistentesGrupales.length;
+    const totalSesiones = sesionesIndividuales + sesionesGrupales;
     const clientesSet = new Set([
       ...sesiones.map(a => a.client_id),
       ...asistentesGrupales.map(a => `grupal:${a.nombre?.trim().toLowerCase()}`),
@@ -169,17 +171,22 @@ export default function Estadisticas() {
     sesiones.forEach(a => {
       const id = a.client_id;
       const n = a.clients?.full_name || "Cliente";
-      if (!cliMap[id]) cliMap[id] = { nombre: n, count: 0, totalByCurrency: {} };
+      if (!cliMap[id]) cliMap[id] = { nombre: n, count: 0, individuales: 0, grupales: 0, totalByCurrency: {}, ultima: null };
       cliMap[id].count++;
+      cliMap[id].individuales++;
       sumarEn(cliMap[id].totalByCurrency, a.services?.currency, parseFloat(a.total_price || 0));
+      if (!cliMap[id].ultima || a.date > cliMap[id].ultima) cliMap[id].ultima = a.date;
     });
     asistentesGrupales.forEach(a => {
       const id = `grupal:${a.nombre?.trim().toLowerCase()}`;
-      if (!cliMap[id]) cliMap[id] = { nombre: a.nombre || "Sin nombre", count: 0, totalByCurrency: {} };
+      if (!cliMap[id]) cliMap[id] = { nombre: a.nombre || "Sin nombre", count: 0, individuales: 0, grupales: 0, totalByCurrency: {}, ultima: null };
       cliMap[id].count++;
+      cliMap[id].grupales++;
       sumarEn(cliMap[id].totalByCurrency, a.currency, a.monto);
+      if (a.date && (!cliMap[id].ultima || a.date > cliMap[id].ultima)) cliMap[id].ultima = a.date;
     });
-    const topClientes = Object.values(cliMap).sort((a, b) => b.count - a.count).slice(0, 5);
+    const todosLosClientes = Object.values(cliMap).sort((a, b) => b.count - a.count);
+    const topClientes = todosLosClientes.slice(0, 5);
 
     const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
     const diaMap = {};
@@ -211,7 +218,7 @@ export default function Estadisticas() {
     });
     const futuroCount = (futuros || []).length + asistentesFuturos.length;
 
-    setStats({ totalSesiones, ingresoTotal: ingresoARS, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, diasPopulares, futuroByCurrency, futuroCount });
+    setStats({ totalSesiones, sesionesIndividuales, sesionesGrupales, ingresoTotal: ingresoARS, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, todosLosClientes, diasPopulares, futuroByCurrency, futuroCount });
     setLoading(false);
   };
 
@@ -310,6 +317,25 @@ export default function Estadisticas() {
     URL.revokeObjectURL(url);
   };
 
+  const exportarClientesCSV = () => {
+    const encabezado = ["Cliente", "Sesiones individuales", "Sesiones grupales", "Total sesiones", "Última sesión", "Total ARS", "Total USD", "Total EUR"];
+    const filas = [encabezado];
+    stats.todosLosClientes.forEach(c => {
+      filas.push([
+        c.nombre, c.individuales, c.grupales, c.count, c.ultima || "—",
+        Math.round(c.totalByCurrency.ARS || 0), Math.round(c.totalByCurrency.USD || 0), Math.round(c.totalByCurrency.EUR || 0),
+      ]);
+    });
+    const csv = filas.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const totalMod = stats.modalidad.virtual + stats.modalidad.presencial;
   const pctV = totalMod > 0 ? Math.round((stats.modalidad.virtual / totalMod) * 100) : 0;
   const pctP = totalMod > 0 ? Math.round((stats.modalidad.presencial / totalMod) * 100) : 0;
@@ -373,7 +399,11 @@ export default function Estadisticas() {
               <div key={m.key} style={s.metricCard}>
                 <div style={{ fontSize: "11px", color: m.color, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</div>
                 <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
-                <div style={s.metricSub}>{m.key === "aFuturo" ? `${stats.futuroCount} turno${stats.futuroCount === 1 ? "" : "s"} por venir` : m.sub}</div>
+                <div style={s.metricSub}>
+                  {m.key === "aFuturo" ? `${stats.futuroCount} turno${stats.futuroCount === 1 ? "" : "s"} por venir`
+                    : m.key === "totalSesiones" ? `${stats.sesionesIndividuales} individuales · ${stats.sesionesGrupales} grupales`
+                    : m.sub}
+                </div>
                 <div style={{ width: "28px", height: "3px", background: m.color, borderRadius: "2px", marginTop: "10px" }}></div>
               </div>
             ))}
@@ -484,6 +514,46 @@ export default function Estadisticas() {
                         <td style={{ fontSize: "12px", color: "#B89FD0", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>📹{m.virtual} · 📍{m.presencial}</td>
                         <td style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{fmtMonedas(m.ingresos)}</td>
                         <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{m.servicioTop}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div style={s.card}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <div>
+                <div style={s.cardTitle}>Reporte de clientes</div>
+                <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "-4px" }}>{stats.todosLosClientes.length} clientes con al menos una sesión, período actual</div>
+              </div>
+              <button onClick={exportarClientesCSV} disabled={stats.todosLosClientes.length === 0}
+                style={{ padding: "6px 14px", background: "#EDE8FA", color: "#5C3F99", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: "nowrap" }}>
+                ⬇ Exportar CSV
+              </button>
+            </div>
+            {stats.todosLosClientes.length === 0 ? (
+              <div style={s.emptyText}>Sin datos en este período</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      {["Cliente", "Individuales", "Grupales", "Total ses.", "Última sesión", "Total gastado"].map(h => (
+                        <th key={h} style={{ fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "8px 10px", textAlign: h === "Cliente" ? "left" : "right", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.todosLosClientes.map((c, i) => (
+                      <tr key={i}>
+                        <td style={{ fontSize: "13px", color: "#2A1845", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{c.nombre}</td>
+                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{c.individuales}</td>
+                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{c.grupales}</td>
+                        <td style={{ fontSize: "13px", color: "#2A1845", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{c.count}</td>
+                        <td style={{ fontSize: "12px", color: "#B89FD0", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{c.ultima || "—"}</td>
+                        <td style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{fmtMonedas(c.totalByCurrency)}</td>
                       </tr>
                     ))}
                   </tbody>
