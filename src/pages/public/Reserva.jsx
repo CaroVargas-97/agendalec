@@ -111,13 +111,15 @@ export default function Reserva() {
   }, []);
 
   // Ventana de reservas: mes actual siempre habilitado, y el mes siguiente se
-  // habilita solo, automáticamente, una semana antes de que empiece.
+  // habilita solo, automáticamente, una semana antes de que empiece — salvo
+  // que la profesional lo haya abierto a mano desde Configuración.
   const finVentanaReservas = () => {
     const hoy = new Date();
     const inicioProximo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
     const cutoff = new Date(inicioProximo);
     cutoff.setDate(cutoff.getDate() - 7);
-    const abreProximo = hoy >= cutoff;
+    const claveProximo = `${inicioProximo.getFullYear()}-${String(inicioProximo.getMonth()+1).padStart(2,"0")}`;
+    const abreProximo = hoy >= cutoff || profSettings?.mes_manual_abierto === claveProximo;
     const mesFin = hoy.getMonth() + (abreProximo ? 1 : 0);
     return new Date(hoy.getFullYear(), mesFin + 1, 0);
   };
@@ -132,7 +134,7 @@ export default function Reserva() {
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }, { data: overrides }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),

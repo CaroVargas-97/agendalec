@@ -77,6 +77,7 @@ export default function Configuracion() {
   const [contactoForm, setContactoForm] = useState({ phone: "", address: "" });
   const [contactoMsg, setContactoMsg] = useState("");
   const [reservasForm, setReservasForm] = useState({ pausadas: false });
+  const [mesManualAbierto, setMesManualAbierto] = useState(null);
   const [reservasMsg, setReservasMsg] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [inviteMsg, setInviteMsg] = useState("");
@@ -169,6 +170,7 @@ export default function Configuracion() {
       if (cfg) {
         setPausas({ pausa: cfg.break_minutes ?? 15, anticipacion: cfg.min_advance_hours ?? 24, cancelacion: cfg.cancellation_hours ?? 24 });
         setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", paypal_link: cfg.paypal_link || "", mp_enabled: cfg.mp_enabled || false });
+        setMesManualAbierto(cfg.mes_manual_abierto || null);
       }
 
       const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
@@ -774,6 +776,24 @@ export default function Configuracion() {
               }}>
                 {reservasForm.pausadas ? "🔓 Reactivar reservas" : "⏸ Pausar reservas temporalmente"}
               </button>
+              {(() => {
+                const hoy = new Date();
+                const proximo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+                const claveProximo = `${proximo.getFullYear()}-${String(proximo.getMonth()+1).padStart(2,"0")}`;
+                const nombreProximo = proximo.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+                const yaAbierto = mesManualAbierto === claveProximo;
+                return (
+                  <button style={{ ...s.cancelBtn, marginTop: "8px" }} onClick={async () => {
+                    const uid = await getUid();
+                    const nuevoValor = yaAbierto ? null : claveProximo;
+                    const { error } = await supabase.from("settings").update({ mes_manual_abierto: nuevoValor }).eq("professional_id", uid);
+                    if (error) setReservasMsg("Error al guardar");
+                    else { setMesManualAbierto(nuevoValor); setReservasMsg(yaAbierto ? "✓ Vuelve a la apertura automática" : `✓ ${nombreProximo} ya está disponible para reservar`); setTimeout(() => setReservasMsg(""), 2500); }
+                  }}>
+                    {yaAbierto ? `🔒 Cerrar apertura manual de ${nombreProximo}` : `🔓 Abrir ${nombreProximo} ahora`}
+                  </button>
+                );
+              })()}
             </div>
             <div style={s.card}>
               <div style={s.cardTitle}>Cambiar contraseña</div>
