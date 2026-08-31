@@ -530,7 +530,7 @@ export default function Agenda() {
                         );
                       })()}
                       {turnos.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: "13px", color: "#C4A8D8" }}>No hay turnos para este día</div>}
-                      {turnos.filter(t => t.start_time).map((t, i) => {
+                      {turnos.filter(t => t.start_time && t.status !== "cancelled").map((t, i) => {
                         const isPending = t.status === "pending" || t.status === "partial";
                         const isVirtual = t.modality === "virtual";
                         const isCancelled = t.status === "cancelled";
@@ -557,7 +557,7 @@ export default function Agenda() {
                     <div></div>
                     {semana.map((d, i) => {
                       const esHoy = toISO(d) === toISO(new Date());
-                      const countDia = turnosSemana.filter(t => t.date === toISO(d)).length;
+                      const countDia = turnosSemana.filter(t => t.date === toISO(d) && t.status !== "cancelled").length;
                       const esBloqueado = blockedDates.some(b => b.date === toISO(d) && !b.start_time);
                       const tieneBloqueoParcial = blockedDates.some(b => b.date === toISO(d) && b.start_time);
                       return (
@@ -572,7 +572,7 @@ export default function Agenda() {
                       <>
                         <div style={{ height: "64px", fontSize: "11px", color: "#C4A8D8", paddingTop: "4px" }}>{h}</div>
                         {semana.map((d, di) => {
-                          const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.slice(0,2) === h.slice(0,2));
+                          const turnosDia = turnosSemana.filter(t => t.date === toISO(d) && t.start_time?.slice(0,2) === h.slice(0,2) && t.status !== "cancelled");
                           const celdaBloqueadaTotal = blockedDates.some(b => b.date === toISO(d) && !b.start_time);
                           const celdaBloqueadaParcial = blockedDates.some(b => b.date === toISO(d) && b.start_time && b.start_time.slice(0,5) <= h && h < b.end_time.slice(0,5));
                           return (
