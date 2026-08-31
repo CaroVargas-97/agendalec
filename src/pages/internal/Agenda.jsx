@@ -33,6 +33,8 @@ const s = {
   pagoBtnActive: { flex: 1, padding: "8px 4px", borderRadius: "8px", border: "0.5px solid #9B72C0", fontSize: "11px", fontWeight: "500", cursor: "pointer", textAlign: "center", background: "#EDE8FA", color: "#5C3F99", fontFamily: "'Plus Jakarta Sans', sans-serif" },
 };
 
+const esLimpieza = (t) => !!t.services?.name?.toLowerCase().includes("limpieza");
+
 const toISO = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 const formatFecha = (date) => date.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
 
@@ -491,10 +493,11 @@ export default function Agenda() {
                     <div style={{ marginBottom: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
                       <div style={{ fontSize: "11px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>A coordinar este día</div>
                       {turnos.filter(t => !t.start_time).map((t, i) => {
+                        const isLimpieza = esLimpieza(t);
                         const isPending = t.status === "pending" || t.status === "partial";
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
-                            <strong>{t.clients?.full_name}</strong> · {t.services?.name}
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isLimpieza ? "#EAF6EE" : isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isLimpieza ? "#3B8C5A" : isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
+                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}
                           </div>
                         );
                       })}
@@ -531,14 +534,15 @@ export default function Agenda() {
                       })()}
                       {turnos.length === 0 && <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", fontSize: "13px", color: "#C4A8D8" }}>No hay turnos para este día</div>}
                       {turnos.filter(t => t.start_time && t.status !== "cancelled").map((t, i) => {
+                        const isLimpieza = esLimpieza(t);
                         const isPending = t.status === "pending" || t.status === "partial";
                         const isVirtual = t.modality === "virtual";
                         const isCancelled = t.status === "cancelled";
-                        const accent = isCancelled ? "#9CA3AF" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
-                        const bg = isCancelled ? "#F3F4F6" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
-                        const textColor = isCancelled ? "#6B7280" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
-                        const label = isCancelled ? "Cancelado" : isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial";
-                        const emoji = isCancelled ? "✗" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                        const accent = isCancelled ? "#9CA3AF" : isLimpieza ? "#3B8C5A" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
+                        const bg = isCancelled ? "#F3F4F6" : isLimpieza ? "#EAF6EE" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
+                        const textColor = isCancelled ? "#6B7280" : isLimpieza ? "#1F5C37" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
+                        const label = isCancelled ? "Cancelado" : isLimpieza ? "Limpieza" : isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial";
+                        const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         const h = getHeight(t.start_time, t.end_time);
                         return (
                           <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
@@ -579,12 +583,13 @@ export default function Agenda() {
                               {turnosDelDia.length === 0 ? (
                                 <div style={{ padding: "10px 12px", fontSize: "12px", color: "#C4A8D8" }}>Sin turnos</div>
                               ) : turnosDelDia.map((t, ti) => {
+                                const isLimpieza = esLimpieza(t);
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
-                                const accent = isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
-                                const bg = isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
-                                const textColor = isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
-                                const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                                const accent = isLimpieza ? "#3B8C5A" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
+                                const bg = isLimpieza ? "#EAF6EE" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
+                                const textColor = isLimpieza ? "#1F5C37" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
+                                const emoji = isLimpieza ? "🌿" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
                                   <div key={ti} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", background: bg, borderTop: "0.5px solid #fff", borderLeft: `4px solid ${accent}`, cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
                                     <div style={{ fontSize: "11px", fontWeight: "600", color: accent, minWidth: "44px" }}>{t.start_time ? t.start_time.slice(0,5) : "A coord."}</div>
@@ -627,13 +632,14 @@ export default function Agenda() {
                           return (
                             <div key={`${h}-${di}`} style={{ height: "64px", borderLeft: "0.5px solid #F0E8F8", borderBottom: "0.5px solid #F8F0FC", position: "relative", background: (celdaBloqueadaTotal || celdaBloqueadaParcial) ? "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 6px, #F9FAFB 6px, #F9FAFB 12px)" : toISO(d) === toISO(new Date()) ? "#FDFAFF" : "transparent" }}>
                               {turnosDia.map((t, ti) => {
+                                const isLimpieza = esLimpieza(t);
                                 const isPending = t.status === "pending" || t.status === "partial";
                                 const isVirtual = t.modality === "virtual";
                                 const isCancelled = t.status === "cancelled";
-                                const accent = isCancelled ? "#9CA3AF" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
-                                const bg = isCancelled ? "#F3F4F6" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
-                                const textColor = isCancelled ? "#6B7280" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
-                                const emoji = isCancelled ? "✗" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                                const accent = isCancelled ? "#9CA3AF" : isLimpieza ? "#3B8C5A" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
+                                const bg = isCancelled ? "#F3F4F6" : isLimpieza ? "#EAF6EE" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
+                                const textColor = isCancelled ? "#6B7280" : isLimpieza ? "#1F5C37" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
+                                const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
                                   <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "6px", padding: "4px 6px", background: bg, borderLeft: `3px solid ${accent}`, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: "1px" }}>
                                     <div style={{ fontSize: "9px", fontWeight: "600", color: accent }}>{t.start_time?.slice(0,5)} {emoji}</div>
