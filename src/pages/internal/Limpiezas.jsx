@@ -211,6 +211,14 @@ export default function Limpiezas() {
     await cargar();
   };
 
+  const eliminar = async (l) => {
+    if (!window.confirm("¿Eliminar esta limpieza definitivamente? Esta acción no se puede deshacer.")) return;
+    await supabase.from("payments").delete().eq("appointment_id", l.id);
+    const { error } = await supabase.from("appointments").delete().eq("id", l.id);
+    if (error) { alert("No se pudo eliminar: " + error.message); return; }
+    await cargar();
+  };
+
   const subirComprobante = async (l, file, tipo) => {
     if (!file) return;
     const pago = l.payments?.find(p => p.type === tipo);
@@ -336,6 +344,11 @@ export default function Limpiezas() {
                       <a href={linkWhatsApp(l.clients.phone)} target="_blank" rel="noreferrer"><button style={s.btnWA}>💬</button></a>
                     )}
                     <button onClick={() => cancelar(l)} style={{ padding: "5px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>✕</button>
+                  </div>
+                )}
+                {l.status === "cancelled" && (
+                  <div style={{ display: "flex", marginTop: "10px" }}>
+                    <button onClick={() => eliminar(l)} style={{ padding: "5px 10px", background: "#fff", color: "#9CA3AF", border: "0.5px solid #E5E7EB", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>🗑 Eliminar</button>
                   </div>
                 )}
               </div>
