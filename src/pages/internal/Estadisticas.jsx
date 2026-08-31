@@ -51,6 +51,7 @@ export default function Estadisticas() {
   const [modoMes, setModoMes] = useState(false);
   const [mesSeleccionado, setMesSeleccionado] = useState(() => { const d = new Date(); return { anio: d.getFullYear(), mes: d.getMonth() }; });
   const [loading, setLoading] = useState(true);
+  const [mostrarFuturo, setMostrarFuturo] = useState(false);
   const [stats, setStats] = useState({
     totalSesiones: 0, sesionesIndividuales: 0, sesionesGrupales: 0, ingresoTotal: 0, ingresoByCurrency: {},
     ingresoIndividualByCurrency: {}, ingresoGrupalByCurrency: {},
@@ -58,7 +59,7 @@ export default function Estadisticas() {
     serviciosIndividuales: [], eventosGrupales: [],
     modalidad: { virtual: 0, presencial: 0 },
     topClientesIndividuales: [], topAsistentesGrupales: [], todosLosClientes: [], diasPopulares: [],
-    futuroByCurrency: {}, futuroCount: 0,
+    futuroByCurrency: {}, futuroCount: 0, futuroDetalle: [],
   });
   const [resumenMensual, setResumenMensual] = useState([]);
   const [loadingMensual, setLoadingMensual] = useState(true);
@@ -112,13 +113,13 @@ export default function Estadisticas() {
       // es todo lo que ya está reservado y todavía no ocurrió.
       supabase
         .from("appointments")
-        .select("total_price, services(currency)")
+        .select("date, total_price, services(name, currency), clients(full_name)")
         .eq("professional_id", uid)
         .gt("date", hoyISO)
         .neq("status", "cancelled"),
       supabase
         .from("group_events")
-        .select("price, currency, group_attendees(status, custom_price)")
+        .select("name, date, price, currency, group_attendees(full_name, status, custom_price)")
         .eq("professional_id", uid)
         .gt("date", hoyISO),
       supabase.from("services").select("id").ilike("name", "%limpieza%"),
@@ -255,6 +256,21 @@ export default function Estadisticas() {
     });
     const futuroCount = (futuros || []).length + asistentesFuturos.length;
 
+    // Detalle turno por turno de lo que compone "A futuro", para que se
+    // pueda ver de dónde sale el número en vez de mostrar solo el total.
+    const futuroDetalle = [
+      ...(futuros || []).map(a => ({
+        fecha: a.date, nombre: a.clients?.full_name || "Cliente", detalle: a.services?.name || "Sin servicio",
+        currency: a.services?.currency || "ARS", monto: parseFloat(a.total_price || 0),
+      })),
+      ...(eventosFuturos || []).flatMap(ev =>
+        (ev.group_attendees || []).map(a => ({
+          fecha: ev.date, nombre: a.full_name || "Sin nombre", detalle: ev.name,
+          currency: ev.currency || "ARS", monto: a.status === "cortesia" ? 0 : parseFloat(a.custom_price ?? ev.price ?? 0),
+        }))
+      ),
+    ].sort((a, b) => a.fecha.localeCompare(b.fecha));
+
     setStats({
       totalSesiones, sesionesIndividuales, sesionesGrupales, ingresoTotal: ingresoARS,
       ingresoByCurrency, ingresoIndividualByCurrency, ingresoGrupalByCurrency,
@@ -262,7 +278,7 @@ export default function Estadisticas() {
       serviciosIndividuales, eventosGrupales,
       modalidad: { virtual, presencial },
       topClientesIndividuales, topAsistentesGrupales, todosLosClientes, diasPopulares,
-      futuroByCurrency, futuroCount,
+      futuroByCurrency, futuroCount, futuroDetalle,
     });
     setLoading(false);
   };
@@ -461,11 +477,15 @@ export default function Estadisticas() {
         <>
           <div style={s.metrics}>
             {metricsDef.filter(m => m.key !== "aFuturo" || !modoMes).map(m => (
-              <div key={m.key} style={s.metricCard}>
+              <div
+                key={m.key}
+                style={{ ...s.metricCard, cursor: m.key === "aFuturo" ? "pointer" : "default" }}
+                onClick={m.key === "aFuturo" ? () => setMostrarFuturo(v => !v) : undefined}
+              >
                 <div style={{ fontSize: "11px", color: m.color, marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>{m.label}</div>
                 <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
                 <div style={s.metricSub}>
-                  {m.key === "aFuturo" ? `${stats.futuroCount} turno${stats.futuroCount === 1 ? "" : "s"} por venir`
+                  {m.key === "aFuturo" ? `${stats.futuroCount} turno${stats.futuroCount === 1 ? "" : "s"} por venir · ${mostrarFuturo ? "ocultar" : "ver"} detalle ${mostrarFuturo ? "▴" : "▾"}`
                     : m.key === "totalSesiones" ? `${stats.sesionesIndividuales} sesiones individuales · ${stats.sesionesGrupales} personas anotadas a grupales`
                     : m.sub}
                 </div>
@@ -473,6 +493,35 @@ export default function Estadisticas() {
               </div>
             ))}
           </div>
+
+          {mostrarFuturo && !modoMes && (
+            <div style={s.card}>
+              <div style={s.cardTitle}>Detalle de lo agendado a futuro</div>
+              {stats.futuroDetalle.length === 0 ? <div style={s.emptyText}>No hay turnos agendados a futuro</div> : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        {["Fecha", "Cliente", "Servicio/evento", "Monto"].map(h => (
+                          <th key={h} style={{ fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "8px 10px", textAlign: h === "Monto" ? "right" : "left", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.futuroDetalle.map((f, i) => (
+                        <tr key={i}>
+                          <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8", whiteSpace: "nowrap" }}>{f.fecha}</td>
+                          <td style={{ fontSize: "13px", color: "#2A1845", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{f.nombre}</td>
+                          <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{f.detalle}</td>
+                          <td style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{fmtMonedas({ [f.currency]: f.monto })}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           <div style={s.sectionHeader}>
             <div style={s.sectionTitle}>🧘 Individuales</div>
