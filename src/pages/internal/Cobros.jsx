@@ -249,6 +249,14 @@ export default function Cobros() {
     cargar();
   };
 
+  const eliminarTurno = async (id) => {
+    if (!window.confirm("¿Eliminar este turno definitivamente? Esta acción no se puede deshacer.")) return;
+    await supabase.from("payments").delete().eq("appointment_id", id);
+    const { error } = await supabase.from("appointments").delete().eq("id", id);
+    if (error) { alert("No se pudo eliminar: " + error.message); return; }
+    cargar();
+  };
+
   const fmtMonedas = (byCurrency) => {
     const entradas = Object.entries(byCurrency || {}).filter(([, v]) => v > 0);
     if (entradas.length === 0) return "$0";
@@ -386,6 +394,9 @@ export default function Cobros() {
                   <div style={{ ...s.cobroMonto, color: t.status === "confirmed" ? "#3B6D11" : "#A32D2D" }}>
                     {symFor(t.services?.currency)}{parseFloat(t.total_price || 0).toLocaleString("es-AR")}
                   </div>
+                  {t.status === "cancelled" && (
+                    <button onClick={() => eliminarTurno(t.id)} style={{ padding: "6px 10px", background: "#fff", color: "#9CA3AF", border: "0.5px solid #E5E7EB", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>🗑 Eliminar</button>
+                  )}
                 </div>
               ))
             )}
