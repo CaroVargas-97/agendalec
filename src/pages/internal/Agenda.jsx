@@ -552,7 +552,56 @@ export default function Agenda() {
                   </div>
                   </>
                 )}
-                {vista === "semana" && (
+                {vista === "semana" && (isMobile ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {semana.map((d, i) => {
+                      const esHoy = toISO(d) === toISO(new Date());
+                      const esBloqueado = blockedDates.some(b => b.date === toISO(d) && !b.start_time);
+                      const bloqueosDia = blockedDates.filter(b => b.date === toISO(d) && b.start_time);
+                      const turnosDelDia = turnosSemana
+                        .filter(t => t.date === toISO(d) && t.status !== "cancelled")
+                        .sort((a, b) => (a.start_time || "99:99").localeCompare(b.start_time || "99:99"));
+                      return (
+                        <div key={i} style={{ borderRadius: "10px", border: `0.5px solid ${esHoy ? "#D0B8E8" : "#F0E8F8"}`, overflow: "hidden" }}>
+                          <div style={{ padding: "8px 12px", background: esHoy ? "#F3EEFF" : "#FAF7FD", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ fontSize: "13px", fontWeight: esHoy ? "600" : "500", color: esHoy ? "#5C3F99" : "#2A1845", textTransform: "capitalize" }}>
+                              {DIAS_SEMANA[i]} {d.getDate()}
+                            </div>
+                            {esBloqueado && <div style={{ fontSize: "11px", color: "#9CA3AF" }}>🔒 bloqueado</div>}
+                          </div>
+                          {esBloqueado ? null : (
+                            <div>
+                              {bloqueosDia.map((b, bi) => (
+                                <div key={`b${bi}`} style={{ padding: "8px 12px", fontSize: "11px", color: "#6B7280", background: "#F9FAFB", borderTop: "0.5px solid #F0E8F8" }}>
+                                  🔒 {b.start_time.slice(0,5)}–{b.end_time.slice(0,5)} bloqueado{b.reason ? ` · ${b.reason}` : ""}
+                                </div>
+                              ))}
+                              {turnosDelDia.length === 0 ? (
+                                <div style={{ padding: "10px 12px", fontSize: "12px", color: "#C4A8D8" }}>Sin turnos</div>
+                              ) : turnosDelDia.map((t, ti) => {
+                                const isPending = t.status === "pending" || t.status === "partial";
+                                const isVirtual = t.modality === "virtual";
+                                const accent = isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
+                                const bg = isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
+                                const textColor = isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
+                                const emoji = isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                                return (
+                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", background: bg, borderTop: "0.5px solid #fff", borderLeft: `4px solid ${accent}`, cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
+                                    <div style={{ fontSize: "11px", fontWeight: "600", color: accent, minWidth: "44px" }}>{t.start_time ? t.start_time.slice(0,5) : "A coord."}</div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontSize: "13px", fontWeight: "600", color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.clients?.full_name}</div>
+                                      <div style={{ fontSize: "11px", color: textColor, opacity: 0.75, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emoji} {t.services?.name}</div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
                   <div style={{ overflowX: "auto" }}><div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, minWidth: "600px" }}>
                     <div></div>
                     {semana.map((d, i) => {
@@ -599,7 +648,7 @@ export default function Agenda() {
                       </>
                     ))}
                   </div></div>
-                )}
+                ))}
               </>
             )}
           </div>
