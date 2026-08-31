@@ -26,6 +26,9 @@ const s = {
   modV: { background: "#9B72C0", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", fontWeight: "500" },
   modP: { background: "#E88BB0", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", fontWeight: "500" },
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "1rem 0" },
+  sectionHeader: { display: "flex", alignItems: "center", gap: "10px", marginTop: "6px" },
+  sectionTitle: { fontSize: "15px", fontWeight: "600", color: "#3B2460" },
+  sectionLine: { flex: 1, height: "1px", background: "#E8DEF5" },
 };
 
 const metricsDef = [
@@ -50,8 +53,11 @@ export default function Estadisticas() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalSesiones: 0, sesionesIndividuales: 0, sesionesGrupales: 0, ingresoTotal: 0, ingresoByCurrency: {},
-    clientesUnicos: 0, promedioSesion: 0, servicios: [],
-    modalidad: { virtual: 0, presencial: 0 }, topClientes: [], todosLosClientes: [], diasPopulares: [],
+    ingresoIndividualByCurrency: {}, ingresoGrupalByCurrency: {},
+    clientesUnicos: 0, promedioSesion: 0,
+    serviciosIndividuales: [], eventosGrupales: [],
+    modalidad: { virtual: 0, presencial: 0 },
+    topClientesIndividuales: [], topAsistentesGrupales: [], todosLosClientes: [], diasPopulares: [],
     futuroByCurrency: {}, futuroCount: 0,
   });
   const [resumenMensual, setResumenMensual] = useState([]);
@@ -146,14 +152,18 @@ export default function Estadisticas() {
     ]);
     const clientesUnicos = clientesSet.size;
 
-    const ingresoByCurrency = {};
+    const ingresoIndividualByCurrency = {};
     sesiones.forEach(a => {
       const cur = a.services?.currency || "ARS";
-      ingresoByCurrency[cur] = (ingresoByCurrency[cur] || 0) + parseFloat(a.total_price || 0);
+      ingresoIndividualByCurrency[cur] = (ingresoIndividualByCurrency[cur] || 0) + parseFloat(a.total_price || 0);
     });
+    const ingresoGrupalByCurrency = {};
     asistentesGrupales.forEach(a => {
-      ingresoByCurrency[a.currency] = (ingresoByCurrency[a.currency] || 0) + a.monto;
+      ingresoGrupalByCurrency[a.currency] = (ingresoGrupalByCurrency[a.currency] || 0) + a.monto;
     });
+    const ingresoByCurrency = {};
+    Object.entries(ingresoIndividualByCurrency).forEach(([cur, v]) => { ingresoByCurrency[cur] = (ingresoByCurrency[cur] || 0) + v; });
+    Object.entries(ingresoGrupalByCurrency).forEach(([cur, v]) => { ingresoByCurrency[cur] = (ingresoByCurrency[cur] || 0) + v; });
     const ingresoARS = ingresoByCurrency["ARS"] || 0;
     const arsCount = sesiones.filter(a => !a.services?.currency || a.services?.currency === "ARS").length
       + asistentesGrupales.filter(a => a.currency === "ARS").length;
@@ -165,20 +175,27 @@ export default function Estadisticas() {
     // (pesos y dólares mezclados bajo el mismo total).
     const sumarEn = (obj, cur, monto) => { obj[cur || "ARS"] = (obj[cur || "ARS"] || 0) + monto; };
 
-    const servMap = {};
+    // Separados: un evento grupal puntual (que pasó una sola vez, con mucha
+    // gente anotada) no compite en la misma lista que un servicio individual
+    // que se repite con distintos clientes — mezclarlos hacía parecer que un
+    // evento de una vez era "más pedido" que un servicio realmente recurrente.
+    const servMapInd = {};
     sesiones.forEach(a => {
       const n = a.services?.name || "Sin servicio";
-      if (!servMap[n]) servMap[n] = { count: 0, totalByCurrency: {} };
-      servMap[n].count++;
-      sumarEn(servMap[n].totalByCurrency, a.services?.currency, parseFloat(a.total_price || 0));
+      if (!servMapInd[n]) servMapInd[n] = { count: 0, totalByCurrency: {} };
+      servMapInd[n].count++;
+      sumarEn(servMapInd[n].totalByCurrency, a.services?.currency, parseFloat(a.total_price || 0));
     });
+    const serviciosIndividuales = Object.entries(servMapInd).map(([nombre, v]) => ({ nombre, ...v })).sort((a, b) => b.count - a.count);
+
+    const servMapGrp = {};
     asistentesGrupales.forEach(a => {
       const n = a.evento || "Evento grupal";
-      if (!servMap[n]) servMap[n] = { count: 0, totalByCurrency: {} };
-      servMap[n].count++;
-      sumarEn(servMap[n].totalByCurrency, a.currency, a.monto);
+      if (!servMapGrp[n]) servMapGrp[n] = { count: 0, totalByCurrency: {} };
+      servMapGrp[n].count++;
+      sumarEn(servMapGrp[n].totalByCurrency, a.currency, a.monto);
     });
-    const servicios = Object.entries(servMap).map(([nombre, v]) => ({ nombre, ...v })).sort((a, b) => b.count - a.count);
+    const eventosGrupales = Object.entries(servMapGrp).map(([nombre, v]) => ({ nombre, ...v })).sort((a, b) => b.count - a.count);
 
     const virtual = sesiones.filter(a => a.modality === "virtual").length;
     const presencial = sesiones.filter(a => a.modality === "presencial").length;
@@ -202,7 +219,11 @@ export default function Estadisticas() {
       if (a.date && (!cliMap[id].ultima || a.date > cliMap[id].ultima)) cliMap[id].ultima = a.date;
     });
     const todosLosClientes = Object.values(cliMap).sort((a, b) => b.count - a.count);
-    const topClientes = todosLosClientes.slice(0, 5);
+    // Top de cada sección por separado: alguien puede ser un cliente fiel
+    // de sesiones individuales sin haber ido nunca a un grupal, y viceversa
+    // — mezclarlos en un solo ranking tapaba esa diferencia.
+    const topClientesIndividuales = Object.values(cliMap).filter(c => c.individuales > 0).sort((a, b) => b.individuales - a.individuales).slice(0, 5);
+    const topAsistentesGrupales = Object.values(cliMap).filter(c => c.grupales > 0).sort((a, b) => b.grupales - a.grupales).slice(0, 5);
 
     const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
     const diaMap = {};
@@ -234,7 +255,15 @@ export default function Estadisticas() {
     });
     const futuroCount = (futuros || []).length + asistentesFuturos.length;
 
-    setStats({ totalSesiones, sesionesIndividuales, sesionesGrupales, ingresoTotal: ingresoARS, clientesUnicos, promedioSesion, ingresoByCurrency, servicios, modalidad: { virtual, presencial }, topClientes, todosLosClientes, diasPopulares, futuroByCurrency, futuroCount });
+    setStats({
+      totalSesiones, sesionesIndividuales, sesionesGrupales, ingresoTotal: ingresoARS,
+      ingresoByCurrency, ingresoIndividualByCurrency, ingresoGrupalByCurrency,
+      clientesUnicos, promedioSesion,
+      serviciosIndividuales, eventosGrupales,
+      modalidad: { virtual, presencial },
+      topClientesIndividuales, topAsistentesGrupales, todosLosClientes, diasPopulares,
+      futuroByCurrency, futuroCount,
+    });
     setLoading(false);
   };
 
@@ -355,7 +384,8 @@ export default function Estadisticas() {
   const totalMod = stats.modalidad.virtual + stats.modalidad.presencial;
   const pctV = totalMod > 0 ? Math.round((stats.modalidad.virtual / totalMod) * 100) : 0;
   const pctP = totalMod > 0 ? Math.round((stats.modalidad.presencial / totalMod) * 100) : 0;
-  const maxServ = Math.max(...stats.servicios.map(s => s.count), 1);
+  const maxServInd = Math.max(...stats.serviciosIndividuales.map(s => s.count), 1);
+  const maxEventGrp = Math.max(...stats.eventosGrupales.map(s => s.count), 1);
   const maxDia = Math.max(...stats.diasPopulares.map(d => d.count), 1);
 
   const nombreMesSel = new Date(mesSeleccionado.anio, mesSeleccionado.mes, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" });
@@ -436,7 +466,7 @@ export default function Estadisticas() {
                 <div style={{ fontSize: "32px", fontWeight: "500", color: "#2A1845", lineHeight: 1 }}>{metricValues[m.key]}</div>
                 <div style={s.metricSub}>
                   {m.key === "aFuturo" ? `${stats.futuroCount} turno${stats.futuroCount === 1 ? "" : "s"} por venir`
-                    : m.key === "totalSesiones" ? `${stats.sesionesIndividuales} individuales · ${stats.sesionesGrupales} grupales`
+                    : m.key === "totalSesiones" ? `${stats.sesionesIndividuales} sesiones individuales · ${stats.sesionesGrupales} personas anotadas a grupales`
                     : m.sub}
                 </div>
                 <div style={{ width: "28px", height: "3px", background: m.color, borderRadius: "2px", marginTop: "10px" }}></div>
@@ -444,15 +474,20 @@ export default function Estadisticas() {
             ))}
           </div>
 
+          <div style={s.sectionHeader}>
+            <div style={s.sectionTitle}>🧘 Individuales</div>
+            <div style={s.sectionLine}></div>
+            <div style={{ fontSize: "12px", color: "#B89FD0" }}>{stats.sesionesIndividuales} sesiones · {fmtMonedas(stats.ingresoIndividualByCurrency)}</div>
+          </div>
           <div style={s.grid}>
             <div style={s.card}>
               <div style={s.cardTitle}>Servicios más solicitados</div>
-              {stats.servicios.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.servicios.map((sv, i) => (
+              {stats.serviciosIndividuales.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.serviciosIndividuales.map((sv, i) => (
                 <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <div style={{ flex: 1 }}>
                     <div style={s.rowName}>{sv.nombre}</div>
                     <div style={s.bar}>
-                      <div style={{ height: "100%", width: `${(sv.count / maxServ) * 100}%`, background: barColors[i % barColors.length], borderRadius: "3px" }}></div>
+                      <div style={{ height: "100%", width: `${(sv.count / maxServInd) * 100}%`, background: barColors[i % barColors.length], borderRadius: "3px" }}></div>
                     </div>
                   </div>
                   <div style={{ textAlign: "right", minWidth: "80px" }}>
@@ -486,35 +521,76 @@ export default function Estadisticas() {
             </div>
 
             <div style={s.card}>
-              <div style={s.cardTitle}>Top clientes</div>
-              {stats.topClientes.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.topClientes.map((c, i) => (
+              <div style={s.cardTitle}>Top clientes individuales</div>
+              {stats.topClientesIndividuales.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.topClientesIndividuales.map((c, i) => (
                 <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "#3B2460", fontWeight: "500", flexShrink: 0 }}>
                     {c.nombre.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
                   </div>
                   <div style={s.rowName}>{c.nombre}</div>
                   <div style={{ textAlign: "right" }}>
-                    <div style={s.rowValue}>{c.count} ses.</div>
+                    <div style={s.rowValue}>{c.individuales} ses.</div>
                     <div style={s.rowSub}>{fmtMonedas(c.totalByCurrency)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={s.sectionHeader}>
+            <div style={s.sectionTitle}>👥 Grupales</div>
+            <div style={s.sectionLine}></div>
+            <div style={{ fontSize: "12px", color: "#B89FD0" }}>{stats.sesionesGrupales} personas anotadas · {fmtMonedas(stats.ingresoGrupalByCurrency)}</div>
+          </div>
+          <div style={s.grid}>
+            <div style={s.card}>
+              <div style={s.cardTitle}>Eventos/cursos más concurridos</div>
+              {stats.eventosGrupales.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.eventosGrupales.map((sv, i) => (
+                <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ flex: 1 }}>
+                    <div style={s.rowName}>{sv.nombre}</div>
+                    <div style={s.bar}>
+                      <div style={{ height: "100%", width: `${(sv.count / maxEventGrp) * 100}%`, background: barColors[i % barColors.length], borderRadius: "3px" }}></div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", minWidth: "100px" }}>
+                    <div style={s.rowValue}>{sv.count} anotados</div>
+                    <div style={s.rowSub}>{fmtMonedas(sv.totalByCurrency)}</div>
                   </div>
                 </div>
               ))}
             </div>
 
             <div style={s.card}>
-              <div style={s.cardTitle}>Días más activos</div>
-              {stats.diasPopulares.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.diasPopulares.map((d, i) => (
+              <div style={s.cardTitle}>Top asistentes a grupales</div>
+              {stats.topAsistentesGrupales.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.topAsistentesGrupales.map((c, i) => (
                 <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                  <div style={{ flex: 1 }}>
-                    <div style={s.rowName}>{d.dia}</div>
-                    <div style={s.bar}>
-                      <div style={{ height: "100%", width: `${(d.count / maxDia) * 100}%`, background: barColors[i % barColors.length], borderRadius: "3px" }}></div>
-                    </div>
+                  <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: avatarColors[i % avatarColors.length], display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "#3B2460", fontWeight: "500", flexShrink: 0 }}>
+                    {c.nombre.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
                   </div>
-                  <div style={{ ...s.rowValue, minWidth: "36px", textAlign: "right" }}>{d.count}</div>
+                  <div style={s.rowName}>{c.nombre}</div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={s.rowValue}>{c.grupales} veces</div>
+                    <div style={s.rowSub}>{fmtMonedas(c.totalByCurrency)}</div>
+                  </div>
                 </div>
               ))}
             </div>
+          </div>
+
+          <div style={s.card}>
+            <div style={s.cardTitle}>Días más activos</div>
+            {stats.diasPopulares.length === 0 ? <div style={s.emptyText}>Sin datos</div> : stats.diasPopulares.map((d, i) => (
+              <div key={i} style={s.rowItem} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <div style={{ flex: 1 }}>
+                  <div style={s.rowName}>{d.dia}</div>
+                  <div style={s.bar}>
+                    <div style={{ height: "100%", width: `${(d.count / maxDia) * 100}%`, background: barColors[i % barColors.length], borderRadius: "3px" }}></div>
+                  </div>
+                </div>
+                <div style={{ ...s.rowValue, minWidth: "36px", textAlign: "right" }}>{d.count}</div>
+              </div>
+            ))}
           </div>
 
           <div style={s.card}>
