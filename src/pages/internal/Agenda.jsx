@@ -607,6 +607,21 @@ export default function Agenda() {
                     })}
                   </div>
                 ) : (
+                  <>
+                  {turnosSemana.some(t => !t.start_time && t.status !== "cancelled") && (
+                    <div style={{ marginBottom: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                      <div style={{ fontSize: "11px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>A coordinar esta semana</div>
+                      {turnosSemana.filter(t => !t.start_time && t.status !== "cancelled").map((t, i) => {
+                        const isLimpieza = esLimpieza(t);
+                        const isPending = t.status === "pending" || t.status === "partial";
+                        return (
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isLimpieza ? "#EAF6EE" : isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isLimpieza ? "#3B8C5A" : isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
+                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{t.date ? ` · ${new Date(t.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" })}` : ""}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div style={{ overflowX: "auto" }}><div style={{ display: "grid", gridTemplateColumns: `52px repeat(7, 1fr)`, minWidth: "600px" }}>
                     <div></div>
                     {semana.map((d, i) => {
@@ -654,6 +669,7 @@ export default function Agenda() {
                       </>
                     ))}
                   </div></div>
+                  </>
                 ))}
               </>
             )}
