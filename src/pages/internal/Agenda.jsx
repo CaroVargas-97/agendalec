@@ -5,8 +5,8 @@ import { calcularSaldoPendiente } from "../../utils/pagos";
 import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 import { cuando } from "../../utils/fecha";
 
-const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
 const DIAS_SEMANA = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+const RANGO_DEFAULT = { inicio: 8, fin: 20 };
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -38,9 +38,9 @@ const esLimpieza = (t) => !!t.services?.name?.toLowerCase().includes("limpieza")
 const toISO = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 const formatFecha = (date) => date.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
 
-const getTop = (hora) => {
+const getTop = (hora, horaInicio) => {
   const [h, m] = hora.split(":").map(Number);
-  return ((h - 8) * 64) + (m / 60 * 64);
+  return ((h - horaInicio) * 64) + (m / 60 * 64);
 };
 
 const getHeight = (inicio, fin) => {
@@ -81,6 +81,9 @@ export default function Agenda() {
   const [savingEditTurno, setSavingEditTurno] = useState(false);
   const [horaActual, setHoraActual] = useState(new Date());
   const [blockedDates, setBlockedDates] = useState([]);
+  const [rangoHoras, setRangoHoras] = useState(RANGO_DEFAULT);
+
+  const HORAS = Array.from({ length: rangoHoras.fin - rangoHoras.inicio }, (_, i) => `${String(rangoHoras.inicio + i).padStart(2, "0")}:00`);
 
   useEffect(() => {
     const interval = setInterval(() => setHoraActual(new Date()), 60000);
@@ -128,15 +131,19 @@ export default function Agenda() {
     if (filtroProf !== "todos") turnosQuery = turnosQuery.eq("professional_id", filtroProf);
     if (filtroMod !== "todas") turnosQuery = turnosQuery.eq("modality", filtroMod);
 
-    // Ninguna de estas 4 consultas depende de las otras: se disparan todas
+    let availQuery = supabase.from("availability").select("day_of_week, active, start_time, end_time");
+    if (filtroProf !== "todos") availQuery = availQuery.eq("professional_id", filtroProf);
+
+    // Ninguna de estas 5 consultas depende de las otras: se disparan todas
     // juntas en vez de esperar en cadena, para que Agenda cargue de una.
-    const [{ data: blocked }, { data: turnosData }, { data: profs }, { data: svs }] = await Promise.all([
+    const [{ data: blocked }, { data: turnosData }, { data: profs }, { data: svs }, { data: avail }] = await Promise.all([
       currentUid
         ? supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", currentUid)
         : Promise.resolve({ data: [] }),
       turnosQuery,
       supabase.from("profiles").select("id, full_name").eq("role", "professional"),
       supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency, requires_slot"),
+      availQuery,
     ]);
 
     setBlockedDates(blocked || []);
@@ -144,6 +151,31 @@ export default function Agenda() {
     else setTurnosSemana(turnosData || []);
     setProfesionales(profs || []);
     setServicios(svs || []);
+
+    // La grilla sigue la disponibilidad configurada (Config → Disponibilidad)
+    // en vez de horas fijas en el código. Si hay un turno cargado fuera de
+    // ese rango (una excepción puntual), igual se expande para que no quede
+    // cortado.
+    let horaMin = RANGO_DEFAULT.inicio, horaMax = RANGO_DEFAULT.fin;
+    const diasActivos = (avail || []).filter(a => a.active && a.start_time && a.end_time);
+    if (diasActivos.length > 0) {
+      horaMin = Math.min(...diasActivos.map(a => parseInt(a.start_time.slice(0, 2), 10)));
+      horaMax = Math.max(...diasActivos.map(a => {
+        const [hh, mm] = a.end_time.split(":").map(Number);
+        return mm > 0 ? hh + 1 : hh;
+      }));
+    }
+    (turnosData || []).forEach(t => {
+      if (!t.start_time) return;
+      const hh = parseInt(t.start_time.slice(0, 2), 10);
+      if (hh < horaMin) horaMin = hh;
+      const [eh, em] = (t.end_time || t.start_time).split(":").map(Number);
+      const ehCeil = em > 0 ? eh + 1 : eh;
+      if (ehCeil > horaMax) horaMax = ehCeil;
+    });
+    if (horaMax <= horaMin) horaMax = horaMin + 1;
+    setRangoHoras({ inicio: horaMin, fin: horaMax });
+
     setLoading(false);
   };
 
@@ -515,7 +547,7 @@ export default function Agenda() {
                         </div>
                       )}
                       {bloqueosParcialesHoy.map((b, i) => (
-                        <div key={i} style={{ position: "absolute", left: 0, right: 0, top: `${getTop(b.start_time.slice(0,5))}px`, height: `${getHeight(b.start_time.slice(0,5), b.end_time.slice(0,5))}px`, background: "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 8px, #F9FAFB 8px, #F9FAFB 16px)", zIndex: 4, border: "0.5px solid #D1D5DB", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", gap: "8px" }}>
+                        <div key={i} style={{ position: "absolute", left: 0, right: 0, top: `${getTop(b.start_time.slice(0,5), rangoHoras.inicio)}px`, height: `${getHeight(b.start_time.slice(0,5), b.end_time.slice(0,5))}px`, background: "repeating-linear-gradient(45deg, #F3F4F6, #F3F4F6 8px, #F9FAFB 8px, #F9FAFB 16px)", zIndex: 4, border: "0.5px solid #D1D5DB", borderRadius: "6px", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 10px", gap: "8px" }}>
                           <div style={{ fontSize: "11px", color: "#6B7280" }}>🔒 {b.start_time.slice(0,5)}–{b.end_time.slice(0,5)} bloqueado{b.reason ? ` · ${b.reason}` : ""}</div>
                           <button onClick={async () => { await supabase.from("blocked_dates").delete().eq("id", b.id); await cargarDatos(); }} style={{ padding: "3px 8px", background: "#fff", color: "#6B7280", border: "0.5px solid #D1D5DB", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", flexShrink: 0 }}>✕</button>
                         </div>
@@ -523,8 +555,8 @@ export default function Agenda() {
                       {HORAS.map(h => <div key={h} style={{ height: "64px", borderBottom: "0.5px solid #F8F0FC" }}></div>)}
                       {toISO(fecha) === toISO(new Date()) && (() => {
                         const mins = horaActual.getHours() * 60 + horaActual.getMinutes();
-                        const top = ((horaActual.getHours() - 8) * 64) + (horaActual.getMinutes() / 60 * 64);
-                        if (mins < 8 * 60 || mins > 20 * 60) return null;
+                        const top = ((horaActual.getHours() - rangoHoras.inicio) * 64) + (horaActual.getMinutes() / 60 * 64);
+                        if (mins < rangoHoras.inicio * 60 || mins > rangoHoras.fin * 60) return null;
                         return (
                           <div style={{ position: "absolute", left: 0, right: 0, top: `${top}px`, zIndex: 10, display: "flex", alignItems: "center", gap: "4px", pointerEvents: "none" }}>
                             <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#E24B4A", flexShrink: 0, marginLeft: "-4px" }}></div>
@@ -545,7 +577,7 @@ export default function Agenda() {
                         const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         const h = getHeight(t.start_time, t.end_time);
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time, rangoHoras.inicio)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
                             <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}</div>
                             <div style={{ fontSize: "13px", fontWeight: "700", color: textColor, lineHeight: "1.2" }}>{t.clients?.full_name}</div>
                             {h > 45 && <div style={{ fontSize: "11px", color: textColor, opacity: 0.75 }}>{t.services?.name}</div>}
