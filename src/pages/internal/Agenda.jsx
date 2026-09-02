@@ -5,7 +5,7 @@ import { calcularSaldoPendiente } from "../../utils/pagos";
 import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 import { cuando } from "../../utils/fecha";
 
-const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00"];
+const HORAS = ["08:00","09:00","10:00","11:00","12:00","13:00","14:00","15:00","16:00","17:00","18:00","19:00"];
 const DIAS_SEMANA = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
 const s = {
@@ -524,7 +524,7 @@ export default function Agenda() {
                       {toISO(fecha) === toISO(new Date()) && (() => {
                         const mins = horaActual.getHours() * 60 + horaActual.getMinutes();
                         const top = ((horaActual.getHours() - 8) * 64) + (horaActual.getMinutes() / 60 * 64);
-                        if (mins < 8 * 60 || mins > 19 * 60) return null;
+                        if (mins < 8 * 60 || mins > 20 * 60) return null;
                         return (
                           <div style={{ position: "absolute", left: 0, right: 0, top: `${top}px`, zIndex: 10, display: "flex", alignItems: "center", gap: "4px", pointerEvents: "none" }}>
                             <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#E24B4A", flexShrink: 0, marginLeft: "-4px" }}></div>
