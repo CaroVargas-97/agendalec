@@ -397,7 +397,7 @@ export default function Agenda() {
       const { data: nc, error: errCliente } = await supabase.from("clients").insert({
         full_name: busquedaCliente,
         phone: nuevoClienteData.phone || null,
-        email: nuevoClienteData.email || null
+        email: nuevoClienteData.email.trim().toLowerCase() || null
       }).select("id").single();
       if (errCliente) {
         setSavingError("Error al crear el cliente: " + errCliente.message);
@@ -416,7 +416,7 @@ export default function Agenda() {
     }
 
     const precio = getPrecioEfectivo(srv);
-    const status = estadoPago === "completo" ? "confirmed" : "pending";
+    const status = estadoPago === "completo" ? "confirmed" : estadoPago === "sena" ? "partial" : "pending";
     const { data: turno, error: errTurno } = await supabase.from("appointments").insert({
       professional_id: form.profesional, client_id: clienteId, service_id: form.servicioId,
       date: esACoordinarSrv ? (form.fecha || null) : form.fecha,
@@ -432,8 +432,14 @@ export default function Agenda() {
 
     // Registrar pagos según el estado
     if (estadoPago === "sena") {
+      // "Seña pagada" significa que la seña ya se cobró: se registra pagada
+      // y se deja el saldo cargado como pendiente, no como "a confirmar".
       const sena = Math.round(precio / 2);
-      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: sena, status: "pending" });
+      const saldo = precio - sena;
+      await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: sena, status: "paid", paid_at: new Date().toISOString() });
+      if (saldo > 0) {
+        await supabase.from("payments").insert({ appointment_id: turno.id, type: "saldo", amount: saldo, status: "pending" });
+      }
     } else if (estadoPago === "completo") {
       await supabase.from("payments").insert({ appointment_id: turno.id, type: "seña", amount: precio, status: "paid", paid_at: new Date().toISOString() });
     } else {

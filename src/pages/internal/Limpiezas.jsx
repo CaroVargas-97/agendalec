@@ -125,7 +125,7 @@ export default function Limpiezas() {
       const { data: nc, error: errCliente } = await supabase.from("clients").insert({
         full_name: busquedaCliente.trim(),
         phone: nuevoClienteData.phone || null,
-        email: nuevoClienteData.email || null,
+        email: nuevoClienteData.email.trim().toLowerCase() || null,
       }).select("id").single();
       if (errCliente) { setNuevoError("Error al crear el cliente: " + errCliente.message); setSavingNuevo(false); return; }
       clienteId = nc?.id;

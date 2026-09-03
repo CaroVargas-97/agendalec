@@ -64,16 +64,21 @@ export default async function handler(req, res) {
       try {
         const { data: settings } = await supabase
           .from("settings")
-          .select("alias, alias_usd")
+          .select("alias, alias_usd, paypal_link")
           .eq("professional_id", turno.professional_id)
           .maybeSingle();
 
-        const esUSD = turno.services?.currency === "USD" || turno.services?.currency === "EUR";
-        const alias = (esUSD ? settings?.alias_usd : null) || settings?.alias || "consultar con el profesional";
-        const sym = esUSD ? "U$S " : "$";
+        const currency = turno.services?.currency;
+        const esUSD = currency === "USD";
+        const esEUR = currency === "EUR";
+        const sym = esUSD ? "U$S " : esEUR ? "€" : "$";
+        const monto = `${sym}${parseInt(pago.amount).toLocaleString("es-AR")}`;
+        const formaPago = esEUR
+          ? `por PayPal: ${settings?.paypal_link || "consultar con el profesional"}`
+          : `al alias: *${(esUSD ? settings?.alias_usd : settings?.alias) || "consultar con el profesional"}*`;
 
         const linkSaldo = `https://agendalec.vercel.app/saldo?id=${pago.id}`;
-        const mensaje = `Hola ${turno.clients.full_name}! Tu turno es mañana ✨\n\n🕐 Horario: ${turno.start_time.slice(0,5)} hs\n🌿 Servicio: ${turno.services.name}\n💜 Profesional: ${turno.profiles.full_name}\n\nPara confirmar tu lugar, te recordamos abonar el saldo pendiente de ${sym}${parseInt(pago.amount).toLocaleString("es-AR")} al alias: *${alias}*.\n\nCuando transfieras, subí el comprobante acá: ${linkSaldo}\n\nCon amor, Espacio LEC 🤍\n¡Te esperamos!\n\n⚠️ Este número es únicamente para confirmación de turnos. No recibe mensajes ni consultas.`;
+        const mensaje = `Hola ${turno.clients.full_name}! Tu turno es mañana ✨\n\n🕐 Horario: ${turno.start_time.slice(0,5)} hs\n🌿 Servicio: ${turno.services.name}\n💜 Profesional: ${turno.profiles.full_name}\n\nPara confirmar tu lugar, te recordamos abonar el saldo pendiente de ${monto} ${formaPago}.\n\nCuando transfieras, subí el comprobante acá: ${linkSaldo}\n\nCon amor, Espacio LEC 🤍\n¡Te esperamos!\n\n⚠️ Este número es únicamente para confirmación de turnos. No recibe mensajes ni consultas.`;
 
         await enviarWhatsApp(celular, mensaje);
         resultados.push({ cliente: turno.clients.full_name, estado: "enviado" });

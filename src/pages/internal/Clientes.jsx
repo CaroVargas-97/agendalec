@@ -99,7 +99,7 @@ export default function Clientes() {
     const { error } = await supabase.from("clients").insert({
       full_name: nuevoForm.nombre.trim(),
       phone: nuevoForm.celular || null,
-      email: nuevoForm.mail || null,
+      email: nuevoForm.mail.trim().toLowerCase() || null,
       price_type: nuevoPrecioTipo,
       custom_price: (nuevoPrecioTipo === "especial" || nuevoPrecioTipo === "cortesia") && nuevoCustomPrice ? parseFloat(nuevoCustomPrice) : null,
     });
