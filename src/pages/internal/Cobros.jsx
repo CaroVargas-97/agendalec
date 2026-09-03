@@ -31,6 +31,8 @@ const s = {
 };
 
 const symFor = (cur) => cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+const es2x1 = (notes) => !!notes?.includes("2x1");
+const Tag2x1 = () => <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "10px", background: "#FDE8F0", color: "#A0407A", marginLeft: "6px", verticalAlign: "middle" }}>🎁 2x1</span>;
 
 const metrics = [
   { key: "cobradoHoy",      label: "Cobrado hoy",       color: "#63B522", prefix: "$", sub: null },
@@ -70,18 +72,18 @@ export default function Cobros() {
       supabase.from("services").select("id").ilike("name", "%limpieza%"),
       supabase
         .from("appointments")
-        .select("id, date, start_time, status, total_price, modality, service_id, clients(full_name), services(name, currency), profiles(full_name), payments(id, receipt_url, type, status)")
+        .select("id, date, start_time, status, total_price, modality, service_id, notes, clients(full_name), services(name, currency), profiles(full_name), payments(id, receipt_url, type, status)")
         .in("status", ["pending", "partial"])
         .order("date", { ascending: true }),
       supabase
         .from("payments")
-        .select("id, amount, receipt_url, appointment_id, appointments(id, date, start_time, total_price, service_id, clients(full_name), services(name, currency), profiles(full_name))")
+        .select("id, amount, receipt_url, appointment_id, appointments(id, date, start_time, total_price, service_id, notes, clients(full_name), services(name, currency), profiles(full_name))")
         .eq("type", "saldo")
         .eq("status", "pending")
         .order("created_at", { ascending: true }),
       supabase
         .from("appointments")
-        .select("id, date, start_time, status, total_price, service_id, clients(full_name), services(name, currency), payments(receipt_url, type)")
+        .select("id, date, start_time, status, total_price, service_id, notes, clients(full_name), services(name, currency), payments(receipt_url, type)")
         .in("status", ["confirmed", "cancelled"])
         .order("date", { ascending: false })
         .limit(50),
@@ -320,7 +322,7 @@ export default function Cobros() {
               ) : pendientes.map((t, i) => (
                 <div key={i} style={{ ...s.cobroRow, background: "#FFFBEB" }}>
                   <div style={{ flex: 1, minWidth: "180px" }}>
-                    <div style={s.cobroNombre}>{t.clients?.full_name}</div>
+                    <div style={s.cobroNombre}>{t.clients?.full_name}{es2x1(t.notes) && <Tag2x1 />}</div>
                     <div style={s.cobroDetalle}>{t.services?.name} · {cuando(t.date, t.start_time)}</div>
                     <div style={{ ...s.cobroDetalle, color: "#D97706", marginTop: "2px", fontWeight: "500" }}>Seña: {symFor(t.services?.currency)}{(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</div>
                     {t.payments?.find(p => p.type === "seña")?.receipt_url && (
@@ -356,7 +358,7 @@ export default function Cobros() {
               ) : saldos.map((p, i) => (
                 <div key={i} style={{ ...s.cobroRow, background: "#F3E8FF" }}>
                   <div style={{ flex: 1, minWidth: "180px" }}>
-                    <div style={s.cobroNombre}>{p.appointments?.clients?.full_name}</div>
+                    <div style={s.cobroNombre}>{p.appointments?.clients?.full_name}{es2x1(p.appointments?.notes) && <Tag2x1 />}</div>
                     <div style={s.cobroDetalle}>{p.appointments?.services?.name} · {cuando(p.appointments?.date, p.appointments?.start_time)}</div>
                     {p.receipt_url && (
                       <a href={p.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
@@ -386,7 +388,7 @@ export default function Cobros() {
               ) : historial.map((t, i) => (
                 <div key={i} style={{ ...s.cobroRow, background: t.status === "confirmed" ? "#F8F4FC" : "#FFF5F5" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={s.cobroNombre}>{t.clients?.full_name}</div>
+                    <div style={s.cobroNombre}>{t.clients?.full_name}{es2x1(t.notes) && <Tag2x1 />}</div>
                     <div style={s.cobroDetalle}>{t.services?.name} · {cuando(t.date, t.start_time)}</div>
                     <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
                       {t.payments?.filter(p => p.receipt_url).map((p, pi) => (

@@ -34,6 +34,7 @@ const s = {
 };
 
 const esLimpieza = (t) => !!t.services?.name?.toLowerCase().includes("limpieza");
+const es2x1 = (t) => !!t.notes?.includes("2x1");
 
 const toISO = (date) => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
 const formatFecha = (date) => date.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
@@ -543,7 +544,7 @@ export default function Agenda() {
                         const isPending = t.status === "pending" || t.status === "partial";
                         return (
                           <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isLimpieza ? "#EAF6EE" : isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isLimpieza ? "#3B8C5A" : isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
-                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}
+                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{es2x1(t) && " · 🎁 2x1"}
                           </div>
                         );
                       })}
@@ -592,7 +593,7 @@ export default function Agenda() {
                         const h = getHeight(t.start_time, t.end_time);
                         return (
                           <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time, rangoHoras.inicio)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
-                            <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}</div>
+                            <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}{es2x1(t) && " · 🎁 2x1"}</div>
                             <div style={{ fontSize: "13px", fontWeight: "700", color: textColor, lineHeight: "1.2" }}>{t.clients?.full_name}</div>
                             {h > 45 && <div style={{ fontSize: "11px", color: textColor, opacity: 0.75 }}>{t.services?.name}</div>}
                           </div>
@@ -640,7 +641,7 @@ export default function Agenda() {
                                   <div key={ti} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", background: bg, borderTop: "0.5px solid #fff", borderLeft: `4px solid ${accent}`, cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
                                     <div style={{ fontSize: "11px", fontWeight: "600", color: accent, minWidth: "44px" }}>{t.start_time ? t.start_time.slice(0,5) : "A coord."}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontSize: "13px", fontWeight: "600", color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.clients?.full_name}</div>
+                                      <div style={{ fontSize: "13px", fontWeight: "600", color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.clients?.full_name}{es2x1(t) && " 🎁"}</div>
                                       <div style={{ fontSize: "11px", color: textColor, opacity: 0.75, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emoji} {t.services?.name}</div>
                                     </div>
                                   </div>
@@ -662,7 +663,7 @@ export default function Agenda() {
                         const isPending = t.status === "pending" || t.status === "partial";
                         return (
                           <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isLimpieza ? "#EAF6EE" : isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isLimpieza ? "#3B8C5A" : isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
-                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{t.date ? ` · ${new Date(t.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" })}` : ""}
+                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{es2x1(t) && " · 🎁 2x1"}{t.date ? ` · ${new Date(t.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" })}` : ""}
                           </div>
                         );
                       })}
@@ -703,7 +704,7 @@ export default function Agenda() {
                                 const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
                                   <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "6px", padding: "4px 6px", background: bg, borderLeft: `3px solid ${accent}`, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: "1px" }}>
-                                    <div style={{ fontSize: "9px", fontWeight: "600", color: accent }}>{t.start_time?.slice(0,5)} {emoji}</div>
+                                    <div style={{ fontSize: "9px", fontWeight: "600", color: accent }}>{t.start_time?.slice(0,5)} {emoji}{es2x1(t) && " 🎁"}</div>
                                     <div style={{ fontSize: "10px", fontWeight: "700", lineHeight: "1.2", color: textColor }}>{t.clients?.full_name?.split(" ")[0]}</div>
                                     <div style={{ fontSize: "9px", color: textColor, opacity: 0.75, lineHeight: "1.1" }}>{t.services?.name}</div>
                                   </div>
@@ -742,6 +743,9 @@ export default function Agenda() {
                     )}
                     {t.clients?.price_type === "especial" && (
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99", marginTop: "4px", display: "inline-block" }}>✨ Precio especial</span>
+                    )}
+                    {es2x1(t) && (
+                      <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FDE8F0", color: "#A0407A", marginTop: "4px", display: "inline-block" }}>{t.notes}</span>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: "6px" }}>
