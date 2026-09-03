@@ -166,10 +166,18 @@ export default function Agenda() {
       }));
     }
     (turnosData || []).forEach(t => {
-      if (!t.start_time) return;
+      if (!t.start_time || t.status === "cancelled") return;
       const hh = parseInt(t.start_time.slice(0, 2), 10);
       if (hh < horaMin) horaMin = hh;
       const [eh, em] = (t.end_time || t.start_time).split(":").map(Number);
+      const ehCeil = em > 0 ? eh + 1 : eh;
+      if (ehCeil > horaMax) horaMax = ehCeil;
+    });
+    (blocked || []).forEach(b => {
+      if (!b.start_time) return;
+      const hh = parseInt(b.start_time.slice(0, 2), 10);
+      if (hh < horaMin) horaMin = hh;
+      const [eh, em] = (b.end_time || b.start_time).split(":").map(Number);
       const ehCeil = em > 0 ? eh + 1 : eh;
       if (ehCeil > horaMax) horaMax = ehCeil;
     });
