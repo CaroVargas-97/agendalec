@@ -50,6 +50,8 @@ export default function Grupales() {
   const [nuevoError, setNuevoError] = useState("");
 
   const [asistenteForm, setAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "", modalidad: "" });
+  const [es2x1Asistente, setEs2x1Asistente] = useState(false);
+  const [asistente2Form, setAsistente2Form] = useState({ nombre: "", telefono: "", mail: "" });
   const [comprobanteAsistente, setComprobanteAsistente] = useState(null);
   const [asistenteEditandoId, setAsistenteEditandoId] = useState(null);
   const [editAsistenteForm, setEditAsistenteForm] = useState({ nombre: "", telefono: "", mail: "", precioDescuento: "", modalidad: "" });
@@ -169,14 +171,22 @@ export default function Grupales() {
 
   const agregarAsistente = async () => {
     if (!asistenteForm.nombre.trim()) return;
+    if (es2x1Asistente && !asistente2Form.nombre.trim()) return;
     setSavingAsistente(true);
+
+    // 2x1: dos personas anotadas al mismo evento, cada una paga la mitad
+    // del precio de una entrada. Se ignora cualquier precio con descuento
+    // cargado a mano en ese caso, para no mezclar dos sistemas de rebaja.
+    const mitad = Math.round((eventoSeleccionado.price ?? 0) / 2);
+    const modalidadEfectiva = eventoSeleccionado.modality === "ambas" ? (asistenteForm.modalidad || null) : eventoSeleccionado.modality;
+
     const { data: nuevo, error } = await supabase.from("group_attendees").insert({
       event_id: eventoSeleccionado.id,
       full_name: asistenteForm.nombre.trim(),
       phone: asistenteForm.telefono || null,
       email: asistenteForm.mail || null,
-      custom_price: asistenteForm.precioDescuento !== "" ? parseFloat(asistenteForm.precioDescuento) : null,
-      modality: eventoSeleccionado.modality === "ambas" ? (asistenteForm.modalidad || null) : eventoSeleccionado.modality,
+      custom_price: es2x1Asistente ? mitad : (asistenteForm.precioDescuento !== "" ? parseFloat(asistenteForm.precioDescuento) : null),
+      modality: modalidadEfectiva,
       status: "pending",
     }).select("id").single();
     if (error) { alert("Error al agregar: " + error.message); setSavingAsistente(false); return; }
@@ -188,7 +198,22 @@ export default function Grupales() {
       await subirComprobante(nuevo.id, comprobanteAsistente, "sena");
     }
 
+    if (es2x1Asistente) {
+      const { error: error2 } = await supabase.from("group_attendees").insert({
+        event_id: eventoSeleccionado.id,
+        full_name: asistente2Form.nombre.trim(),
+        phone: asistente2Form.telefono || null,
+        email: asistente2Form.mail || null,
+        custom_price: mitad,
+        modality: modalidadEfectiva,
+        status: "pending",
+      });
+      if (error2) alert("Se anotó a " + asistenteForm.nombre + " pero hubo un error al anotar al acompañante: " + error2.message);
+    }
+
     setAsistenteForm({ nombre: "", telefono: "", mail: "", precioDescuento: "", modalidad: "" });
+    setAsistente2Form({ nombre: "", telefono: "", mail: "" });
+    setEs2x1Asistente(false);
     setComprobanteAsistente(null);
     setSavingAsistente(false);
     await refrescarAsistentes();
@@ -502,10 +527,39 @@ export default function Grupales() {
                       </div>
                     </div>
 
-                    <div style={s.field}>
-                      <label style={s.label}>Precio con descuento (opcional)</label>
-                      <input type="number" min="0" value={asistenteForm.precioDescuento} onChange={e => setAsistenteForm({...asistenteForm, precioDescuento: e.target.value})} placeholder={`Sin descuento: ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price?.toLocaleString("es-AR") || 0}`} style={s.input} />
+                    {!es2x1Asistente && (
+                      <div style={s.field}>
+                        <label style={s.label}>Precio con descuento (opcional)</label>
+                        <input type="number" min="0" value={asistenteForm.precioDescuento} onChange={e => setAsistenteForm({...asistenteForm, precioDescuento: e.target.value})} placeholder={`Sin descuento: ${symFor(eventoSeleccionado.currency)}${eventoSeleccionado.price?.toLocaleString("es-AR") || 0}`} style={s.input} />
+                      </div>
+                    )}
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", background: es2x1Asistente ? "#FDE8F0" : "#F8F4FC", borderRadius: "10px" }}>
+                      <input type="checkbox" id="es2x1" checked={es2x1Asistente} onChange={e => setEs2x1Asistente(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
+                      <label htmlFor="es2x1" style={{ fontSize: "12px", color: es2x1Asistente ? "#A0407A" : "#5C3F99", cursor: "pointer" }}>
+                        🎁 2x1 (agregar con acompañante, mitad de precio cada uno{eventoSeleccionado.price != null ? ` · ${symFor(eventoSeleccionado.currency)}${Math.round(eventoSeleccionado.price / 2).toLocaleString("es-AR")} c/u` : ""})
+                      </label>
                     </div>
+
+                    {es2x1Asistente && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "10px 12px", border: "0.5px dashed #E88BB0", borderRadius: "10px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: "500", color: "#A0407A", textTransform: "uppercase", letterSpacing: "0.4px" }}>Datos del acompañante</div>
+                        <div style={s.field}>
+                          <label style={s.label}>Nombre y apellido</label>
+                          <input type="text" placeholder="Ej: Juan Pérez" value={asistente2Form.nombre} onChange={e => setAsistente2Form({...asistente2Form, nombre: e.target.value})} style={s.input} />
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+                          <div style={s.field}>
+                            <label style={s.label}>Celular</label>
+                            <input type="tel" placeholder="11 1234-5678" value={asistente2Form.telefono} onChange={e => setAsistente2Form({...asistente2Form, telefono: e.target.value})} style={s.input} />
+                          </div>
+                          <div style={s.field}>
+                            <label style={s.label}>Mail (opcional)</label>
+                            <input type="email" placeholder="mail@ejemplo.com" value={asistente2Form.mail} onChange={e => setAsistente2Form({...asistente2Form, mail: e.target.value})} style={s.input} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {eventoSeleccionado.modality === "ambas" && (
                       <div style={s.field}>
@@ -530,7 +584,7 @@ export default function Grupales() {
                       </label>
                     </div>
 
-                    <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim()} style={{ ...s.saveBtn, padding: "10px", marginTop: "2px" }}>{savingAsistente ? "Agregando..." : "+ Anotar"}</button>
+                    <button onClick={agregarAsistente} disabled={savingAsistente || !asistenteForm.nombre.trim() || (es2x1Asistente && !asistente2Form.nombre.trim())} style={{ ...s.saveBtn, padding: "10px", marginTop: "2px" }}>{savingAsistente ? "Agregando..." : es2x1Asistente ? "+ Anotar a los dos" : "+ Anotar"}</button>
                   </div>
                 </div>
 

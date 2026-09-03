@@ -85,6 +85,18 @@ export default function Reserva() {
   const [form, setForm] = useState({ nombre: "", celular: "", mail: "" });
   const [clienteReconocido, setClienteReconocido] = useState(false);
   const [clientePrecio, setClientePrecio] = useState(null);
+
+  // 2x1: la Persona 2 tiene su propio servicio, día/hora y datos, en
+  // paralelo al estado de arriba (que pasa a ser "de la Persona 1").
+  const [es2x1, setEs2x1] = useState(false);
+  const [servicio2, setServicio2] = useState(null);
+  const [mesActual2, setMesActual2] = useState(inicioMes);
+  const [dia2, setDia2] = useState(null);
+  const [hora2, setHora2] = useState(null);
+  const [modalidad2, setModalidad2] = useState(null);
+  const [horariosOcupados2, setHorariosOcupados2] = useState([]);
+  const [form2, setForm2] = useState({ nombre: "", celular: "", mail: "" });
+  const [clienteReconocido2, setClienteReconocido2] = useState(false);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -163,12 +175,34 @@ export default function Reserva() {
       .then(({ data }) => setHorariosOcupados(data || []));
   }, [dia, profData, mesActual]);
 
+  useEffect(() => {
+    if (!dia2 || !profData) return;
+    const anio = mesActual2.getFullYear();
+    const mes = mesActual2.getMonth() + 1;
+    const fecha = `${anio}-${String(mes).padStart(2, "0")}-${String(dia2).padStart(2, "0")}`;
+    supabase.from("turnos_ocupados").select("start_time, end_time")
+      .eq("professional_id", profData.id).eq("date", fecha)
+      .in("status", ["pending", "confirmed", "partial"])
+      .not("start_time", "is", null)
+      .then(({ data }) => setHorariosOcupados2(data || []));
+  }, [dia2, profData, mesActual2]);
+
   const srv = servicios.find(s => s.id === servicio);
   const esACoorinar = srv?.requires_slot === false;
-  const esCortesia = clientePrecio?.tipo === "cortesia";
-  const esPrecioEspecial = clientePrecio?.tipo === "especial" && clientePrecio.monto != null;
-  const total = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : (srv?.price || 0);
+  const srv2 = servicios.find(s => s.id === servicio2);
+  const esACoorinar2 = srv2?.requires_slot === false;
+  const esCortesia = !es2x1 && clientePrecio?.tipo === "cortesia";
+  const esPrecioEspecial = !es2x1 && clientePrecio?.tipo === "especial" && clientePrecio.monto != null;
+  // En el 2x1 no se combinan cortesía/precio especial: el total del combo
+  // siempre es el precio de referencia (servicio de la Persona 1) partido
+  // a la mitad entre las dos personas, sin importar si alguna de las dos
+  // tiene un precio especial cargado.
+  const totalNormal = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : (srv?.price || 0);
+  const mitad2x1 = Math.round((srv?.price || 0) / 2);
+  const total = es2x1 ? mitad2x1 : totalNormal;
+  const total2 = mitad2x1;
   const sena = Math.round(total / 2);
+  const sena2 = Math.round(total2 / 2);
   const sym = srv?.currency === "USD" ? "U$S " : srv?.currency === "EUR" ? "€" : "$";
   const esMonedaExtranjera = srv?.currency === "USD" || srv?.currency === "EUR";
   const esPaypal = srv?.currency === "EUR";
@@ -270,6 +304,90 @@ export default function Reserva() {
     ? new Date(anioMes, mesMes, dia).toLocaleDateString("es-AR", { day: "numeric", month: "long" })
     : "";
 
+  // Calendar helpers de la Persona 2 (2x1) — mismo cálculo que arriba, pero
+  // con su propio servicio/mes/modalidad, ya que elige día y hora aparte.
+  const anioMes2 = mesActual2.getFullYear();
+  const mesMes2 = mesActual2.getMonth();
+  const diasEnMes2 = new Date(anioMes2, mesMes2 + 1, 0).getDate();
+  const primerDow2 = new Date(anioMes2, mesMes2, 1).getDay();
+  const offsetLunes2 = primerDow2 === 0 ? 6 : primerDow2 - 1;
+  const nombreMes2 = mesActual2.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  const mesAnteriorPermitido2 = new Date(anioMes2, mesMes2, 1) > new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const mesSiguientePermitido2 = new Date(anioMes2, mesMes2 + 1, 1) <= finVentanaReservas();
+
+  const esDiaSeleccionable2 = (d) => {
+    const fechaObj = new Date(anioMes2, mesMes2, d);
+    if (fechaObj < hoy) return false;
+    if (fechaObj > finVentanaReservas()) return false;
+    const fechaStr2d = `${anioMes2}-${String(mesMes2 + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    if (blockedDatesProf.some(b => b.date === fechaStr2d && !b.start_time)) return false;
+    const dow = fechaObj.getDay();
+    if (disponibilidad.length === 0) return dow !== 0 && dow !== 6;
+    const modEfectiva = srv2?.modality !== "ambas" ? srv2?.modality : modalidad2;
+    const override = modalityOverrides.find(o => o.date === fechaStr2d);
+    return disponibilidad.some(a => {
+      if (a.day_of_week !== dow) return false;
+      if (!modEfectiva) return true;
+      const modDia = override ? override.modality : a.modality;
+      return modDia === "ambas" || modDia === modEfectiva;
+    });
+  };
+
+  const generarHorarios2 = (d) => {
+    if (!d || !srv2) return [];
+    const fechaStr2d = `${anioMes2}-${String(mesMes2 + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const fechaObj = new Date(anioMes2, mesMes2, d);
+    const dow = fechaObj.getDay();
+    const avail = disponibilidad.find(a => a.day_of_week === dow);
+    if (!avail) return [];
+    const overrideHorario = modalityOverrides.find(o => o.date === fechaStr2d && o.start_time);
+    const horaBase = overrideHorario || avail;
+    const [sH, sM] = horaBase.start_time.slice(0, 5).split(":").map(Number);
+    const [eH, eM] = horaBase.end_time.slice(0, 5).split(":").map(Number);
+    const startMins = sH * 60 + sM;
+    const endMins = eH * 60 + eM;
+    const slotStep = srv2.duration_minutes + profPausa;
+    const bloquesParciales = blockedDatesProf.filter(b => b.date === fechaStr2d && b.start_time);
+    const esHoy = fechaObj.getTime() === hoy.getTime();
+    const ahoraMins = esHoy ? new Date().getHours() * 60 + new Date().getMinutes() : -1;
+    const slots = [];
+    for (let t = startMins; t + srv2.duration_minutes <= endMins; t += slotStep) {
+      if (esHoy && t <= ahoraMins) continue;
+      const slotFin = t + srv2.duration_minutes;
+      const bloqueado = bloquesParciales.some(b => {
+        const [bH, bM] = b.start_time.slice(0,5).split(":").map(Number);
+        const [eH2, eM2] = b.end_time.slice(0,5).split(":").map(Number);
+        const bStart = bH * 60 + bM, bEnd = eH2 * 60 + eM2;
+        return t < bEnd && slotFin > bStart;
+      });
+      if (!bloqueado) slots.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+    }
+    return slots;
+  };
+
+  const cambiarMes2 = (delta) => {
+    const nuevo = new Date(anioMes2, mesMes2 + delta, 1);
+    if (delta < 0 && nuevo < new Date(hoy.getFullYear(), hoy.getMonth(), 1)) return;
+    if (delta > 0 && nuevo > finVentanaReservas()) return;
+    setMesActual2(nuevo);
+    setDia2(null);
+    setHora2(null);
+  };
+
+  useEffect(() => {
+    if (!es2x1 || !srv2 || disponibilidad.length === 0) return;
+    if (srv2.modality === "ambas" && !modalidad2) return;
+    const hayDisponible = Array.from({ length: diasEnMes2 }, (_, i) => i + 1).some(esDiaSeleccionable2);
+    if (!hayDisponible && mesSiguientePermitido2) cambiarMes2(1);
+  }, [es2x1, srv2, modalidad2, disponibilidad, blockedDatesProf, modalityOverrides, mesActual2]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fechaStr2 = dia2
+    ? `${anioMes2}-${String(mesMes2 + 1).padStart(2, "0")}-${String(dia2).padStart(2, "0")}`
+    : "";
+  const fechaLabel2 = dia2
+    ? new Date(anioMes2, mesMes2, dia2).toLocaleDateString("es-AR", { day: "numeric", month: "long" })
+    : "";
+
   const copiarAlias = () => {
     navigator.clipboard.writeText(aliasActivo || paypalActivo || "");
     setCopiado(true);
@@ -290,29 +408,95 @@ export default function Reserva() {
     }
   };
 
+  const buscarClientePorMail2 = async (mail) => {
+    if (!mail || !mail.includes("@")) return;
+    const { data: rows } = await supabase.rpc("buscar_cliente_por_email", { p_email: mail.trim().toLowerCase() });
+    const data = rows?.[0];
+    if (data) {
+      setForm2(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
+      setClienteReconocido2(true);
+    } else {
+      setClienteReconocido2(false);
+    }
+  };
+
+  const calcEndTime = (horaSel, srvSel) => {
+    if (!horaSel || !srvSel) return null;
+    const [h, m] = horaSel.split(":").map(Number);
+    const endH = h + Math.floor((m + srvSel.duration_minutes) / 60);
+    const endM = (m + srvSel.duration_minutes) % 60;
+    return `${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}`;
+  };
+
   const confirmarReserva = async () => {
     setError("");
     // El botón queda habilitado siempre: si falta algo se explica acá en
     // vez de dejarlo atenuado sin feedback, que es como una clienta real
     // se quedó pensando que había reservado sin haber tocado nada.
     if (!form.nombre || !form.celular || !form.mail) { setError("Completá tus datos para confirmar."); return; }
+    if (es2x1 && (!form2.nombre || !form2.celular || !form2.mail)) { setError("Completá los datos de las dos personas para confirmar."); return; }
     if (!aceptaTyC) { setError("Tenés que aceptar los Términos y Condiciones."); return; }
     if (!comprobante && !esCortesia && (aliasActivo || paypalActivo)) { setError("Subí el comprobante de la transferencia para confirmar."); return; }
     setGuardando(true);
     setComprobanteFallo(false);
     try {
+      if (es2x1) {
+        const { data: resultado, error: errRpc } = await supabase.rpc("crear_reserva_2x1", {
+          p_professional_id: profData.id,
+          p_service_id_1: srv.id, p_nombre_1: form.nombre, p_telefono_1: form.celular, p_email_1: form.mail.trim().toLowerCase(),
+          p_date_1: esACoorinar ? null : fechaStr, p_start_time_1: esACoorinar ? null : hora, p_end_time_1: calcEndTime(hora, srv),
+          p_modality_1: modalidad || srv.modality, p_total_1: total,
+          p_service_id_2: srv2.id, p_nombre_2: form2.nombre, p_telefono_2: form2.celular, p_email_2: form2.mail.trim().toLowerCase(),
+          p_date_2: esACoorinar2 ? null : fechaStr2, p_start_time_2: esACoorinar2 ? null : hora2, p_end_time_2: calcEndTime(hora2, srv2),
+          p_modality_2: modalidad2 || srv2.modality, p_total_2: total2,
+        });
+        if (errRpc) throw errRpc;
+
+        if (comprobante) {
+          const ext = comprobante.name.split(".").pop();
+          const { data: uploadData, error: errUpload } = await supabase.storage
+            .from("comprobantes")
+            .upload(`${resultado.turno_1}-2x1.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
+          if (errUpload) {
+            console.error("Error subiendo comprobante:", errUpload.message);
+            setComprobanteFallo(true);
+          } else if (uploadData) {
+            const { data: { publicUrl: rawUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+            const publicUrl = `${rawUrl}?t=${Date.now()}`;
+            // Un solo comprobante cubre la transferencia combinada de las dos
+            // señas: se adjunta al pago de cada una de las dos personas.
+            const [{ data: ok1, error: errU1 }, { data: ok2, error: errU2 }] = await Promise.all([
+              supabase.rpc("adjuntar_comprobante", { p_payment_id: resultado.pago_1, p_receipt_url: publicUrl }),
+              supabase.rpc("adjuntar_comprobante", { p_payment_id: resultado.pago_2, p_receipt_url: publicUrl }),
+            ]);
+            if (errU1 || !ok1 || errU2 || !ok2) { console.error("Error guardando comprobante 2x1"); setComprobanteFallo(true); }
+          }
+        }
+
+        const cuandoTxt1 = esACoorinar ? "a coordinar" : `${fechaLabel} ${hora} hs`;
+        const cuandoTxt2 = esACoorinar2 ? "a coordinar" : `${fechaLabel2} ${hora2} hs`;
+        fetch("/api/notificar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            professionalId: profData.id,
+            title: "🎁 Nuevo 2x1",
+            body: `${form.nombre} (${srv.name.trim()} · ${cuandoTxt1}) + ${form2.nombre} (${srv2.name.trim()} · ${cuandoTxt2})${comprobante ? " · adjuntaron comprobante" : ""}`,
+            url: "/",
+          }),
+        }).catch(() => {});
+
+        setStep(4);
+        setGuardando(false);
+        return;
+      }
+
       const { data: clienteId, error: errCliente } = await supabase.rpc("obtener_o_crear_cliente", {
         p_nombre: form.nombre, p_telefono: form.celular, p_email: form.mail.trim().toLowerCase()
       });
       if (errCliente) throw errCliente;
 
-      let endTime = null;
-      if (!esACoorinar && hora) {
-        const [h, m] = hora.split(":").map(Number);
-        const endH = h + Math.floor((m + srv.duration_minutes) / 60);
-        const endM = (m + srv.duration_minutes) % 60;
-        endTime = `${String(endH).padStart(2,"0")}:${String(endM).padStart(2,"0")}`;
-      }
+      const endTime = esACoorinar ? null : calcEndTime(hora, srv);
 
       const turnoId = crypto.randomUUID();
       const { error: errTurno } = await supabase.from("appointments").insert({
@@ -375,8 +559,9 @@ export default function Reserva() {
       setStep(4);
     } catch (err) {
       if (err?.code === "23P01") {
-        setError("Justo se ocupó ese horario. Elegí otro, por favor.");
+        setError(es2x1 ? "Justo se ocupó uno de los dos horarios. Elegí otro, por favor." : "Justo se ocupó ese horario. Elegí otro, por favor.");
         setHora(null);
+        if (es2x1) setHora2(null);
         setStep(2);
       } else {
         setError("Hubo un error al confirmar el turno. Intentá de nuevo.");
@@ -386,6 +571,7 @@ export default function Reserva() {
   };
 
   const horariosDia = generarHorarios(dia);
+  const horariosDia2 = generarHorarios2(dia2);
 
   if (loading) return (
     <div style={s.wrap}><div style={s.loadingText}>Cargando...</div></div>
@@ -434,7 +620,7 @@ export default function Reserva() {
           {profesionales.length === 0 ? (
             <div style={s.loadingText}>No hay profesionales disponibles aún.</div>
           ) : profesionales.map((p, i) => (
-            <div key={i} style={prof === p.full_name ? s.profCardSelected : s.profCard} onClick={() => { setProf(p.full_name); setServicio(null); }}>
+            <div key={i} style={prof === p.full_name ? s.profCardSelected : s.profCard} onClick={() => { setProf(p.full_name); setServicio(null); setServicio2(null); setEs2x1(false); }}>
               <div style={{ ...s.avatar, background: i % 2 === 0 ? "#C4A8D8" : "#F4B8D1" }}>
                 {p.full_name?.split(" ").map(n => n[0]).join("").slice(0,2)}
               </div>
@@ -452,7 +638,7 @@ export default function Reserva() {
                   const label = cur === "USD" ? "🇺🇸 Dólares" : cur === "EUR" ? "🇪🇺 Euros" : "🇦🇷 Pesos";
                   const activo = moneda === cur;
                   return (
-                    <button key={cur} onClick={() => { setMoneda(cur); setServicio(null); }}
+                    <button key={cur} onClick={() => { setMoneda(cur); setServicio(null); setServicio2(null); setEs2x1(false); }}
                       style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: activo ? "500" : "400", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: activo ? "2px solid #9B72C0" : "0.5px solid #E0D0F0", background: activo ? "#EDE8FA" : "#fff", color: activo ? "#5C3F99" : "#B89FD0" }}>
                       {label}
                     </button>
@@ -478,12 +664,39 @@ export default function Reserva() {
                   ))}
                 </>
               )}
+              {servicio && (
+                <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", background: es2x1 ? "#FDE8F0" : "#F8F4FC", borderRadius: "10px" }}>
+                  <input type="checkbox" id="es2x1r" checked={es2x1} onChange={e => { setEs2x1(e.target.checked); if (!e.target.checked) setServicio2(null); }} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
+                  <label htmlFor="es2x1r" style={{ fontSize: "12px", color: es2x1 ? "#A0407A" : "#5C3F99", cursor: "pointer" }}>
+                    🎁 2x1 — reservá con alguien más, cada uno paga la mitad ({moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{Math.round((srv?.price || 0) / 2).toLocaleString("es-AR")} c/u)
+                  </label>
+                </div>
+              )}
+              {es2x1 && (
+                <div style={{ marginTop: "10px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí el servicio de la 2da persona</div>
+                  {servicios.filter(sv => sv.currency === moneda).map((sv, i) => (
+                    <div key={sv.id} style={servicio2 === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => setServicio2(sv.id)}>
+                      <div style={s.srvTop}>
+                        <span style={s.srvNombre}>{sv.name}</span>
+                        <span style={s.srvPrecio}>{moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{sv.price.toLocaleString("es-AR")}</span>
+                      </div>
+                      <div style={s.srvDet}>
+                        <span>{sv.duration_minutes} min</span>
+                        {sv.modality === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
+                        {sv.modality === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
+                        {sv.modality === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {prof && loadingServicios && <div style={s.loadingText}>Cargando servicios...</div>}
           {prof && !loadingServicios && servicios.length === 0 && <div style={s.loadingText}>Este profesional no tiene servicios disponibles.</div>}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <button style={{ ...s.btnNext, background: prof && servicio ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio} onClick={() => esACoorinar ? setStep(3) : setStep(2)}>
+            <button style={{ ...s.btnNext, background: prof && servicio && (!es2x1 || servicio2) ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio || (es2x1 && !servicio2)} onClick={() => (esACoorinar && (!es2x1 || esACoorinar2)) ? setStep(3) : setStep(2)}>
               Continuar
             </button>
             <a href="/" style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", textDecoration: "none", display: "block", textAlign: "center", boxSizing: "border-box" }}>← Volver al inicio</a>
@@ -495,88 +708,166 @@ export default function Reserva() {
         <div style={s.card}>
           <div>
             <div style={s.title}>¿Cuándo querés tu turno?</div>
-            <div style={s.sub}>{srv?.name} con {prof} · {srv?.duration_minutes} min</div>
+            <div style={s.sub}>{es2x1 ? `Persona 1 · ${srv?.name}` : `${srv?.name} con ${prof}`} · {srv?.duration_minutes} min</div>
           </div>
 
-          {srv?.modality === "ambas" && (
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>¿Cómo preferís la sesión?</div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button style={modalidad === "presencial" ? s.modBtnP : s.modBtn} onClick={() => { setModalidad("presencial"); setDia(null); setHora(null); }}>📍 Presencial</button>
-                <button style={modalidad === "virtual" ? s.modBtnV : s.modBtn} onClick={() => { setModalidad("virtual"); setDia(null); setHora(null); }}>📹 Virtual</button>
-              </div>
-              {modalidad === "presencial" && profData?.address && (
-                <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#A0407A" }}>
-                  📍 <strong>Dirección:</strong> {profData.address}
-                </div>
-              )}
-            </div>
-          )}
-          {srv?.modality === "presencial" && profData?.address && (
-            <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#A0407A" }}>
-              📍 <strong>Dirección:</strong> {profData.address}
-            </div>
-          )}
-
-          {(srv?.modality !== "ambas" || modalidad) && (
+          {!esACoorinar && (
             <>
-              <div>
-                <div style={s.calHeader}>
-                  <span style={{ cursor: mesAnteriorPermitido ? "pointer" : "default", color: mesAnteriorPermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(-1)}>‹</span>
-                  <span>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
-                  <span style={{ cursor: mesSiguientePermitido ? "pointer" : "default", color: mesSiguientePermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(1)}>›</span>
-                </div>
-                <div style={s.calGrid}>
-                  {["L","M","X","J","V","S","D"].map(d => <div key={d} style={s.calDayName}>{d}</div>)}
-                  {Array(offsetLunes).fill(null).map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
-                  {Array.from({length: diasEnMes}, (_, i) => i + 1).map(d => {
-                    const seleccionable = esDiaSeleccionable(d);
-                    const esHoy = anioMes === hoy.getFullYear() && mesMes === hoy.getMonth() && d === hoy.getDate();
-                    return (
-                      <div key={d} onClick={() => seleccionable && setDia(d)}
-                        style={!seleccionable ? s.calDayOff : dia === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
-                        {d}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              {dia && (
-                <div>
-                  <div style={{ fontSize: "12px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Horarios disponibles</div>
-                  {horariosDia.length === 0 ? (
-                    <div style={s.loadingText}>No hay horarios disponibles este día.</div>
-                  ) : (
-                    <div style={s.horaGrid}>
-                      {horariosDia.map(h => {
-                        const [hH, hM] = h.split(":").map(Number);
-                        const slotInicio = hH * 60 + hM;
-                        const slotFin = slotInicio + srv.duration_minutes;
-                        const ocupado = horariosOcupados.some(o => {
-                          const [oH, oM] = o.start_time.slice(0,5).split(":").map(Number);
-                          const [eH, eM] = o.end_time.slice(0,5).split(":").map(Number);
-                          const oInicio = oH * 60 + oM, oFin = eH * 60 + eM;
-                          return slotInicio < oFin && oInicio < slotFin;
-                        });
-                        return (
-                          <button key={h}
-                            style={ocupado ? s.horaBtnOff : hora === h ? s.horaBtnSelected : s.horaBtn}
-                            disabled={ocupado}
-                            onClick={() => !ocupado && setHora(h)}>{h}</button>
-                        );
-                      })}
+              {srv?.modality === "ambas" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>¿Cómo preferís la sesión?</div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button style={modalidad === "presencial" ? s.modBtnP : s.modBtn} onClick={() => { setModalidad("presencial"); setDia(null); setHora(null); }}>📍 Presencial</button>
+                    <button style={modalidad === "virtual" ? s.modBtnV : s.modBtn} onClick={() => { setModalidad("virtual"); setDia(null); setHora(null); }}>📹 Virtual</button>
+                  </div>
+                  {modalidad === "presencial" && profData?.address && (
+                    <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#A0407A" }}>
+                      📍 <strong>Dirección:</strong> {profData.address}
                     </div>
                   )}
                 </div>
               )}
+              {srv?.modality === "presencial" && profData?.address && (
+                <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "#A0407A" }}>
+                  📍 <strong>Dirección:</strong> {profData.address}
+                </div>
+              )}
+
+              {(srv?.modality !== "ambas" || modalidad) && (
+                <>
+                  <div>
+                    <div style={s.calHeader}>
+                      <span style={{ cursor: mesAnteriorPermitido ? "pointer" : "default", color: mesAnteriorPermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(-1)}>‹</span>
+                      <span>{nombreMes.charAt(0).toUpperCase() + nombreMes.slice(1)}</span>
+                      <span style={{ cursor: mesSiguientePermitido ? "pointer" : "default", color: mesSiguientePermitido ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes(1)}>›</span>
+                    </div>
+                    <div style={s.calGrid}>
+                      {["L","M","X","J","V","S","D"].map(d => <div key={d} style={s.calDayName}>{d}</div>)}
+                      {Array(offsetLunes).fill(null).map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
+                      {Array.from({length: diasEnMes}, (_, i) => i + 1).map(d => {
+                        const seleccionable = esDiaSeleccionable(d);
+                        const esHoy = anioMes === hoy.getFullYear() && mesMes === hoy.getMonth() && d === hoy.getDate();
+                        return (
+                          <div key={d} onClick={() => seleccionable && setDia(d)}
+                            style={!seleccionable ? s.calDayOff : dia === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
+                            {d}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {dia && (
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Horarios disponibles</div>
+                      {horariosDia.length === 0 ? (
+                        <div style={s.loadingText}>No hay horarios disponibles este día.</div>
+                      ) : (
+                        <div style={s.horaGrid}>
+                          {horariosDia.map(h => {
+                            const [hH, hM] = h.split(":").map(Number);
+                            const slotInicio = hH * 60 + hM;
+                            const slotFin = slotInicio + srv.duration_minutes;
+                            const ocupado = horariosOcupados.some(o => {
+                              const [oH, oM] = o.start_time.slice(0,5).split(":").map(Number);
+                              const [eH, eM] = o.end_time.slice(0,5).split(":").map(Number);
+                              const oInicio = oH * 60 + oM, oFin = eH * 60 + eM;
+                              return slotInicio < oFin && oInicio < slotFin;
+                            });
+                            return (
+                              <button key={h}
+                                style={ocupado ? s.horaBtnOff : hora === h ? s.horaBtnSelected : s.horaBtn}
+                                disabled={ocupado}
+                                onClick={() => !ocupado && setHora(h)}>{h}</button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </>
+          )}
+
+          {es2x1 && !esACoorinar2 && (
+            <div style={{ borderTop: "0.5px solid #F0E8F8", paddingTop: "14px", marginTop: "4px", display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={s.sub}>Persona 2 · {srv2?.name} · {srv2?.duration_minutes} min</div>
+
+              {srv2?.modality === "ambas" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>¿Cómo prefiere la sesión?</div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button style={modalidad2 === "presencial" ? s.modBtnP : s.modBtn} onClick={() => { setModalidad2("presencial"); setDia2(null); setHora2(null); }}>📍 Presencial</button>
+                    <button style={modalidad2 === "virtual" ? s.modBtnV : s.modBtn} onClick={() => { setModalidad2("virtual"); setDia2(null); setHora2(null); }}>📹 Virtual</button>
+                  </div>
+                </div>
+              )}
+
+              {(srv2?.modality !== "ambas" || modalidad2) && (
+                <>
+                  <div>
+                    <div style={s.calHeader}>
+                      <span style={{ cursor: mesAnteriorPermitido2 ? "pointer" : "default", color: mesAnteriorPermitido2 ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes2(-1)}>‹</span>
+                      <span>{nombreMes2.charAt(0).toUpperCase() + nombreMes2.slice(1)}</span>
+                      <span style={{ cursor: mesSiguientePermitido2 ? "pointer" : "default", color: mesSiguientePermitido2 ? "#9B72C0" : "#E0D0F0" }} onClick={() => cambiarMes2(1)}>›</span>
+                    </div>
+                    <div style={s.calGrid}>
+                      {["L","M","X","J","V","S","D"].map(d => <div key={d} style={s.calDayName}>{d}</div>)}
+                      {Array(offsetLunes2).fill(null).map((_, i) => <div key={`e2${i}`} style={s.calDayOff}></div>)}
+                      {Array.from({length: diasEnMes2}, (_, i) => i + 1).map(d => {
+                        const seleccionable = esDiaSeleccionable2(d);
+                        const esHoy = anioMes2 === hoy.getFullYear() && mesMes2 === hoy.getMonth() && d === hoy.getDate();
+                        return (
+                          <div key={d} onClick={() => seleccionable && setDia2(d)}
+                            style={!seleccionable ? s.calDayOff : dia2 === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
+                            {d}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {dia2 && (
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Horarios disponibles</div>
+                      {horariosDia2.length === 0 ? (
+                        <div style={s.loadingText}>No hay horarios disponibles este día.</div>
+                      ) : (
+                        <div style={s.horaGrid}>
+                          {horariosDia2.map(h => {
+                            const [hH, hM] = h.split(":").map(Number);
+                            const slotInicio = hH * 60 + hM;
+                            const slotFin = slotInicio + srv2.duration_minutes;
+                            const ocupado = horariosOcupados2.some(o => {
+                              const [oH, oM] = o.start_time.slice(0,5).split(":").map(Number);
+                              const [eH, eM] = o.end_time.slice(0,5).split(":").map(Number);
+                              const oInicio = oH * 60 + oM, oFin = eH * 60 + eM;
+                              return slotInicio < oFin && oInicio < slotFin;
+                            });
+                            return (
+                              <button key={h}
+                                style={ocupado ? s.horaBtnOff : hora2 === h ? s.horaBtnSelected : s.horaBtn}
+                                disabled={ocupado}
+                                onClick={() => !ocupado && setHora2(h)}>{h}</button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(1)}>← Volver</button>
-            <button style={{ ...s.btnNext, background: dia && hora ? "#9B72C0" : "#E0D0F0" }}
-              disabled={!dia || !hora}
-              onClick={() => { if (srv?.modality !== "ambas") setModalidad(srv?.modality); setStep(3); }}>
+            <button style={{ ...s.btnNext, background: ((esACoorinar || (dia && hora)) && (!es2x1 || esACoorinar2 || (dia2 && hora2))) ? "#9B72C0" : "#E0D0F0" }}
+              disabled={(!esACoorinar && (!dia || !hora)) || (es2x1 && !esACoorinar2 && (!dia2 || !hora2))}
+              onClick={() => {
+                if (srv?.modality !== "ambas") setModalidad(srv?.modality);
+                if (es2x1 && srv2?.modality !== "ambas") setModalidad2(srv2?.modality);
+                setStep(3);
+              }}>
               Continuar
             </button>
           </div>
@@ -611,8 +902,23 @@ export default function Reserva() {
           <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
           <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
 
+          {es2x1 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px", border: "0.5px dashed #E88BB0", borderRadius: "10px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "500", color: "#A0407A", textTransform: "uppercase", letterSpacing: "0.4px" }}>🎁 Datos de la 2da persona</div>
+              <div style={s.field}>
+                <label style={s.label}>Mail</label>
+                <input type="email" value={form2.mail} onChange={e => { setForm2({...form2, mail: e.target.value}); setClienteReconocido2(false); }} onBlur={e => buscarClientePorMail2(e.target.value)} placeholder="mail@ejemplo.com" style={s.input} />
+              </div>
+              {clienteReconocido2 && (
+                <div style={{ background: "#EAF3DE", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#3B6D11" }}>✓ Encontramos sus datos.</div>
+              )}
+              <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form2.nombre} onChange={e => setForm2({...form2, nombre: e.target.value})} placeholder="Nombre del acompañante" style={s.input} /></div>
+              <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form2.celular} onChange={e => setForm2({...form2, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
+            </div>
+          )}
+
           <div style={s.resumenBox}>
-            <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen</div>
+            <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen{es2x1 ? " · Persona 1" : ""}</div>
             <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{srv?.name} · {srv?.duration_minutes} min</span></div>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
             {profData?.phone && <div style={s.resRow}><span style={s.resLabel}>Teléfono</span><span style={s.resValor}>{profData.phone}</span></div>}
@@ -628,7 +934,7 @@ export default function Reserva() {
               </>
             )}
             <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "2px" }}>
-              <div style={s.resRow}><span style={s.resLabel}>Precio total</span><span style={s.resValor}>{esCortesia ? "🎁 Cortesía" : `${sym}${total.toLocaleString("es-AR")}`}</span></div>
+              <div style={s.resRow}><span style={s.resLabel}>{es2x1 ? "Paga esta persona" : "Precio total"}</span><span style={s.resValor}>{esCortesia ? "🎁 Cortesía" : `${sym}${total.toLocaleString("es-AR")}`}</span></div>
               {!esCortesia && (
                 <>
                   <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña ahora (50%)</span><span style={s.resSeña}>{sym}{sena.toLocaleString("es-AR")}</span></div>
@@ -638,13 +944,38 @@ export default function Reserva() {
             </div>
           </div>
 
+          {es2x1 && (
+            <div style={s.resumenBox}>
+              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "2px" }}>Resumen · Persona 2</div>
+              <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{srv2?.name} · {srv2?.duration_minutes} min</span></div>
+              {esACoorinar2 ? (
+                <div style={{ background: "#EDE8FA", borderRadius: "8px", padding: "10px 12px", fontSize: "12px", color: "#5C3F99" }}>
+                  📅 El equipo de {prof} se comunicará a la brevedad para coordinar el horario.
+                </div>
+              ) : (
+                <>
+                  <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel2} · {hora2}</span></div>
+                  <div style={s.resRow}><span style={s.resLabel}>Modalidad</span><span style={s.resValor}>{modalidad2 === "virtual" ? "📹 Virtual" : "📍 Presencial"}</span></div>
+                </>
+              )}
+              <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "2px" }}>
+                <div style={s.resRow}><span style={s.resLabel}>Paga esta persona</span><span style={s.resValor}>{sym}{total2.toLocaleString("es-AR")}</span></div>
+                <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Seña ahora (50%)</span><span style={s.resSeña}>{sym}{sena2.toLocaleString("es-AR")}</span></div>
+                <div style={{ ...s.resRow, marginTop: "4px" }}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>{sym}{sena2.toLocaleString("es-AR")}</span></div>
+              </div>
+              <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "2px" }}>
+                <div style={s.resRow}><span style={{ ...s.resLabel, fontWeight: "500" }}>Total a transferir (las dos señas)</span><span style={{ ...s.resValor, fontWeight: "600" }}>{sym}{(sena + sena2).toLocaleString("es-AR")}</span></div>
+              </div>
+            </div>
+          )}
+
           {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{srv?.currency === "USD" ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
               {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
-              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a transferir: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a transferir: <strong style={{ color: "#5C3F99" }}>{sym}{(es2x1 ? sena + sena2 : sena).toLocaleString("es-AR")}</strong></div>
             </div>
           )}
 
@@ -653,13 +984,13 @@ export default function Reserva() {
               <div style={s.aliasTitulo}>Pagá la seña por PayPal (en euros)</div>
               <a href={paypalUrl} target="_blank" rel="noreferrer" style={{ ...s.aliasValor, textDecoration: "none", wordBreak: "break-all" }}>{paypalActivo}</a>
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar link"}</div>
-              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a pagar: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a pagar: <strong style={{ color: "#5C3F99" }}>{sym}{(es2x1 ? sena + sena2 : sena).toLocaleString("es-AR")}</strong></div>
             </div>
           )}
 
           {!aliasActivo && !paypalActivo && !esCortesia && (
             <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99" }}>
-              El equipo se va a contactar con vos para coordinar el pago de la seña ({sym}{sena.toLocaleString("es-AR")}).
+              El equipo se va a contactar con vos para coordinar el pago de la seña ({sym}{(es2x1 ? sena + sena2 : sena).toLocaleString("es-AR")}).
             </div>
           )}
 
@@ -725,9 +1056,17 @@ export default function Reserva() {
 
           <div style={{ ...s.resumenBox, width: "100%", textAlign: "left" }}>
             <div style={s.resRow}><span style={s.resLabel}>Profesional</span><span style={s.resValor}>{prof}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Servicio</span><span style={s.resValor}>{srv?.name} · {modalidad}</span></div>
-            <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{fechaLabel} · {hora}</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>{es2x1 ? "Persona 1" : "Servicio"}</span><span style={s.resValor}>{srv?.name} · {modalidad}</span></div>
+            <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{esACoorinar ? "a coordinar" : `${fechaLabel} · ${hora}`}</span></div>
             {!esCortesia && <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena.toLocaleString("es-AR")}</span></div>}
+            {es2x1 && (
+              <>
+                <div style={{ borderTop: "0.5px solid #E8DEFA", paddingTop: "8px", marginTop: "4px" }}></div>
+                <div style={s.resRow}><span style={s.resLabel}>Persona 2</span><span style={s.resValor}>{srv2?.name} · {modalidad2}</span></div>
+                <div style={s.resRow}><span style={s.resLabel}>Fecha</span><span style={s.resValor}>{esACoorinar2 ? "a coordinar" : `${fechaLabel2} · ${hora2}`}</span></div>
+                <div style={s.resRow}><span style={s.resLabel}>Saldo 12hs antes</span><span style={s.resValor}>${sena2.toLocaleString("es-AR")}</span></div>
+              </>
+            )}
           </div>
           {comprobanteFallo && (
             <div style={{ ...s.avisoBox, background: "#FEF3E8", color: "#92400E" }}>
@@ -739,6 +1078,8 @@ export default function Reserva() {
             setStep(1); setProf(null); setServicio(null); setMoneda(null); setDia(null); setHora(null);
             setModalidad(null); setForm({ nombre: "", celular: "", mail: "" }); setClienteReconocido(false);
             setMesActual(inicioMes()); setComprobante(null); setComprobanteFallo(false);
+            setEs2x1(false); setServicio2(null); setMesActual2(inicioMes()); setDia2(null); setHora2(null);
+            setModalidad2(null); setForm2({ nombre: "", celular: "", mail: "" }); setClienteReconocido2(false);
           }}>
             Volver al inicio
           </button>
