@@ -24,7 +24,7 @@ function App() {
   // qué pantalla (y qué turno abrir dentro de ella) hay que ir de una.
   const paramsIniciales = new URLSearchParams(window.location.search);
   const [page, setPage] = useState(paramsIniciales.get("page") || "dashboard");
-  const [deepLinkTurno] = useState(paramsIniciales.get("turno"));
+  const [deepLinkTurno, setDeepLinkTurno] = useState(paramsIniciales.get("turno"));
   const [authPage, setAuthPage] = useState("login");
   const [showLogin, setShowLogin] = useState(false);
 
@@ -37,6 +37,21 @@ function App() {
       setSession(session);
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Si la app ya estaba abierta cuando llega una notificación, el service
+  // worker no navega la pestaña por su cuenta (Safari/iOS lo ignora) —
+  // en cambio manda este mensaje y acá se cambia de pantalla a mano.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMessage = (event) => {
+      if (event.data?.type !== "agendalec-navigate") return;
+      const params = new URLSearchParams(event.data.url?.split("?")[1] || "");
+      setPage(params.get("page") || "dashboard");
+      setDeepLinkTurno(params.get("turno"));
+    };
+    navigator.serviceWorker.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker.removeEventListener("message", onMessage);
   }, []);
 
   const path = window.location.pathname;

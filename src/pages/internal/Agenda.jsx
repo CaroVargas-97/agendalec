@@ -220,7 +220,7 @@ export default function Agenda({ deepLinkTurno }) {
       await abrirTurno({ id: deepLinkTurno });
       window.history.replaceState({}, "", window.location.pathname);
     })();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deepLinkTurno]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cerrarTurno = () => { setTurnoSeleccionado(null); setPagosDelTurno([]); setEditandoTurno(false); };
 

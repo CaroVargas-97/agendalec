@@ -29,9 +29,11 @@ self.addEventListener("notificationclick", (event) => {
       for (const cliente of lista) {
         if ("focus" in cliente) {
           await cliente.focus();
-          // Enfocar la pestaña ya abierta no alcanza: si no se navega
-          // también, la notificación te deja en la pantalla en la que
-          // ya estabas en vez de llevarte al turno que la generó.
+          // WindowClient.navigate() no anda confiable en todos los
+          // navegadores (Safari/iOS en particular lo ignora en silencio),
+          // así que además se le avisa a la página por mensaje para que
+          // ella misma cambie de pantalla sin depender de esa API.
+          cliente.postMessage({ type: "agendalec-navigate", url: destino });
           if ("navigate" in cliente) {
             try { await cliente.navigate(destino); } catch (e) {}
           }
