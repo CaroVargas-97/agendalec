@@ -483,7 +483,7 @@ export default function Reserva() {
             professionalId: profData.id,
             title: "🎁 Nuevo 2x1",
             body: `${form.nombre} (${srv.name.trim()} · ${cuandoTxt1}) + ${form2.nombre} (${srv2.name.trim()} · ${cuandoTxt2})${comprobante ? " · adjuntaron comprobante" : ""}`,
-            url: "/",
+            url: `/?page=agenda&turno=${resultado.turno_1}`,
           }),
         }).catch(() => {});
 
@@ -553,7 +553,7 @@ export default function Reserva() {
           professionalId: profData.id,
           title: esACoorinar ? "🌿 Nueva limpieza" : "📅 Nuevo turno",
           body: `${form.nombre} · ${srv.name.trim()} · ${cuandoTxt}${comprobante ? " · adjuntó comprobante" : ""}`,
-          url: "/",
+          url: `/?page=agenda&turno=${turnoId}`,
         }),
       }).catch(() => {});
 

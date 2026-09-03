@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       const payload = JSON.stringify({
         title: "🌿 Limpiezas energéticas",
         body: resumen,
-        url: "/",
+        url: "/?page=limpiezas",
         tag: "limpiezas-recordatorio",
       });
 

@@ -80,7 +80,7 @@ export default function Saldo() {
         professionalId: info.professional_id,
         title: "💰 Comprobante de saldo",
         body: `${info.cliente} · ${info.servicio} · adjuntó el comprobante del saldo`,
-        url: "/",
+        url: `/?page=agenda&turno=${info.appointment_id}`,
       }),
     }).catch(() => {});
 

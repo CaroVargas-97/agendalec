@@ -51,7 +51,7 @@ const getHeight = (inicio, fin) => {
   return Math.max((mins / 60) * 64 - 4, 30);
 };
 
-export default function Agenda() {
+export default function Agenda({ deepLinkTurno }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [fecha, setFecha] = useState(new Date());
   const [vista, setVista] = useState(window.innerWidth < 768 ? "dia" : "semana");
@@ -208,6 +208,19 @@ export default function Agenda() {
     setPagosDelTurno(pagos || []);
     setLoadingPagos(false);
   };
+
+  // Al entrar desde una notificación push (?page=agenda&turno=<id>), se
+  // abre directo el turno correspondiente en vez de dejar a Caro en la
+  // pantalla general de Agenda para que lo busque a mano.
+  useEffect(() => {
+    if (!deepLinkTurno) return;
+    (async () => {
+      const { data: t } = await supabase.from("appointments").select("date").eq("id", deepLinkTurno).maybeSingle();
+      if (t?.date) setFecha(new Date(t.date + "T12:00:00"));
+      await abrirTurno({ id: deepLinkTurno });
+      window.history.replaceState({}, "", window.location.pathname);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cerrarTurno = () => { setTurnoSeleccionado(null); setPagosDelTurno([]); setEditandoTurno(false); };
 

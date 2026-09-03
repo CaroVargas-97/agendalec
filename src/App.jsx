@@ -19,7 +19,12 @@ import Layout from "./components/internal/Layout";
 function App() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState("dashboard");
+  // Al tocar una notificación push, el service worker abre/navega acá con
+  // ?page=agenda&turno=<id> — se lee una sola vez al cargar para saber a
+  // qué pantalla (y qué turno abrir dentro de ella) hay que ir de una.
+  const paramsIniciales = new URLSearchParams(window.location.search);
+  const [page, setPage] = useState(paramsIniciales.get("page") || "dashboard");
+  const [deepLinkTurno] = useState(paramsIniciales.get("turno"));
   const [authPage, setAuthPage] = useState("login");
   const [showLogin, setShowLogin] = useState(false);
 
@@ -71,7 +76,7 @@ function App() {
   }
 
   const renderPage = () => {
-    if (page === "agenda") return <Agenda setPage={setPage} />;
+    if (page === "agenda") return <Agenda setPage={setPage} deepLinkTurno={deepLinkTurno} />;
     if (page === "config") return <Configuracion setPage={setPage} />;
     if (page === "clientes") return <Clientes setPage={setPage} />;
     if (page === "cobros") return <Cobros setPage={setPage} />;
