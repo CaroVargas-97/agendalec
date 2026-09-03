@@ -36,7 +36,7 @@ const metrics = [
   { key: "cobradoHoy",      label: "Cobrado hoy",       color: "#63B522", prefix: "$", sub: null },
   { key: "saldosPendientes",label: "Saldos pendientes",  color: "#F59E0B", prefix: "$", subKey: "saldosCount" },
   { key: "estesMes",        label: "Este mes",           color: "#9B72C0", prefix: "$", sub: "cobrado por completo" },
-  { key: "cancelaciones",   label: "Cancelaciones",      color: "#E24B4A", prefix: "",  sub: "en historial" },
+  { key: "cancelaciones",   label: "Cancelaciones",      color: "#E24B4A", prefix: "",  sub: "en total" },
 ];
 
 export default function Cobros() {
@@ -137,7 +137,15 @@ export default function Cobros() {
     asistentesGrupales.filter(a => a.status === "pending").forEach(a => sumarEn(saldosPendientes, a.currency, a.monto));
     asistentesGrupales.filter(a => a.status === "partial").forEach(a => sumarEn(saldosPendientes, a.currency, Math.round(a.monto / 2)));
 
-    const cancelaciones = (confirmados || []).filter(t => t.status === "cancelled").length;
+    // Conteo real de cancelaciones: la consulta de "confirmados" de arriba
+    // trae confirmados+cancelados mezclados con un límite de 50 filas (para
+    // que el historial cargue rápido), así que contar sobre esos datos podía
+    // dar un número más bajo que el total real si había más de 50 turnos
+    // confirmados más recientes que alguna cancelación vieja.
+    let cancelQuery = supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "cancelled");
+    if (idsLimpieza.size > 0) cancelQuery = cancelQuery.not("service_id", "in", `(${[...idsLimpieza].join(",")})`);
+    const { count: cancelacionesTotal } = await cancelQuery;
+    const cancelaciones = cancelacionesTotal ?? (confirmados || []).filter(t => t.status === "cancelled").length;
     const grupalPendientesCount = asistentesGrupales.filter(a => a.status === "pending" || a.status === "partial").length;
     // El contador acompaña al monto: cuenta todos los saldos pendientes
     // (incluidas limpiezas, que no se listan acá) más los de grupales.
