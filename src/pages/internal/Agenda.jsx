@@ -246,6 +246,16 @@ export default function Agenda({ deepLinkTurno }) {
     if (!esACoordinarTurno && (!editTurnoForm.fecha || !editTurnoForm.hora)) {
       setEditTurnoError("Completá fecha y hora."); return;
     }
+    // El EXCLUDE constraint de la base solo evita choques de horario entre
+    // turnos, no sabe nada de los días bloqueados (que viven en otra
+    // tabla) — sin este chequeo, se podía mover un turno a un día
+    // bloqueado y quedaba invisible, tapado por el aviso de "Día
+    // bloqueado" en el calendario.
+    const bloqueoTotal = !esACoordinarTurno && blockedDates.find(b => b.date === editTurnoForm.fecha && !b.start_time);
+    if (bloqueoTotal) {
+      setEditTurnoError(`Ese día está bloqueado${bloqueoTotal.reason ? ` (${bloqueoTotal.reason})` : ""}. Elegí otra fecha o desbloqueá el día primero.`);
+      return;
+    }
     setSavingEditTurno(true);
 
     let endTime = null;
@@ -403,6 +413,12 @@ export default function Agenda({ deepLinkTurno }) {
     const srv = servicios.find(s => s.id === form.servicioId);
     if (!srv || !form.profesional || !busquedaCliente) {
       setSavingError("Completá todos los campos obligatorios.");
+      setSaving(false); return;
+    }
+    const esACoordinarPrecheck = srv.requires_slot === false;
+    const bloqueoTotalNuevo = !esACoordinarPrecheck && blockedDates.find(b => b.date === form.fecha && !b.start_time);
+    if (bloqueoTotalNuevo) {
+      setSavingError(`Ese día está bloqueado${bloqueoTotalNuevo.reason ? ` (${bloqueoTotalNuevo.reason})` : ""}. Elegí otra fecha o desbloqueá el día primero.`);
       setSaving(false); return;
     }
 
@@ -605,7 +621,7 @@ export default function Agenda({ deepLinkTurno }) {
                         const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         const h = getHeight(t.start_time, t.end_time);
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time, rangoHoras.inicio)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden" }}>
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time, rangoHoras.inicio)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden", zIndex: 6 }}>
                             <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}{es2x1(t) && " · 🎁 2x1"}</div>
                             <div style={{ fontSize: "13px", fontWeight: "700", color: textColor, lineHeight: "1.2" }}>{t.clients?.full_name}</div>
                             {h > 45 && <div style={{ fontSize: "11px", color: textColor, opacity: 0.75 }}>{t.services?.name}</div>}
