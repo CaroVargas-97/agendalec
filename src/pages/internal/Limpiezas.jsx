@@ -40,6 +40,10 @@ export default function Limpiezas() {
   const [tab, setTab] = useState("pendientes");
   const [subiendo, setSubiendo] = useState(null);
 
+  const [editandoClienteId, setEditandoClienteId] = useState(null);
+  const [editClienteForm, setEditClienteForm] = useState({ nombre: "", telefono: "", mail: "" });
+  const [savingEditCliente, setSavingEditCliente] = useState(false);
+
   const [nuevoAbierto, setNuevoAbierto] = useState(false);
   const [busquedaCliente, setBusquedaCliente] = useState("");
   const [clientesCoincidentes, setClientesCoincidentes] = useState([]);
@@ -69,7 +73,7 @@ export default function Limpiezas() {
 
     const { data } = await supabase
       .from("appointments")
-      .select("id, date, start_time, status, total_price, modality, notes, completed_at, clients(full_name, phone), services(name, currency), payments(id, type, status, amount, receipt_url)")
+      .select("id, date, start_time, status, total_price, modality, notes, completed_at, clients(id, full_name, phone, email), services(name, currency), payments(id, type, status, amount, receipt_url)")
       .eq("professional_id", uid)
       .in("service_id", idsLimpieza)
       .order("date", { ascending: true, nullsFirst: false });
@@ -204,6 +208,25 @@ export default function Limpiezas() {
     await cargar();
   };
 
+  const iniciarEdicionCliente = (l) => {
+    setEditClienteForm({ nombre: l.clients?.full_name || "", telefono: l.clients?.phone || "", mail: l.clients?.email || "" });
+    setEditandoClienteId(l.id);
+  };
+
+  const guardarEdicionCliente = async (l) => {
+    if (!editClienteForm.nombre.trim()) return;
+    setSavingEditCliente(true);
+    const { error } = await supabase.from("clients").update({
+      full_name: editClienteForm.nombre.trim(),
+      phone: editClienteForm.telefono || null,
+      email: editClienteForm.mail.trim().toLowerCase() || null,
+    }).eq("id", l.clients.id);
+    if (error) { alert("No se pudo guardar: " + error.message); setSavingEditCliente(false); return; }
+    setSavingEditCliente(false);
+    setEditandoClienteId(null);
+    await cargar();
+  };
+
   const cancelar = async (l) => {
     if (!window.confirm(`¿Cancelar la limpieza de ${l.clients?.full_name}?`)) return;
     await supabase.from("appointments").update({ status: "cancelled" }).eq("id", l.id);
@@ -288,10 +311,16 @@ export default function Limpiezas() {
               <div key={l.id} style={s.fila}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                   <div style={{ flex: 1, minWidth: "180px" }}>
-                    <div style={{ fontSize: "14px", fontWeight: "500", color: "#2A1845" }}>{l.clients?.full_name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ fontSize: "14px", fontWeight: "500", color: "#2A1845" }}>{l.clients?.full_name}</div>
+                      {l.clients?.id && editandoClienteId !== l.id && (
+                        <button onClick={() => iniciarEdicionCliente(l)} title="Editar datos del cliente" style={{ width: "20px", height: "20px", borderRadius: "5px", border: "0.5px solid #E0D0F0", background: "#F8F4FC", cursor: "pointer", fontSize: "11px", color: "#9B72C0", padding: 0 }}>✎</button>
+                      )}
+                    </div>
                     <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "2px" }}>
                       {l.services?.name} · {sym}{parseFloat(l.total_price || 0).toLocaleString("es-AR")}
                     </div>
+                    {l.clients?.phone && editandoClienteId !== l.id && <div style={{ fontSize: "12px", color: "#9B72C0", marginTop: "2px" }}>{l.clients.phone}</div>}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                     {l.date ? <span style={s.tagParcial}>{fmtFecha(l.date)}</span> : <span style={s.tagSinFecha}>Sin fecha</span>}
@@ -305,6 +334,20 @@ export default function Limpiezas() {
                     )}
                   </div>
                 </div>
+
+                {editandoClienteId === l.id && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "8px", padding: "10px", background: "#F8F4FC", borderRadius: "8px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px" }}>
+                      <input type="text" value={editClienteForm.nombre} onChange={e => setEditClienteForm({...editClienteForm, nombre: e.target.value})} placeholder="Nombre y apellido" style={{ ...s.input, fontSize: "12px" }} />
+                      <input type="tel" value={editClienteForm.telefono} onChange={e => setEditClienteForm({...editClienteForm, telefono: e.target.value})} placeholder="Celular" style={{ ...s.input, fontSize: "12px" }} />
+                    </div>
+                    <input type="email" value={editClienteForm.mail} onChange={e => setEditClienteForm({...editClienteForm, mail: e.target.value})} placeholder="Mail (opcional)" style={{ ...s.input, fontSize: "12px" }} />
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button onClick={() => setEditandoClienteId(null)} style={{ ...s.cancelBtn, flex: 1, padding: "6px" }}>Cancelar</button>
+                      <button onClick={() => guardarEdicionCliente(l)} disabled={savingEditCliente || !editClienteForm.nombre.trim()} style={{ ...s.saveBtn, flex: 1, padding: "6px" }}>{savingEditCliente ? "Guardando..." : "Guardar"}</button>
+                    </div>
+                  </div>
+                )}
 
                 {(sena?.receipt_url || saldo?.receipt_url) && (
                   <div style={{ display: "flex", gap: "10px", marginTop: "6px" }}>
