@@ -4,20 +4,21 @@ import { supabase } from "../../supabase";
 const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
 
 const s = {
-  main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.75rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   topbar: { display: "flex", alignItems: "flex-start", justifyContent: "space-between" },
   title: { fontSize: "18px", fontWeight: "500", color: "#2A1845" },
   titleSub: { fontSize: "13px", color: "#9B72C0", marginTop: "3px" },
-  tabs: { display: "flex", gap: "6px" },
+  periodBar: { display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", padding: "10px 14px", background: "#fff", border: "0.5px solid #EDE4F7", borderRadius: "10px" },
+  tabs: { display: "flex", gap: "6px", flexWrap: "wrap" },
   tab: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  tabActive: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #9B72C0", background: "#EDE8FA", color: "#3B2460", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  metrics: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" },
-  metricCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.1rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  tabActive: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "none", background: "#9B72C0", color: "#fff", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  metrics: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "16px" },
+  metricCard: { background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.2rem 1.3rem", boxShadow: "0 4px 16px rgba(42,24,69,0.05)" },
   metricSub: { fontSize: "11px", color: "#B89FD0", marginTop: "4px" },
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" },
-  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.25rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
-  cardTitle: { fontSize: "11px", fontWeight: "500", color: "#B89FD0", marginBottom: "1rem", textTransform: "uppercase", letterSpacing: "0.5px" },
-  rowItem: { display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", marginBottom: "2px", transition: "background 0.15s" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.25rem" },
+  card: { background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.4rem", boxShadow: "0 4px 16px rgba(42,24,69,0.05)" },
+  cardTitle: { fontSize: "11px", fontWeight: "500", color: "#B89FD0", marginBottom: "1.1rem", textTransform: "uppercase", letterSpacing: "0.5px" },
+  rowItem: { display: "flex", alignItems: "center", gap: "10px", padding: "10px 10px", borderRadius: "8px", marginBottom: "4px", transition: "background 0.15s" },
   rowName: { fontSize: "13px", fontWeight: "500", color: "#2A1845", flex: 1 },
   rowValue: { fontSize: "13px", color: "#5C3F99", fontWeight: "500" },
   rowSub: { fontSize: "11px", color: "#B89FD0" },
@@ -26,8 +27,8 @@ const s = {
   modV: { background: "#9B72C0", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", fontWeight: "500" },
   modP: { background: "#E88BB0", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "11px", fontWeight: "500" },
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "1rem 0" },
-  sectionHeader: { display: "flex", alignItems: "center", gap: "10px", marginTop: "6px" },
-  sectionTitle: { fontSize: "15px", fontWeight: "600", color: "#3B2460" },
+  sectionHeader: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "2px" },
+  sectionTitle: { fontSize: "16px", fontWeight: "600", color: "#3B2460" },
   sectionLine: { flex: 1, height: "1px", background: "#E8DEF5" },
 };
 
@@ -452,7 +453,7 @@ export default function Estadisticas() {
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+      <div style={s.periodBar}>
         <div style={s.tabs}>
           {periodos.map(p => (
             <button key={p.key} style={!modoMes && periodo === p.key ? s.tabActive : s.tab} onClick={() => { setModoMes(false); setPeriodo(p.key); }}>
@@ -523,6 +524,7 @@ export default function Estadisticas() {
             </div>
           )}
 
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           <div style={s.sectionHeader}>
             <div style={s.sectionTitle}>🧘 Individuales</div>
             <div style={s.sectionLine}></div>
@@ -585,7 +587,9 @@ export default function Estadisticas() {
               ))}
             </div>
           </div>
+          </div>
 
+          <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
           <div style={s.sectionHeader}>
             <div style={s.sectionTitle}>👥 Grupales</div>
             <div style={s.sectionLine}></div>
@@ -625,6 +629,7 @@ export default function Estadisticas() {
                 </div>
               ))}
             </div>
+          </div>
           </div>
 
           <div style={s.card}>
