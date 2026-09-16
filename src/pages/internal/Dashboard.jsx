@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../supabase";
 
 const s = {
-  main: { flex: 1, padding: "1.5rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  topbar: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "1.5rem" },
+  main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.75rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  topbar: { display: "flex", alignItems: "flex-start", justifyContent: "space-between" },
   greeting: { fontSize: "18px", fontWeight: "500", color: "#2A1845" },
   greetingSub: { fontSize: "13px", color: "#9B72C0", marginTop: "3px" },
-  avatar: { width: "38px", height: "38px", borderRadius: "50%", background: "#C4A8D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "500", color: "#3B2460" },
-  metrics: { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px", marginBottom: "1.5rem" },
-  metricCard: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.1rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  avatar: { width: "40px", height: "40px", borderRadius: "50%", background: "#C4A8D8", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: "500", color: "#3B2460", boxShadow: "0 2px 8px rgba(155,114,192,0.3)" },
+  metrics: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "16px" },
+  metricCard: { background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.2rem 1.3rem", boxShadow: "0 4px 16px rgba(42,24,69,0.05)" },
   metricSub: { fontSize: "11px", color: "#B89FD0", marginTop: "4px" },
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "1rem" },
-  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
-  cardTitle: { fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "center" },
+  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1.25rem" },
+  card: { background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.3rem 1.4rem", boxShadow: "0 4px 16px rgba(42,24,69,0.05)" },
+  cardTitle: { fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "14px", display: "flex", justifyContent: "space-between", alignItems: "center" },
   cardLink: { fontSize: "11px", color: "#9B72C0", cursor: "pointer", fontWeight: "400" },
   badgeV: { fontSize: "10px", padding: "2px 7px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99" },
   badgeP: { fontSize: "10px", padding: "2px 7px", borderRadius: "20px", background: "#FDF2F8", color: "#831843" },
@@ -108,7 +108,7 @@ export default function Dashboard({ setPage }) {
           {loading ? <div style={s.emptyText}>Cargando...</div> :
            turnos.length === 0 ? <div style={s.emptyText}>No hay turnos para hoy</div> :
            turnos.map((t, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "8px", background: turnoRowBg(t), marginBottom: i < turnos.length - 1 ? "6px" : 0 }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "8px", background: turnoRowBg(t), marginBottom: i < turnos.length - 1 ? "8px" : 0 }}>
               <div style={{ fontSize: "11px", color: "#9B72C0", minWidth: "38px" }}>{t.start_time ? t.start_time.slice(0,5) : "a coord."}</div>
               <span style={t.modality === "virtual" ? s.badgeV : s.badgeP}>
                 {t.modality === "virtual" ? "📹 Virtual" : "📍 Presencial"}
@@ -127,7 +127,7 @@ export default function Dashboard({ setPage }) {
             <div style={s.cardTitle}>Profesionales</div>
             {profesionales.length === 0 ? <div style={s.emptyText}>No hay profesionales</div> :
              profesionales.map((p, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "8px", background: "#F8F4FC", marginBottom: i < profesionales.length - 1 ? "6px" : 0 }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", borderRadius: "8px", background: "#F8F4FC", marginBottom: i < profesionales.length - 1 ? "8px" : 0 }}>
                 <div style={{ ...s.profAvatar, background: i % 2 === 0 ? "#C4A8D8" : "#F4B8D1" }}>
                   {p.full_name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase() || "?"}
                 </div>
