@@ -901,7 +901,7 @@ export default function Reserva() {
             </div>
           )}
           <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
-          <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
+          <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ... (o +código de país si sos del exterior)" style={s.input} /></div>
 
           {es2x1 && (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px", border: "0.5px dashed #E88BB0", borderRadius: "10px" }}>
@@ -914,7 +914,7 @@ export default function Reserva() {
                 <div style={{ background: "#EAF3DE", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#3B6D11" }}>✓ Encontramos sus datos.</div>
               )}
               <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form2.nombre} onChange={e => setForm2({...form2, nombre: e.target.value})} placeholder="Nombre del acompañante" style={s.input} /></div>
-              <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form2.celular} onChange={e => setForm2({...form2, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
+              <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form2.celular} onChange={e => setForm2({...form2, celular: e.target.value})} placeholder="+54 9 11 ... (o +código de país si sos del exterior)" style={s.input} /></div>
             </div>
           )}
 

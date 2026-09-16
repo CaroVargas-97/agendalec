@@ -36,13 +36,15 @@ export function normalizarCelular(phone) {
     }
   }
 
-  // Un celular argentino son 10 dígitos: área (2 a 4) + abonado.
+  // Un celular argentino son 10 dígitos: área (2 a 4) + abonado. Si no da
+  // 10, puede ser simplemente que sea de otro país y le falte el "+" con
+  // el código — sin ese signo no hay forma de saber a qué país pertenece.
   if (d.length !== 10) {
     return {
       ok: false,
       digits: d,
       internacional: false,
-      motivo: d.length < 10 ? "faltan dígitos" : "sobran dígitos",
+      motivo: "revisar — si es del exterior, escribilo con + y el código de país",
     };
   }
 
@@ -55,3 +57,14 @@ export function linkWhatsApp(phone) {
 }
 
 export const celularValido = (phone) => normalizarCelular(phone).ok;
+
+// Mensaje de advertencia único, reutilizado en todos los formularios donde
+// se carga un celular — así no queda un texto distinto (y a veces
+// "argentino" a secas) repetido y desactualizado en cada pantalla.
+export const celularAviso = (phone) => {
+  const r = normalizarCelular(phone);
+  if (r.ok) return null;
+  return r.internacional
+    ? "⚠️ Revisá el número, no tiene una longitud habitual para un celular del exterior"
+    : "⚠️ Revisá el número — si es del exterior, escribilo con + y el código de país (ej: +34, +1, +598)";
+};

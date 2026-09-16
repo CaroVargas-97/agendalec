@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
-import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
+import { linkWhatsApp, celularValido, celularAviso } from "../../utils/whatsapp";
 
 const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
 // Bloques con color: cada cliente en su propio bloque, en vez de filas de
@@ -222,7 +222,7 @@ export default function Clientes() {
                 <label style={s.label}>Celular</label>
                 <input type="tel" value={editDatos.celular} onChange={e => setEditDatos({...editDatos, celular: e.target.value})} style={s.input} />
                 {editDatos.celular && !celularValido(editDatos.celular) && (
-                  <span style={{ fontSize: "11px", color: "#A32D2D" }}>⚠️ No parece un celular argentino válido</span>
+                  <span style={{ fontSize: "11px", color: "#A32D2D" }}>{celularAviso(editDatos.celular)}</span>
                 )}
               </div>
               <div style={s.field}>
@@ -279,7 +279,7 @@ export default function Clientes() {
             <div style={{ fontSize: "12px", color: "#B89FD0" }}>Cargalo antes de mandarle el link de reserva para que el precio especial o la cortesía se aplique solos cuando reserve con este mismo mail.</div>
 
             <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={nuevoForm.nombre} onChange={e => setNuevoForm({...nuevoForm, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
-            <div style={s.field}><label style={s.label}>Celular</label><input type="tel" value={nuevoForm.celular} onChange={e => setNuevoForm({...nuevoForm, celular: e.target.value})} placeholder="+54 9 11..." style={s.input} /></div>
+            <div style={s.field}><label style={s.label}>Celular</label><input type="tel" value={nuevoForm.celular} onChange={e => setNuevoForm({...nuevoForm, celular: e.target.value})} placeholder="+54 9 11... (o +código de país si es del exterior)" style={s.input} /></div>
             <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={nuevoForm.mail} onChange={e => setNuevoForm({...nuevoForm, mail: e.target.value})} placeholder="mail@ejemplo.com" style={s.input} /></div>
 
             <div style={{ ...s.card, boxShadow: "none", border: "0.5px solid #F0E8F8", padding: "1rem" }}>

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 import { authHeaders } from "../../utils/apiAuth";
 import { calcularSaldoPendiente } from "../../utils/pagos";
-import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
+import { linkWhatsApp, celularValido, celularAviso } from "../../utils/whatsapp";
 import { cuando } from "../../utils/fecha";
 
 const DIAS_SEMANA = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
@@ -988,9 +988,9 @@ export default function Agenda({ deepLinkTurno }) {
                 <>
                   <div style={s.field}>
                     <label style={s.label}>Celular (opcional)</label>
-                    <input type="tel" value={nuevoClienteData.phone} onChange={e => setNuevoClienteData({...nuevoClienteData, phone: e.target.value})} placeholder="+54 9 11..." style={s.input} />
+                    <input type="tel" value={nuevoClienteData.phone} onChange={e => setNuevoClienteData({...nuevoClienteData, phone: e.target.value})} placeholder="+54 9 11... (o +código de país si es del exterior)" style={s.input} />
                     {nuevoClienteData.phone && !celularValido(nuevoClienteData.phone) && (
-                      <span style={{ fontSize: "11px", color: "#A32D2D" }}>⚠️ No parece un celular argentino válido (área + número, sin el 15)</span>
+                      <span style={{ fontSize: "11px", color: "#A32D2D" }}>{celularAviso(nuevoClienteData.phone)}</span>
                     )}
                   </div>
                   <div style={s.field}>
