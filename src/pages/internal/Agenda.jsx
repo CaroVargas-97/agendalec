@@ -574,7 +574,7 @@ export default function Agenda({ deepLinkTurno }) {
                         const isPending = t.status === "pending";
                         return (
                           <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isLimpieza ? "#EAF6EE" : isPartial ? "#DBEAFE" : isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isLimpieza ? "#3B8C5A" : isPartial ? "#2563EB" : isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
-                            {isLimpieza && "🌿 "}{isPartial && "💙 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{es2x1(t) && " · 🎁 2x1"}
+                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{es2x1(t) && " · 🎁 2x1"}
                           </div>
                         );
                       })}
@@ -620,11 +620,11 @@ export default function Agenda({ deepLinkTurno }) {
                         const bg = isCancelled ? "#F3F4F6" : isLimpieza ? "#EAF6EE" : isPartial ? "#DBEAFE" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
                         const textColor = isCancelled ? "#6B7280" : isLimpieza ? "#1F5C37" : isPartial ? "#1E3A8A" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
                         const label = isCancelled ? "Cancelado" : isLimpieza ? "Limpieza" : isPartial ? "Seña pagada" : isPending ? "Pendiente" : isVirtual ? "Virtual" : "Presencial";
-                        const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPartial ? "💙" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                        const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPartial ? "" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         const h = getHeight(t.start_time, t.end_time);
                         return (
                           <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time, rangoHoras.inicio)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden", zIndex: 6 }}>
-                            <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji} {label}{es2x1(t) && " · 🎁 2x1"}</div>
+                            <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji ? emoji + " " : ""}{label}{es2x1(t) && " · 🎁 2x1"}</div>
                             <div style={{ fontSize: "13px", fontWeight: "700", color: textColor, lineHeight: "1.2" }}>{t.clients?.full_name}</div>
                             {h > 45 && <div style={{ fontSize: "11px", color: textColor, opacity: 0.75 }}>{t.services?.name}</div>}
                           </div>
@@ -668,13 +668,13 @@ export default function Agenda({ deepLinkTurno }) {
                                 const accent = isLimpieza ? "#3B8C5A" : isPartial ? "#2563EB" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
                                 const bg = isLimpieza ? "#EAF6EE" : isPartial ? "#DBEAFE" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
                                 const textColor = isLimpieza ? "#1F5C37" : isPartial ? "#1E3A8A" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
-                                const emoji = isLimpieza ? "🌿" : isPartial ? "💙" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                                const emoji = isLimpieza ? "🌿" : isPartial ? "" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
                                   <div key={ti} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", background: bg, borderTop: "0.5px solid #fff", borderLeft: `4px solid ${accent}`, cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>
                                     <div style={{ fontSize: "11px", fontWeight: "600", color: accent, minWidth: "44px" }}>{t.start_time ? t.start_time.slice(0,5) : "A coord."}</div>
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                       <div style={{ fontSize: "13px", fontWeight: "600", color: textColor, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.clients?.full_name}{es2x1(t) && " 🎁"}</div>
-                                      <div style={{ fontSize: "11px", color: textColor, opacity: 0.75, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emoji} {t.services?.name}</div>
+                                      <div style={{ fontSize: "11px", color: textColor, opacity: 0.75, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{emoji ? emoji + " " : ""}{t.services?.name}</div>
                                     </div>
                                   </div>
                                 );
@@ -696,7 +696,7 @@ export default function Agenda({ deepLinkTurno }) {
                         const isPending = t.status === "pending";
                         return (
                           <div key={i} onClick={() => abrirTurno(t)} style={{ padding: "8px 12px", borderRadius: "8px", background: isLimpieza ? "#EAF6EE" : isPartial ? "#DBEAFE" : isPending ? "#FFFBEB" : "#F8F4FC", borderLeft: `4px solid ${isLimpieza ? "#3B8C5A" : isPartial ? "#2563EB" : isPending ? "#D97706" : "#9B72C0"}`, cursor: "pointer", fontSize: "12px", color: "#2A1845" }}>
-                            {isLimpieza && "🌿 "}{isPartial && "💙 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{es2x1(t) && " · 🎁 2x1"}{t.date ? ` · ${new Date(t.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" })}` : ""}
+                            {isLimpieza && "🌿 "}<strong>{t.clients?.full_name}</strong> · {t.services?.name}{es2x1(t) && " · 🎁 2x1"}{t.date ? ` · ${new Date(t.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric" })}` : ""}
                           </div>
                         );
                       })}
@@ -735,7 +735,7 @@ export default function Agenda({ deepLinkTurno }) {
                                 const accent = isCancelled ? "#9CA3AF" : isLimpieza ? "#3B8C5A" : isPartial ? "#2563EB" : isPending ? "#D97706" : isVirtual ? "#7C3AED" : "#BE185D";
                                 const bg = isCancelled ? "#F3F4F6" : isLimpieza ? "#EAF6EE" : isPartial ? "#DBEAFE" : isPending ? "#FFFBEB" : isVirtual ? "#F3E8FF" : "#FDF2F8";
                                 const textColor = isCancelled ? "#6B7280" : isLimpieza ? "#1F5C37" : isPartial ? "#1E3A8A" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
-                                const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPartial ? "💙" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
+                                const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPartial ? "" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
                                   <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "6px", padding: "4px 6px", background: bg, borderLeft: `3px solid ${accent}`, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: "1px" }}>
                                     <div style={{ fontSize: "9px", fontWeight: "600", color: accent }}>{t.start_time?.slice(0,5)} {emoji}{es2x1(t) && " 🎁"}</div>
@@ -1044,7 +1044,7 @@ export default function Agenda({ deepLinkTurno }) {
         </div>
 
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          {[["#F3E8FF","#7C3AED","Virtual"],["#FDE8F0","#E88BB0","Presencial"],["#FFF8E8","#F0A800","Pendiente"],["#DBEAFE","#2563EB","💙 Seña pagada"]].map(([bg,border,label]) => (
+          {[["#F3E8FF","#7C3AED","Virtual"],["#FDE8F0","#E88BB0","Presencial"],["#FFF8E8","#F0A800","Pendiente"],["#DBEAFE","#2563EB","Seña pagada"]].map(([bg,border,label]) => (
             <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#B89FD0" }}>
               <div style={{ width: "10px", height: "10px", borderRadius: "2px", background: bg, borderLeft: `2px solid ${border}` }}></div>
               {label}
