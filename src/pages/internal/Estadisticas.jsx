@@ -2,6 +2,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 
 const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
+const blockColors = [
+  { bg: "#F3EEFA", text: "#5C3F99" },
+  { bg: "#FDF0F6", text: "#A0407A" },
+  { bg: "#EEF7F1", text: "#2F7A52" },
+  { bg: "#FDF6EC", text: "#B4790E" },
+  { bg: "#EEF5FA", text: "#2B6C99" },
+];
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.75rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -52,6 +59,7 @@ export default function Estadisticas() {
   const [modoMes, setModoMes] = useState(false);
   const [mesSeleccionado, setMesSeleccionado] = useState(() => { const d = new Date(); return { anio: d.getFullYear(), mes: d.getMonth() }; });
   const [loading, setLoading] = useState(true);
+  const [verTodosClientes, setVerTodosClientes] = useState(false);
   const [mostrarFuturo, setMostrarFuturo] = useState(false);
   const [stats, setStats] = useState({
     totalSesiones: 0, sesionesIndividuales: 0, sesionesGrupales: 0, ingresoTotal: 0, ingresoByCurrency: {},
@@ -701,29 +709,29 @@ export default function Estadisticas() {
             {stats.todosLosClientes.length === 0 ? (
               <div style={s.emptyText}>Sin datos en este período</div>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      {["Cliente", "Individuales", "Grupales", "Total ses.", "Última sesión", "Total gastado"].map(h => (
-                        <th key={h} style={{ fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "8px 10px", textAlign: h === "Cliente" ? "left" : "right", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.todosLosClientes.map((c, i) => (
-                      <tr key={i}>
-                        <td style={{ fontSize: "13px", color: "#2A1845", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{c.nombre}</td>
-                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{c.individuales}</td>
-                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{c.grupales}</td>
-                        <td style={{ fontSize: "13px", color: "#2A1845", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{c.count}</td>
-                        <td style={{ fontSize: "12px", color: "#B89FD0", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{c.ultima || "—"}</td>
-                        <td style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{fmtMonedas(c.totalByCurrency)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {(verTodosClientes ? stats.todosLosClientes : stats.todosLosClientes.slice(0, 10)).map((c, i) => {
+                    const bc = blockColors[i % blockColors.length];
+                    return (
+                      <div key={i} style={{ background: bc.bg, borderRadius: "12px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                        <div style={{ width: "30px", height: "30px", borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "600", color: bc.text, flexShrink: 0 }}>
+                          {c.nombre?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: "140px", fontSize: "13px", fontWeight: "600", color: bc.text }}>{c.nombre}</div>
+                        <div style={{ fontSize: "12px", color: bc.text, opacity: 0.85, minWidth: "110px" }}>{c.individuales} individuales · {c.grupales} grupales</div>
+                        <div style={{ fontSize: "12px", color: bc.text, opacity: 0.7, minWidth: "90px" }}>{c.ultima ? `última: ${c.ultima}` : "sin fecha"}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text }}>{fmtMonedas(c.totalByCurrency)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {stats.todosLosClientes.length > 10 && (
+                  <button onClick={() => setVerTodosClientes(v => !v)} style={{ marginTop: "10px", width: "100%", padding: "9px", background: "#F8F4FC", color: "#5C3F99", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                    {verTodosClientes ? "▴ Ver menos" : `▾ Ver los ${stats.todosLosClientes.length} clientes`}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </>
