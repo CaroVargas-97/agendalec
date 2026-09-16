@@ -778,8 +778,8 @@ export default function Agenda({ deepLinkTurno }) {
                     {t.clients?.price_type === "especial" && (
                       <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99", marginTop: "4px", display: "inline-block" }}>✨ Precio especial</span>
                     )}
-                    {es2x1(t) && (
-                      <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FDE8F0", color: "#A0407A", marginTop: "4px", display: "inline-block" }}>{t.notes}</span>
+                    {t.notes && (
+                      <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: es2x1(t) ? "#FDE8F0" : "#F8F4FC", color: es2x1(t) ? "#A0407A" : "#5C3F99", marginTop: "4px", display: "inline-block" }}>{es2x1(t) ? t.notes : `📝 ${t.notes}`}</span>
                     )}
                   </div>
                   <div style={{ display: "flex", gap: "6px" }}>
