@@ -3,19 +3,21 @@ import { supabase } from "../../supabase";
 import Notificaciones from "./Notificaciones";
 
 const s = {
-  wrap: { display: "flex", minHeight: "100vh", background: "#F8F4FC", fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: "hidden" },
+  wrap: { display: "flex", minHeight: "100vh", background: "#F6F2FA", fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: "hidden" },
 
-  sidebar: { width: "200px", padding: "1.25rem 0.75rem", background: "#2A1845", display: "flex", flexDirection: "column", gap: "2px", flexShrink: 0 },
-  logoWrap: { padding: "0 0.5rem", marginBottom: "1.5rem" },
-  logo: { fontSize: "16px", fontWeight: "500", color: "#fff", letterSpacing: "-0.3px" },
-  logoSub: { fontSize: "10px", color: "#9B72C0", marginTop: "2px" },
-  navItem: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "8px", fontSize: "13px", color: "rgba(255,255,255,0.5)", cursor: "pointer", border: "none", background: "transparent", width: "100%", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  navItemActive: { display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "8px", fontSize: "13px", color: "#fff", fontWeight: "500", cursor: "pointer", border: "none", background: "rgba(155,114,192,0.25)", width: "100%", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  logoutBtn: { marginTop: "auto", padding: "8px 10px", borderRadius: "8px", fontSize: "12px", color: "rgba(255,255,255,0.3)", cursor: "pointer", border: "none", background: "transparent", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", alignItems: "center", gap: "6px" },
+  sidebar: { width: "232px", padding: "1.5rem 1rem", background: "linear-gradient(165deg, #2A1845 0%, #3E2263 60%, #4A2874 100%)", display: "flex", flexDirection: "column", gap: "4px", flexShrink: 0 },
+  logoWrap: { display: "flex", alignItems: "center", gap: "10px", padding: "0 0.35rem", marginBottom: "2rem" },
+  logoBadge: { width: "34px", height: "34px", borderRadius: "10px", background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  logo: { fontSize: "16px", fontWeight: "600", color: "#fff", letterSpacing: "-0.3px" },
+  logoSub: { fontSize: "10px", color: "rgba(255,255,255,0.45)", marginTop: "1px" },
+  navItem: { display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "10px", fontSize: "13px", color: "rgba(255,255,255,0.55)", cursor: "pointer", border: "none", borderLeft: "3px solid transparent", background: "transparent", width: "100%", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif", transition: "background 0.15s" },
+  navItemActive: { display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "10px", fontSize: "13px", color: "#fff", fontWeight: "600", cursor: "pointer", border: "none", borderLeft: "3px solid #E29DD0", background: "rgba(255,255,255,0.12)", width: "100%", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 10px rgba(0,0,0,0.15)" },
+  navIcon: { fontSize: "15px", width: "18px", textAlign: "center" },
+  logoutBtn: { marginTop: "auto", padding: "10px 12px", borderRadius: "10px", fontSize: "12px", color: "rgba(255,255,255,0.4)", cursor: "pointer", border: "none", borderTop: "0.5px solid rgba(255,255,255,0.1)", background: "transparent", textAlign: "left", fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", alignItems: "center", gap: "8px" },
 
   main: { flex: 1, overflow: "auto" },
 
-  bottomNav: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "0.5px solid #E0D0F0", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "8px 0 16px", zIndex: 100 },
+  bottomNav: { position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "0.5px solid #E0D0F0", borderTopLeftRadius: "18px", borderTopRightRadius: "18px", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "8px 0 16px", zIndex: 100, boxShadow: "0 -6px 20px rgba(42,24,69,0.08)" },
   bottomNavItem: { display: "flex", flexDirection: "column", alignItems: "center", gap: "3px", padding: "4px 12px", borderRadius: "8px", cursor: "pointer", border: "none", background: "transparent", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   bottomNavLabel: { fontSize: "10px", color: "#B89FD0" },
   bottomNavLabelActive: { fontSize: "10px", color: "#7B5EA7", fontWeight: "500" },
@@ -60,21 +62,21 @@ export default function Layout({ children, page, setPage }) {
       {!isMobile && (
         <div style={s.sidebar}>
           <div style={s.logoWrap}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "space-between" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <img src="/logo-flower.png" alt="" style={{ width: "22px", height: "22px", filter: "brightness(0) invert(1)" }} />
-                <div style={s.logo}>AgendaLec</div>
-              </div>
-              <Notificaciones setPage={setPage} isMobile={false} />
+            <div style={s.logoBadge}>
+              <img src="/logo-flower.png" alt="" style={{ width: "20px", height: "20px", filter: "brightness(0) invert(1)" }} />
             </div>
-            <div style={s.logoSub}>Gestión de turnos</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={s.logo}>AgendaLec</div>
+              <div style={s.logoSub}>Gestión de turnos</div>
+            </div>
+            <Notificaciones setPage={setPage} isMobile={false} />
           </div>
           {navItems.map(item => (
             <button key={item.key} style={page === item.key ? s.navItemActive : s.navItem} onClick={() => setPage(item.key)}>
-              {item.icon} {item.label}
+              <span style={s.navIcon}>{item.icon}</span> {item.label}
             </button>
           ))}
-          <button style={s.logoutBtn} onClick={handleLogout}>← Cerrar sesión</button>
+          <button style={s.logoutBtn} onClick={handleLogout}><span style={s.navIcon}>←</span> Cerrar sesión</button>
         </div>
       )}
 
