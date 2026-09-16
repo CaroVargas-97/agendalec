@@ -16,8 +16,9 @@ const s = {
   tabs: { display: "flex", gap: "6px", marginBottom: "1.4rem", flexWrap: "wrap" },
   tab: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "0.5px solid #E0D0F0", background: "#fff", color: "#B89FD0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   tabActive: { padding: "7px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", border: "none", background: "#9B72C0", color: "#fff", fontWeight: "500", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  cobroRow: { display: "flex", alignItems: "flex-start", gap: "10px", padding: "14px", borderRadius: "12px", marginBottom: "8px", flexWrap: "wrap" },
-  cobroNombre: { fontSize: "13px", fontWeight: "500", color: "#2A1845" },
+  cobroRow: { display: "flex", alignItems: "flex-start", gap: "12px", padding: "14px 16px", borderRadius: "14px", marginBottom: "10px", flexWrap: "wrap" },
+  cobroAvatar: { width: "34px", height: "34px", borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "600", flexShrink: 0 },
+  cobroNombre: { fontSize: "13px", fontWeight: "600" },
   cobroDetalle: { fontSize: "12px", color: "#9B72C0", marginTop: "2px" },
   cobroMonto: { fontSize: "14px", fontWeight: "500", color: "#5C3F99" },
   tagPending: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FAEEDA", color: "#854F0B" },
@@ -31,6 +32,7 @@ const s = {
 };
 
 const symFor = (cur) => cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
+const iniciales = (nombre) => nombre?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase() || "?";
 const es2x1 = (notes) => !!notes?.includes("2x1");
 const Tag2x1 = () => <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "10px", background: "#FDE8F0", color: "#A0407A", marginLeft: "6px", verticalAlign: "middle" }}>🎁 2x1</span>;
 
@@ -320,9 +322,10 @@ export default function Cobros() {
               pendientes.length === 0 ? (
                 <div style={s.emptyText}>No hay señas pendientes de confirmación</div>
               ) : pendientes.map((t, i) => (
-                <div key={i} style={{ ...s.cobroRow, background: "#FFFBEB" }}>
+                <div key={i} style={{ ...s.cobroRow, background: "#FDF0D5" }}>
+                  <div style={{ ...s.cobroAvatar, color: "#92400E" }}>{iniciales(t.clients?.full_name)}</div>
                   <div style={{ flex: 1, minWidth: "180px" }}>
-                    <div style={s.cobroNombre}>{t.clients?.full_name}{es2x1(t.notes) && <Tag2x1 />}</div>
+                    <div style={{ ...s.cobroNombre, color: "#78350F" }}>{t.clients?.full_name}{es2x1(t.notes) && <Tag2x1 />}</div>
                     <div style={s.cobroDetalle}>{t.services?.name} · {cuando(t.date, t.start_time)}</div>
                     <div style={{ ...s.cobroDetalle, color: "#D97706", marginTop: "2px", fontWeight: "500" }}>Seña: {symFor(t.services?.currency)}{(parseFloat(t.total_price || 0) / 2).toLocaleString("es-AR")}</div>
                     {t.payments?.find(p => p.type === "seña")?.receipt_url && (
@@ -356,9 +359,10 @@ export default function Cobros() {
               saldos.length === 0 ? (
                 <div style={s.emptyText}>No hay saldos pendientes</div>
               ) : saldos.map((p, i) => (
-                <div key={i} style={{ ...s.cobroRow, background: "#F3E8FF" }}>
+                <div key={i} style={{ ...s.cobroRow, background: "#EAE0FA" }}>
+                  <div style={{ ...s.cobroAvatar, color: "#5C3F99" }}>{iniciales(p.appointments?.clients?.full_name)}</div>
                   <div style={{ flex: 1, minWidth: "180px" }}>
-                    <div style={s.cobroNombre}>{p.appointments?.clients?.full_name}{es2x1(p.appointments?.notes) && <Tag2x1 />}</div>
+                    <div style={{ ...s.cobroNombre, color: "#4C1D95" }}>{p.appointments?.clients?.full_name}{es2x1(p.appointments?.notes) && <Tag2x1 />}</div>
                     <div style={s.cobroDetalle}>{p.appointments?.services?.name} · {cuando(p.appointments?.date, p.appointments?.start_time)}</div>
                     {p.receipt_url && (
                       <a href={p.receipt_url} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0", textDecoration: "none", marginTop: "4px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
@@ -386,9 +390,10 @@ export default function Cobros() {
               historial.length === 0 ? (
                 <div style={s.emptyText}>No hay historial</div>
               ) : historial.map((t, i) => (
-                <div key={i} style={{ ...s.cobroRow, background: t.status === "confirmed" ? "#F8F4FC" : "#FFF5F5" }}>
+                <div key={i} style={{ ...s.cobroRow, background: t.status === "confirmed" ? "#E4F2DC" : "#FBE4E4" }}>
+                  <div style={{ ...s.cobroAvatar, color: t.status === "confirmed" ? "#3B6D11" : "#A32D2D" }}>{iniciales(t.clients?.full_name)}</div>
                   <div style={{ flex: 1 }}>
-                    <div style={s.cobroNombre}>{t.clients?.full_name}{es2x1(t.notes) && <Tag2x1 />}</div>
+                    <div style={{ ...s.cobroNombre, color: t.status === "confirmed" ? "#2C5209" : "#791F1F" }}>{t.clients?.full_name}{es2x1(t.notes) && <Tag2x1 />}</div>
                     <div style={s.cobroDetalle}>{t.services?.name} · {cuando(t.date, t.start_time)}</div>
                     <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
                       {t.payments?.filter(p => p.receipt_url).map((p, pi) => (
