@@ -668,29 +668,30 @@ export default function Estadisticas() {
             ) : resumenMensual.length === 0 ? (
               <div style={s.emptyText}>Sin datos</div>
             ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr>
-                      {["Mes", "Sesiones", "Clientes únicos", "Cortesías", "Modalidad", "Ingresos", "Servicio más solicitado"].map(h => (
-                        <th key={h} style={{ fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "8px 10px", textAlign: h === "Mes" || h === "Servicio más solicitado" ? "left" : "right", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px", whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {resumenMensual.map(m => (
-                      <tr key={m.mesKey}>
-                        <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textTransform: "capitalize", whiteSpace: "nowrap" }}>{nombreMes(m.mesKey)}</td>
-                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{m.sesiones}</td>
-                        <td style={{ fontSize: "13px", color: "#5C3F99", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{m.clientesUnicos}</td>
-                        <td style={{ fontSize: "13px", color: "#A0407A", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right" }}>{m.cortesias || "—"}</td>
-                        <td style={{ fontSize: "12px", color: "#B89FD0", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>📹{m.virtual} · 📍{m.presencial}</td>
-                        <td style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500", padding: "10px", borderBottom: "0.5px solid #F0E8F8", textAlign: "right", whiteSpace: "nowrap" }}>{fmtMonedas(m.ingresos)}</td>
-                        <td style={{ fontSize: "13px", color: "#2A1845", padding: "10px", borderBottom: "0.5px solid #F0E8F8" }}>{m.servicioTop}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {resumenMensual.map((m, i) => {
+                  const bc = blockColors[i % blockColors.length];
+                  const stat = (label, value) => (
+                    <div>
+                      <div style={{ fontSize: "10px", color: bc.text, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</div>
+                      <div style={{ fontSize: "14px", fontWeight: "600", color: bc.text, marginTop: "2px" }}>{value}</div>
+                    </div>
+                  );
+                  return (
+                    <div key={m.mesKey} style={{ background: bc.bg, borderRadius: "12px", padding: "14px 18px" }}>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: bc.text, textTransform: "capitalize", marginBottom: "10px" }}>{nombreMes(m.mesKey)}</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: "12px" }}>
+                        {stat("Sesiones", m.sesiones)}
+                        {stat("Clientes únicos", m.clientesUnicos)}
+                        {stat("Cortesías", m.cortesias || "—")}
+                        {stat("Virtual", m.virtual)}
+                        {stat("Presencial", m.presencial)}
+                        {stat("Ingresos", fmtMonedas(m.ingresos))}
+                        {stat("Más pedido", m.servicioTop)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
