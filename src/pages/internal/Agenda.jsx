@@ -9,18 +9,21 @@ const DIAS_SEMANA = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 const RANGO_DEFAULT = { inicio: 8, fin: 20 };
 
 const s = {
-  main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  topbar: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" },
-  toggleWrap: { display: "flex", background: "#fff", border: "0.5px solid #E0D0F0", borderRadius: "8px", overflow: "hidden" },
-  toggleBtn: { padding: "6px 18px", fontSize: "13px", cursor: "pointer", color: "#B89FD0", border: "none", background: "transparent", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  toggleBtnActive: { padding: "6px 18px", fontSize: "13px", cursor: "pointer", color: "#3B2460", fontWeight: "500", border: "none", background: "#EDE8FA", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.25rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  title: { fontSize: "18px", fontWeight: "500", color: "#2A1845" },
+  titleSub: { fontSize: "13px", color: "#9B72C0", marginTop: "3px" },
+  topbar: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" },
+  subbar: { display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px", padding: "10px 14px", background: "#fff", border: "0.5px solid #EDE4F7", borderRadius: "10px" },
+  toggleWrap: { display: "flex", background: "#F8F4FC", border: "0.5px solid #E0D0F0", borderRadius: "8px", overflow: "hidden" },
+  toggleBtn: { padding: "6px 16px", fontSize: "13px", cursor: "pointer", color: "#B89FD0", border: "none", background: "transparent", fontFamily: "'Plus Jakarta Sans', sans-serif" },
+  toggleBtnActive: { padding: "6px 16px", fontSize: "13px", cursor: "pointer", color: "#fff", fontWeight: "500", border: "none", background: "#9B72C0", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   select: { fontSize: "12px", padding: "6px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#5C3F99", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  btnNuevo: { display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" },
-  arrowBtn: { width: "30px", height: "30px", borderRadius: "8px", border: "0.5px solid #E0D0F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#9B72C0", fontSize: "16px", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
+  btnNuevo: { display: "flex", alignItems: "center", gap: "6px", padding: "9px 20px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "9px", fontSize: "13px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 3px 10px rgba(155,114,192,0.35)" },
+  arrowBtn: { width: "30px", height: "30px", borderRadius: "8px", border: "0.5px solid #E0D0F0", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#9B72C0", fontSize: "16px", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   hoyBtn: { padding: "5px 12px", borderRadius: "8px", border: "0.5px solid #D0B8E8", background: "#fff", color: "#9B72C0", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  dateLabel: { fontSize: "15px", fontWeight: "500", color: "#2A1845", minWidth: "140px", textAlign: "center" },
-  card: { background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1rem 1.25rem", flex: 1, overflow: "auto", minWidth: 0, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
-  panel: { width: "100%", maxWidth: "320px", background: "#fff", borderRadius: "12px", border: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" },
+  dateLabel: { fontSize: "14px", fontWeight: "500", color: "#2A1845", minWidth: "150px", textAlign: "center", textTransform: "capitalize" },
+  card: { background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.1rem 1.25rem", flex: 1, overflow: "auto", minWidth: 0, boxShadow: "0 4px 18px rgba(42,24,69,0.05)" },
+  panel: { width: "100%", maxWidth: "320px", background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", overflowY: "auto", boxShadow: "0 4px 18px rgba(42,24,69,0.05)" },
   field: { display: "flex", flexDirection: "column", gap: "4px" },
   label: { fontSize: "12px", color: "#9B72C0" },
   input: { fontSize: "13px", padding: "8px 10px", border: "0.5px solid #E0D0F0", borderRadius: "8px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "100%" },
@@ -524,9 +527,21 @@ export default function Agenda({ deepLinkTurno }) {
     <div style={{ display: "flex", flex: 1, flexDirection: "column" }}>
       <div style={{ ...s.main, padding: isMobile ? "1rem" : "1.5rem" }}>
         <div style={s.topbar}>
+          <div>
+            <div style={s.title}>Agenda</div>
+            <div style={s.titleSub}>
+              {vista === "dia"
+                ? `${turnos.filter(t => t.status !== "cancelled").length} turno${turnos.filter(t => t.status !== "cancelled").length === 1 ? "" : "s"} este día`
+                : `${turnosSemana.filter(t => t.status !== "cancelled").length} turno${turnosSemana.filter(t => t.status !== "cancelled").length === 1 ? "" : "s"} esta semana`}
+            </div>
+          </div>
+          <button style={s.btnNuevo} onClick={() => { setPanelAbierto(true); cerrarTurno(); }}>+ Nuevo turno</button>
+        </div>
+
+        <div style={s.subbar}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
             <button style={s.arrowBtn} onClick={() => irDia(-1)}>‹</button>
-            <div style={{ ...s.dateLabel, minWidth: isMobile ? "auto" : "140px", fontSize: isMobile ? "13px" : "15px" }}>
+            <div style={{ ...s.dateLabel, minWidth: isMobile ? "auto" : "150px", fontSize: isMobile ? "13px" : "14px" }}>
               {vista === "dia" ? formatFecha(fecha) : `${semana[0].toLocaleDateString("es-AR",{day:"numeric",month:"short"})} – ${semana[6].toLocaleDateString("es-AR",{day:"numeric",month:"long", year:"numeric"})}`}
             </div>
             <button style={s.arrowBtn} onClick={() => irDia(1)}>›</button>
@@ -551,11 +566,10 @@ export default function Agenda({ deepLinkTurno }) {
               </>
             )}
             {vista === "dia" && bloqueadoHoy && (
-              <button onClick={desbloquearDia} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 18px", background: "#F3F4F6", color: "#6B7280", border: "0.5px solid #E5E7EB", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+              <button onClick={desbloquearDia} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "7px 14px", background: "#F3F4F6", color: "#6B7280", border: "0.5px solid #E5E7EB", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                 🔓 Desbloquear día
               </button>
             )}
-            <button style={s.btnNuevo} onClick={() => { setPanelAbierto(true); cerrarTurno(); }}>+ Nuevo turno</button>
           </div>
         </div>
 
@@ -623,10 +637,10 @@ export default function Agenda({ deepLinkTurno }) {
                         const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPartial ? "" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                         const h = getHeight(t.start_time, t.end_time);
                         return (
-                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time, rangoHoras.inicio)}px`, height: `${h}px`, borderRadius: "8px", padding: "6px 10px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,0.1)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden", zIndex: 6 }}>
-                            <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji ? emoji + " " : ""}{label}{es2x1(t) && " · 🎁 2x1"}</div>
+                          <div key={i} onClick={() => abrirTurno(t)} style={{ position: "absolute", left: "4px", right: "4px", top: `${getTop(t.start_time, rangoHoras.inicio)}px`, height: `${h}px`, borderRadius: "10px", padding: "7px 11px", background: bg, borderLeft: `4px solid ${accent}`, cursor: "pointer", boxShadow: "0 2px 6px rgba(42,24,69,0.08)", display: "flex", flexDirection: "column", gap: "2px", overflow: "hidden", zIndex: 6, transition: "box-shadow 0.15s" }}>
                             <div style={{ fontSize: "13px", fontWeight: "700", color: textColor, lineHeight: "1.2" }}>{t.clients?.full_name}</div>
-                            {h > 45 && <div style={{ fontSize: "11px", color: textColor, opacity: 0.75 }}>{t.services?.name}</div>}
+                            <div style={{ fontSize: "11px", color: accent, fontWeight: "600" }}>{t.start_time?.slice(0,5)} hs · {emoji ? emoji + " " : ""}{label}{es2x1(t) && " · 🎁 2x1"}</div>
+                            {h > 45 && <div style={{ fontSize: "11px", color: textColor, opacity: 0.7 }}>{t.services?.name}</div>}
                           </div>
                         );
                       })}
@@ -737,7 +751,7 @@ export default function Agenda({ deepLinkTurno }) {
                                 const textColor = isCancelled ? "#6B7280" : isLimpieza ? "#1F5C37" : isPartial ? "#1E3A8A" : isPending ? "#78350F" : isVirtual ? "#4C1D95" : "#831843";
                                 const emoji = isCancelled ? "✗" : isLimpieza ? "🌿" : isPartial ? "" : isPending ? "⏳" : isVirtual ? "📹" : "📍";
                                 return (
-                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "6px", padding: "4px 6px", background: bg, borderLeft: `3px solid ${accent}`, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", display: "flex", flexDirection: "column", gap: "1px" }}>
+                                  <div key={ti} onClick={() => abrirTurno(t)} style={{ position: "absolute", inset: "2px", borderRadius: "7px", padding: "4px 6px", background: bg, borderLeft: `3px solid ${accent}`, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 4px rgba(42,24,69,0.08)", display: "flex", flexDirection: "column", gap: "1px" }}>
                                     <div style={{ fontSize: "9px", fontWeight: "600", color: accent }}>{t.start_time?.slice(0,5)} {emoji}{es2x1(t) && " 🎁"}</div>
                                     <div style={{ fontSize: "10px", fontWeight: "700", lineHeight: "1.2", color: textColor }}>{t.clients?.full_name?.split(" ")[0]}</div>
                                     <div style={{ fontSize: "9px", color: textColor, opacity: 0.75, lineHeight: "1.1" }}>{t.services?.name}</div>
@@ -1043,10 +1057,17 @@ export default function Agenda({ deepLinkTurno }) {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-          {[["#F3E8FF","#7C3AED","Virtual"],["#FDE8F0","#E88BB0","Presencial"],["#FFF8E8","#F0A800","Pendiente"],["#DBEAFE","#2563EB","Seña pagada"]].map(([bg,border,label]) => (
-            <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#B89FD0" }}>
-              <div style={{ width: "10px", height: "10px", borderRadius: "2px", background: bg, borderLeft: `2px solid ${border}` }}></div>
+        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", padding: "10px 14px", background: "#fff", border: "0.5px solid #EDE4F7", borderRadius: "10px" }}>
+          {[
+            ["#F3E8FF","#7C3AED","Virtual"],
+            ["#FDE8F0","#E88BB0","Presencial"],
+            ["#FFF8E8","#F0A800","Pendiente"],
+            ["#DBEAFE","#2563EB","Seña pagada"],
+            ["#EAF6EE","#3B8C5A","Limpieza"],
+            ["#F3F4F6","#9CA3AF","Cancelado"],
+          ].map(([bg,border,label]) => (
+            <div key={label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#8B7FA3" }}>
+              <div style={{ width: "10px", height: "10px", borderRadius: "3px", background: bg, borderLeft: `2px solid ${border}` }}></div>
               {label}
             </div>
           ))}
