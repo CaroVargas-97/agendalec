@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 
 const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
+// Columnas fijas, iguales en el encabezado y en cada mes, para que los
+// números queden alineados en la misma línea de una fila a otra —
+// con auto-fit cada tarjeta se armaba con su propio ancho de columna.
+const mesGridCols = "1.2fr 0.8fr 1fr 0.8fr 0.7fr 0.8fr 1fr 1.3fr";
+
 const blockColors = [
   { bg: "#F3EEFA", text: "#5C3F99" },
   { bg: "#FDF0F6", text: "#A0407A" },
@@ -668,30 +673,29 @@ export default function Estadisticas() {
             ) : resumenMensual.length === 0 ? (
               <div style={s.emptyText}>Sin datos</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {resumenMensual.map((m, i) => {
-                  const bc = blockColors[i % blockColors.length];
-                  const stat = (label, value) => (
-                    <div>
-                      <div style={{ fontSize: "10px", color: bc.text, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.4px" }}>{label}</div>
-                      <div style={{ fontSize: "14px", fontWeight: "600", color: bc.text, marginTop: "2px" }}>{value}</div>
-                    </div>
-                  );
-                  return (
-                    <div key={m.mesKey} style={{ background: bc.bg, borderRadius: "12px", padding: "14px 18px" }}>
-                      <div style={{ fontSize: "13px", fontWeight: "700", color: bc.text, textTransform: "capitalize", marginBottom: "10px" }}>{nombreMes(m.mesKey)}</div>
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: "12px" }}>
-                        {stat("Sesiones", m.sesiones)}
-                        {stat("Clientes únicos", m.clientesUnicos)}
-                        {stat("Cortesías", m.cortesias || "—")}
-                        {stat("Virtual", m.virtual)}
-                        {stat("Presencial", m.presencial)}
-                        {stat("Ingresos", fmtMonedas(m.ingresos))}
-                        {stat("Más pedido", m.servicioTop)}
+              <div style={{ overflowX: "auto" }}>
+                <div style={{ minWidth: "720px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: mesGridCols, gap: "10px", padding: "0 18px" }}>
+                    {["Mes", "Sesiones", "Clientes únicos", "Cortesías", "Virtual", "Presencial", "Ingresos", "Más pedido"].map(h => (
+                      <div key={h} style={{ fontSize: "10px", color: "#B89FD0", textTransform: "uppercase", letterSpacing: "0.4px" }}>{h}</div>
+                    ))}
+                  </div>
+                  {resumenMensual.map((m, i) => {
+                    const bc = blockColors[i % blockColors.length];
+                    return (
+                      <div key={m.mesKey} style={{ background: bc.bg, borderRadius: "12px", padding: "12px 18px", display: "grid", gridTemplateColumns: mesGridCols, gap: "10px", alignItems: "center" }}>
+                        <div style={{ fontSize: "13px", fontWeight: "700", color: bc.text, textTransform: "capitalize" }}>{nombreMes(m.mesKey)}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text }}>{m.sesiones}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text }}>{m.clientesUnicos}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text }}>{m.cortesias || "—"}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text }}>{m.virtual}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text }}>{m.presencial}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text }}>{fmtMonedas(m.ingresos)}</div>
+                        <div style={{ fontSize: "13px", fontWeight: "600", color: bc.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.servicioTop}</div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
