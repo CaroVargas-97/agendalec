@@ -3,6 +3,15 @@ import { supabase } from "../../supabase";
 import { linkWhatsApp, celularValido } from "../../utils/whatsapp";
 
 const avatarColors = ["#C4A8D8", "#F4B8D1", "#A8D4C4", "#F4D4A8", "#A8C4D4"];
+// Bloques con color: cada cliente en su propio bloque, en vez de filas de
+// tabla con líneas — más fácil de escanear de un vistazo.
+const blockColors = [
+  { bg: "#F3EEFA", text: "#5C3F99" },
+  { bg: "#FDF0F6", text: "#A0407A" },
+  { bg: "#EEF7F1", text: "#2F7A52" },
+  { bg: "#FDF6EC", text: "#B4790E" },
+  { bg: "#EEF5FA", text: "#2B6C99" },
+];
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.5rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -11,15 +20,8 @@ const s = {
   titleSub: { fontSize: "13px", color: "#9B72C0", marginTop: "3px" },
   searchInput: { fontSize: "13px", padding: "9px 14px", border: "0.5px solid #E0D0F0", borderRadius: "9px", color: "#2A1845", background: "#fff", fontFamily: "'Plus Jakarta Sans', sans-serif", width: "260px", boxShadow: "0 1px 4px rgba(0,0,0,0.06)" },
   card: { background: "#fff", borderRadius: "14px", border: "0.5px solid #E0D0F0", padding: "1.4rem", boxShadow: "0 4px 16px rgba(42,24,69,0.05)" },
-  tabla: { width: "100%", borderCollapse: "collapse" },
-  th: { fontSize: "11px", color: "#B89FD0", fontWeight: "500", padding: "10px 14px", textAlign: "left", borderBottom: "0.5px solid #F0E8F8", textTransform: "uppercase", letterSpacing: "0.4px" },
-  td: { fontSize: "13px", color: "#2A1845", padding: "14px", borderBottom: "0.5px solid #F0E8F8", verticalAlign: "middle" },
   avatar: { width: "34px", height: "34px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "500", color: "#3B2460", flexShrink: 0 },
-  tagNormal: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#F1EFE8", color: "#6B6860" },
-  tagEspecial: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#EDE8FA", color: "#5C3F99" },
-  tagRegalo: { fontSize: "11px", padding: "2px 8px", borderRadius: "20px", background: "#FDE8F0", color: "#A0407A" },
   btnWA: { display: "inline-flex", alignItems: "center", gap: "4px", padding: "5px 10px", background: "#25D366", color: "#fff", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
-  btnVer: { display: "inline-flex", alignItems: "center", gap: "4px", padding: "6px 12px", background: "#EDE8FA", color: "#5C3F99", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   panel: { position: "fixed", top: 0, right: 0, width: "380px", height: "100vh", background: "#fff", borderLeft: "0.5px solid #E0D0F0", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1.1rem", overflowY: "auto", zIndex: 100, boxShadow: "-4px 0 24px rgba(42,24,69,0.08)" },
   overlay: { position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(42,24,69,0.2)", zIndex: 99 },
   field: { display: "flex", flexDirection: "column", gap: "4px" },
@@ -31,12 +33,6 @@ const s = {
   saveBtn: { width: "100%", padding: "10px", background: "#9B72C0", color: "#fff", border: "none", borderRadius: "8px", fontSize: "14px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" },
   cancelBtn: { width: "100%", padding: "10px", background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
-};
-
-const getPrecioTag = (precio) => {
-  if (precio === "especial") return <span style={s.tagEspecial}>Precio especial</span>;
-  if (precio === "cortesia") return <span style={s.tagRegalo}>Cortesía</span>;
-  return <span style={s.tagNormal}>Normal</span>;
 };
 
 export default function Clientes() {
@@ -151,93 +147,45 @@ export default function Clientes() {
         </div>
       </div>
 
-      {isMobile ? (
-        loading ? <div style={{ ...s.card, ...s.emptyText }}>Cargando...</div> : clientesFiltrados.length === 0 ? (
-          <div style={{ ...s.card, ...s.emptyText }}>No hay clientes aún</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            {clientesFiltrados.map((c, i) => (
-              <div key={i} style={{ ...s.card, padding: "1rem" }} onClick={() => abrirCliente(c)}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <div style={{ ...s.avatar, background: avatarColors[i % avatarColors.length] }}>
-                    {c.full_name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: "500", color: "#2A1845" }}>{c.full_name}</div>
-                    <div style={{ fontSize: "12px", color: "#B89FD0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.email}</div>
-                  </div>
-                  {getPrecioTag(c.price_type || "normal")}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "10px", paddingTop: "10px", borderTop: "0.5px solid #F0E8F8" }}>
-                  <div style={{ fontSize: "12px", color: "#B89FD0" }}>
-                    {c.phone || "Sin celular"}{c.phone && !celularValido(c.phone) ? " ⚠️" : ""} · {c.appointments?.[0]?.count || 0} sesiones
-                  </div>
-                  {c.phone && (
-                    <a href={linkWhatsApp(c.phone)} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
-                      <button style={s.btnWA}>💬</button>
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+      {loading ? (
+        <div style={{ ...s.card, ...s.emptyText }}>Cargando...</div>
+      ) : clientesFiltrados.length === 0 ? (
+        <div style={{ ...s.card, ...s.emptyText }}>No hay clientes aún</div>
       ) : (
-        <div style={s.card}>
-          {loading ? <div style={s.emptyText}>Cargando...</div> : (
-            <table style={s.tabla}>
-              <thead>
-                <tr>
-                  <th style={s.th}>Cliente</th>
-                  <th style={s.th}>Contacto</th>
-                  <th style={s.th}>Sesiones</th>
-                  <th style={s.th}>Precio</th>
-                  <th style={s.th}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientesFiltrados.length === 0 ? (
-                  <tr><td colSpan={5} style={{ ...s.td, textAlign: "center", color: "#B89FD0" }}>No hay clientes aún</td></tr>
-                ) : clientesFiltrados.map((c, i) => (
-                  <tr key={i} style={{ transition: "background 0.15s" }} onMouseEnter={e => e.currentTarget.style.background = "#FDFAFF"} onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <td style={s.td}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <div style={{ ...s.avatar, background: avatarColors[i % avatarColors.length] }}>
-                          {c.full_name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: "500", color: "#2A1845" }}>{c.full_name}</div>
-                          <div style={{ fontSize: "12px", color: "#B89FD0" }}>{c.email}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td style={s.td}>
-                      <div style={{ fontSize: "13px", color: "#2A1845" }}>
-                        {c.phone || "—"}
-                        {c.phone && !celularValido(c.phone) && (
-                          <span title="El número no tiene el formato de un celular argentino, WhatsApp no lo va a encontrar"
-                            style={{ marginLeft: "6px", fontSize: "11px", color: "#A32D2D" }}>⚠️ revisar</span>
-                        )}
-                      </div>
-                      {c.phone && (
-                        <a href={linkWhatsApp(c.phone)} target="_blank" rel="noreferrer">
-                          <button style={{ ...s.btnWA, marginTop: "4px" }}>💬 WhatsApp</button>
-                        </a>
-                      )}
-                    </td>
-                    <td style={s.td}>
-                      <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>{c.appointments?.[0]?.count || 0}</div>
-                      <div style={{ fontSize: "11px", color: "#B89FD0" }}>sesiones</div>
-                    </td>
-                    <td style={s.td}>{getPrecioTag(c.price_type || "normal")}</td>
-                    <td style={s.td}>
-                      <button style={s.btnVer} onClick={() => abrirCliente(c)}>Ver perfil →</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {clientesFiltrados.map((c, i) => {
+            const bc = blockColors[i % blockColors.length];
+            return (
+              <div key={i} onClick={() => abrirCliente(c)} style={{ background: bc.bg, borderRadius: "14px", padding: "14px 18px", cursor: "pointer", display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap" }}>
+                <div style={{ ...s.avatar, width: "38px", height: "38px", background: "#fff", color: bc.text }}>
+                  {c.full_name?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase()}
+                </div>
+                <div style={{ flex: 1, minWidth: "160px" }}>
+                  <div style={{ fontWeight: "600", color: bc.text, fontSize: "14px" }}>{c.full_name}</div>
+                  <div style={{ fontSize: "12px", color: bc.text, opacity: 0.75, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.email}</div>
+                </div>
+                <div style={{ fontSize: "12px", color: bc.text, opacity: 0.85, minWidth: "120px" }}>
+                  {c.phone || "Sin celular"}
+                  {c.phone && !celularValido(c.phone) && <span style={{ marginLeft: "4px" }}>⚠️</span>}
+                </div>
+                {c.phone && (
+                  <a href={linkWhatsApp(c.phone)} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
+                    <button style={s.btnWA}>💬</button>
+                  </a>
+                )}
+                <div style={{ fontSize: "12px", color: bc.text, textAlign: "center", minWidth: "70px" }}>
+                  <div style={{ fontWeight: "600" }}>{c.appointments?.[0]?.count || 0}</div>
+                  <div style={{ opacity: 0.75 }}>sesiones</div>
+                </div>
+                <span style={{ fontSize: "11px", padding: "3px 10px", borderRadius: "20px", background: "#fff", color: bc.text, fontWeight: "500" }}>
+                  {c.price_type === "especial" ? "Especial" : c.price_type === "cortesia" ? "Cortesía" : "Normal"}
+                </span>
+                <button onClick={e => { e.stopPropagation(); abrirCliente(c); }} style={{ padding: "7px 14px", background: "#fff", color: bc.text, border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: "nowrap" }}>
+                  Ver perfil →
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
