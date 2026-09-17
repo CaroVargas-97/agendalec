@@ -60,6 +60,7 @@ export default function Configuracion() {
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
   const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false });
   const [promo2x1Activa, setPromo2x1Activa] = useState(true);
+  const [promo2x1FechaLimite, setPromo2x1FechaLimite] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -172,6 +173,7 @@ export default function Configuracion() {
         setPausas({ pausa: cfg.break_minutes ?? 15, anticipacion: cfg.min_advance_hours ?? 24, cancelacion: cfg.cancellation_hours ?? 24 });
         setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", paypal_link: cfg.paypal_link || "", mp_enabled: cfg.mp_enabled || false });
         setPromo2x1Activa(cfg.promo_2x1_activa !== false);
+        setPromo2x1FechaLimite(cfg.promo_2x1_fecha_limite || "");
         setMesManualAbierto(cfg.mes_manual_abierto || null);
       }
 
@@ -310,7 +312,7 @@ export default function Configuracion() {
     setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled, promo_2x1_activa: promo2x1Activa }, { onConflict: "professional_id" });
+    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled, promo_2x1_activa: promo2x1Activa, promo_2x1_fecha_limite: promo2x1FechaLimite || null }, { onConflict: "professional_id" });
     if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
@@ -495,6 +497,17 @@ export default function Configuracion() {
                     <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "#fff", position: "absolute", top: "3px", left: promo2x1Activa ? "23px" : "3px", transition: "left 0.15s" }}></div>
                   </button>
                 </div>
+                {promo2x1Activa && (
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid #F0E8F8" }}>
+                    <label style={s.label}>Válido hasta (opcional)</label>
+                    <input type="date" value={promo2x1FechaLimite} onChange={e => setPromo2x1FechaLimite(e.target.value)} style={{ ...s.inputFull, marginTop: "4px", maxWidth: "200px" }} />
+                    <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>
+                      {promo2x1FechaLimite
+                        ? `El 2x1 solo se va a ofrecer para turnos hasta esa fecha — dejá el campo vacío para que no tenga límite.`
+                        : "Sin fecha límite: el 2x1 se ofrece para cualquier turno mientras el switch esté prendido."}
+                    </div>
+                  </div>
+                )}
               </div>
               {saveError && <div style={{ fontSize: "12px", color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: "8px" }}>{saveError}</div>}
               <div style={{ display: "flex", justifyContent: "flex-end" }}>

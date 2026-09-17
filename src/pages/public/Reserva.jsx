@@ -147,7 +147,7 @@ export default function Reserva() {
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }, { data: overrides }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto, promo_2x1_activa").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto, promo_2x1_activa, promo_2x1_fecha_limite").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
@@ -228,6 +228,10 @@ export default function Reserva() {
     const fechaObj = new Date(anioMes, mesMes, d);
     if (fechaObj < hoy) return false;
     if (fechaObj > finVentanaReservas()) return false;
+    // El 2x1 puede tener fecha límite (ej: "solo para septiembre") — pasado
+    // ese día, esos días quedan fuera del calendario mientras el 2x1 esté
+    // tildado, sin afectar una reserva normal (sin 2x1) para esa misma fecha.
+    if (es2x1 && profSettings?.promo_2x1_fecha_limite && fechaObj > new Date(profSettings.promo_2x1_fecha_limite + "T23:59:59")) return false;
     const fechaStr = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     if (blockedDatesProf.some(b => b.date === fechaStr && !b.start_time)) return false;
     const dow = fechaObj.getDay();
@@ -320,6 +324,7 @@ export default function Reserva() {
     const fechaObj = new Date(anioMes2, mesMes2, d);
     if (fechaObj < hoy) return false;
     if (fechaObj > finVentanaReservas()) return false;
+    if (profSettings?.promo_2x1_fecha_limite && fechaObj > new Date(profSettings.promo_2x1_fecha_limite + "T23:59:59")) return false;
     const fechaStr2d = `${anioMes2}-${String(mesMes2 + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     if (blockedDatesProf.some(b => b.date === fechaStr2d && !b.start_time)) return false;
     const dow = fechaObj.getDay();
@@ -711,6 +716,12 @@ export default function Reserva() {
             <div style={s.title}>¿Cuándo querés tu turno?</div>
             <div style={s.sub}>{es2x1 ? `Persona 1 · ${srv?.name}` : `${srv?.name} con ${prof}`} · {srv?.duration_minutes} min</div>
           </div>
+
+          {es2x1 && profSettings?.promo_2x1_fecha_limite && (
+            <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A0407A" }}>
+              🎁 El 2x1 solo está disponible para turnos hasta el {new Date(profSettings.promo_2x1_fecha_limite + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}.
+            </div>
+          )}
 
           {!esACoorinar && (
             <>
