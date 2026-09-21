@@ -98,6 +98,8 @@ export default function Reserva() {
   const [horariosOcupados2, setHorariosOcupados2] = useState([]);
   const [form2, setForm2] = useState({ nombre: "", celular: "", mail: "" });
   const [clienteReconocido2, setClienteReconocido2] = useState(false);
+  const [nombreEncontrado, setNombreEncontrado] = useState(null);
+  const [nombreEncontrado2, setNombreEncontrado2] = useState(null);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -407,9 +409,11 @@ export default function Reserva() {
     if (data) {
       setForm(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
       setClienteReconocido(true);
+      setNombreEncontrado(data.full_name || null);
       setClientePrecio(data.price_type && data.price_type !== "normal" ? { tipo: data.price_type, monto: data.custom_price } : null);
     } else {
       setClienteReconocido(false);
+      setNombreEncontrado(null);
       setClientePrecio(null);
     }
   };
@@ -421,9 +425,22 @@ export default function Reserva() {
     if (data) {
       setForm2(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
       setClienteReconocido2(true);
+      setNombreEncontrado2(data.full_name || null);
     } else {
       setClienteReconocido2(false);
+      setNombreEncontrado2(null);
     }
+  };
+
+  // Si el mail ya pertenece a otro cliente pero el nombre tipeado no
+  // coincide, es señal de que alguien puso un mail equivocado (por ejemplo
+  // el de otra persona, a mano o por costumbre) — sin este aviso, la
+  // reserva se engancha en silencio al cliente existente con el nombre
+  // viejo, aunque en pantalla diga otro nombre.
+  const nombreNoCoincide = (nombreTipeado, nombreEnc) => {
+    if (!nombreEnc) return false;
+    const norm = (s) => s.trim().toLowerCase();
+    return norm(nombreTipeado || "") !== "" && norm(nombreTipeado) !== norm(nombreEnc);
   };
 
   const calcEndTime = (horaSel, srvSel) => {
@@ -441,6 +458,13 @@ export default function Reserva() {
     // se quedó pensando que había reservado sin haber tocado nada.
     if (!form.nombre || !form.celular || !form.mail) { setError("Completá tus datos para confirmar."); return; }
     if (es2x1 && (!form2.nombre || !form2.celular || !form2.mail)) { setError("Completá los datos de las dos personas para confirmar."); return; }
+    // Con el mismo mail para las dos, el sistema las trata como la misma
+    // persona (reconoce clientes por mail) y termina uniendo los dos
+    // turnos en un solo cliente en vez de dos — ya pasó en la práctica.
+    if (es2x1 && form.mail.trim().toLowerCase() === form2.mail.trim().toLowerCase()) {
+      setError("Las dos personas necesitan mails distintos — si van con el mismo, el sistema las va a confundir en una sola.");
+      return;
+    }
     if (!aceptaTyC) { setError("Tenés que aceptar los Términos y Condiciones."); return; }
     if (!comprobante && !esCortesia && (aliasActivo || paypalActivo)) { setError("Subí el comprobante de la transferencia para confirmar."); return; }
     setGuardando(true);
@@ -912,6 +936,11 @@ export default function Reserva() {
             </div>
           )}
           <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
+          {nombreNoCoincide(form.nombre, nombreEncontrado) && (
+            <div style={{ background: "#FCEBEB", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A32D2D" }}>
+              ⚠️ Ese mail ya está registrado a nombre de <strong>{nombreEncontrado}</strong>. Si sos otra persona, usá un mail distinto.
+            </div>
+          )}
           <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ... (o +código de país si sos del exterior)" style={s.input} /></div>
 
           {es2x1 && (
@@ -925,6 +954,11 @@ export default function Reserva() {
                 <div style={{ background: "#EAF3DE", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#3B6D11" }}>✓ Encontramos sus datos.</div>
               )}
               <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form2.nombre} onChange={e => setForm2({...form2, nombre: e.target.value})} placeholder="Nombre del acompañante" style={s.input} /></div>
+              {nombreNoCoincide(form2.nombre, nombreEncontrado2) && (
+                <div style={{ background: "#FCEBEB", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A32D2D" }}>
+                  ⚠️ Ese mail ya está registrado a nombre de <strong>{nombreEncontrado2}</strong>. Si es otra persona, usá un mail distinto.
+                </div>
+              )}
               <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form2.celular} onChange={e => setForm2({...form2, celular: e.target.value})} placeholder="+54 9 11 ... (o +código de país si sos del exterior)" style={s.input} /></div>
             </div>
           )}
