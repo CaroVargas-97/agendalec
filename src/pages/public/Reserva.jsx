@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { normalizarCelular } from "../../utils/whatsapp";
 
 const s = {
   wrap: { minHeight: "100vh", background: "#F3EEFF", fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "1.5rem 1rem" },
@@ -464,6 +465,21 @@ export default function Reserva() {
     if (es2x1 && form.mail.trim().toLowerCase() === form2.mail.trim().toLowerCase()) {
       setError("Las dos personas necesitan mails distintos — si van con el mismo, el sistema las va a confundir en una sola.");
       return;
+    }
+    // Mismo chequeo por celular: alguien podía esquivar el aviso del mail
+    // poniendo uno distinto (o inventado) pero repitiendo su propio
+    // teléfono para las dos personas — pasó en la práctica.
+    if (es2x1) {
+      const cel1 = normalizarCelular(form.celular).digits;
+      const cel2 = normalizarCelular(form2.celular).digits;
+      if (cel1 && cel2 && cel1 === cel2) {
+        setError("Las dos personas necesitan celulares distintos — si van con el mismo, el sistema las va a confundir en una sola.");
+        return;
+      }
+      if (form.nombre.trim().toLowerCase() === form2.nombre.trim().toLowerCase()) {
+        setError("Las dos personas necesitan nombres distintos.");
+        return;
+      }
     }
     if (!aceptaTyC) { setError("Tenés que aceptar los Términos y Condiciones."); return; }
     if (!comprobante && !esCortesia && (aliasActivo || paypalActivo)) { setError("Subí el comprobante de la transferencia para confirmar."); return; }
