@@ -321,7 +321,7 @@ export default function Reserva() {
     if (!srv) return false;
     const fechaStrD = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     const slots = generarHorarios(d);
-    if (slots.length === 0) return false;
+    if (slots.length === 0) return true;
     const ocupadosDia = ocupadosMes.filter(o => o.date === fechaStrD);
     return slots.every(h => {
       const [hH, hM] = h.split(":").map(Number);
@@ -433,7 +433,7 @@ export default function Reserva() {
     if (!srv2) return false;
     const fechaStrD = `${anioMes2}-${String(mesMes2 + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     const slots = generarHorarios2(d);
-    if (slots.length === 0) return false;
+    if (slots.length === 0) return true;
     const ocupadosDia = ocupadosMes2.filter(o => o.date === fechaStrD);
     return slots.every(h => {
       const [hH, hM] = h.split(":").map(Number);
