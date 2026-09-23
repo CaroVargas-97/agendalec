@@ -30,6 +30,7 @@ const s = {
   calDayName: { fontSize: "10px", color: "#C4A8D8", textAlign: "center", padding: "3px 0", textTransform: "uppercase", letterSpacing: "0.3px" },
   calDay: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#2A1845", cursor: "pointer", background: "#FDFAFF", border: "0.5px solid #F0E8F8" },
   calDayOff: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#E0D0F0", background: "transparent", border: "none" },
+  calDayLleno: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#D0C0C8", background: "#F8F4F4", border: "0.5px solid #F0E4E4", cursor: "not-allowed", textDecoration: "line-through" },
   calDaySelected: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#fff", background: "#9B72C0", border: "none", cursor: "pointer", boxShadow: "0 2px 8px rgba(155,114,192,0.35)" },
   calDayToday: { height: "38px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#7B5EA7", fontWeight: "600", background: "#fff", border: "1.5px solid #9B72C0", cursor: "pointer" },
   horaGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" },
@@ -96,7 +97,7 @@ export default function Reserva() {
   const [dia2, setDia2] = useState(null);
   const [hora2, setHora2] = useState(null);
   const [modalidad2, setModalidad2] = useState(null);
-  const [horariosOcupados2, setHorariosOcupados2] = useState([]);
+  const [ocupadosMes2, setOcupadosMes2] = useState([]);
   const [form2, setForm2] = useState({ nombre: "", celular: "", mail: "" });
   const [clienteReconocido2, setClienteReconocido2] = useState(false);
   const [nombreEncontrado, setNombreEncontrado] = useState(null);
@@ -106,7 +107,7 @@ export default function Reserva() {
   const [error, setError] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [aceptaTyC, setAceptaTyC] = useState(false);
-  const [horariosOcupados, setHorariosOcupados] = useState([]);
+  const [ocupadosMes, setOcupadosMes] = useState([]);
   const [loadingServicios, setLoadingServicios] = useState(false);
   const [comprobante, setComprobante] = useState(null);
   const [comprobanteFallo, setComprobanteFallo] = useState(false);
@@ -167,29 +168,35 @@ export default function Reserva() {
     cargar();
   }, [prof]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Se trae el mes entero de una (no solo el día elegido): así el
+  // calendario puede marcar de entrada los días que técnicamente están
+  // habilitados pero ya no tienen ningún horario libre, en vez de que la
+  // clienta tenga que hacer clic día por día para descubrirlo.
   useEffect(() => {
-    if (!dia || !profData) return;
+    if (!profData) return;
     const anio = mesActual.getFullYear();
     const mes = mesActual.getMonth() + 1;
-    const fecha = `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
-    supabase.from("turnos_ocupados").select("start_time, end_time")
-      .eq("professional_id", profData.id).eq("date", fecha)
+    const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
+    const hasta = `${anio}-${String(mes).padStart(2, "0")}-${String(new Date(anio, mes, 0).getDate()).padStart(2, "0")}`;
+    supabase.from("turnos_ocupados").select("date, start_time, end_time")
+      .eq("professional_id", profData.id).gte("date", desde).lte("date", hasta)
       .in("status", ["pending", "confirmed", "partial"])
       .not("start_time", "is", null)
-      .then(({ data }) => setHorariosOcupados(data || []));
-  }, [dia, profData, mesActual]);
+      .then(({ data }) => setOcupadosMes(data || []));
+  }, [profData, mesActual]);
 
   useEffect(() => {
-    if (!dia2 || !profData) return;
+    if (!profData) return;
     const anio = mesActual2.getFullYear();
     const mes = mesActual2.getMonth() + 1;
-    const fecha = `${anio}-${String(mes).padStart(2, "0")}-${String(dia2).padStart(2, "0")}`;
-    supabase.from("turnos_ocupados").select("start_time, end_time")
-      .eq("professional_id", profData.id).eq("date", fecha)
+    const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
+    const hasta = `${anio}-${String(mes).padStart(2, "0")}-${String(new Date(anio, mes, 0).getDate()).padStart(2, "0")}`;
+    supabase.from("turnos_ocupados").select("date, start_time, end_time")
+      .eq("professional_id", profData.id).gte("date", desde).lte("date", hasta)
       .in("status", ["pending", "confirmed", "partial"])
       .not("start_time", "is", null)
-      .then(({ data }) => setHorariosOcupados2(data || []));
-  }, [dia2, profData, mesActual2]);
+      .then(({ data }) => setOcupadosMes2(data || []));
+  }, [profData, mesActual2]);
 
   const srv = servicios.find(s => s.id === servicio);
   const esACoorinar = srv?.requires_slot === false;
@@ -304,6 +311,30 @@ export default function Reserva() {
   const fechaStr = dia
     ? `${anioMes}-${String(mesMes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`
     : "";
+  const horariosOcupados = ocupadosMes.filter(o => o.date === fechaStr);
+
+  // Un día puede estar técnicamente habilitado (día/horario configurado)
+  // pero ya no tener ningún horario libre porque se ocupó todo — sin esto,
+  // el calendario lo mostraba igual que uno con lugar, y recién al
+  // clickearlo se enteraba de que no había nada.
+  const diaSinCupo = (d) => {
+    if (!srv) return false;
+    const fechaStrD = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const slots = generarHorarios(d);
+    if (slots.length === 0) return false;
+    const ocupadosDia = ocupadosMes.filter(o => o.date === fechaStrD);
+    return slots.every(h => {
+      const [hH, hM] = h.split(":").map(Number);
+      const slotInicio = hH * 60 + hM;
+      const slotFin = slotInicio + srv.duration_minutes;
+      return ocupadosDia.some(o => {
+        const [oH, oM] = o.start_time.slice(0,5).split(":").map(Number);
+        const [eH, eM] = o.end_time.slice(0,5).split(":").map(Number);
+        const oInicio = oH * 60 + oM, oFin = eH * 60 + eM;
+        return slotInicio < oFin && oInicio < slotFin;
+      });
+    });
+  };
 
   // "6 ago." (agosto abreviado) puede confundirse con la palabra inglesa
   // "ago" si el celular traduce la página automáticamente — pasó con una
@@ -396,6 +427,26 @@ export default function Reserva() {
   const fechaLabel2 = dia2
     ? new Date(anioMes2, mesMes2, dia2).toLocaleDateString("es-AR", { day: "numeric", month: "long" })
     : "";
+  const horariosOcupados2 = ocupadosMes2.filter(o => o.date === fechaStr2);
+
+  const diaSinCupo2 = (d) => {
+    if (!srv2) return false;
+    const fechaStrD = `${anioMes2}-${String(mesMes2 + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const slots = generarHorarios2(d);
+    if (slots.length === 0) return false;
+    const ocupadosDia = ocupadosMes2.filter(o => o.date === fechaStrD);
+    return slots.every(h => {
+      const [hH, hM] = h.split(":").map(Number);
+      const slotInicio = hH * 60 + hM;
+      const slotFin = slotInicio + srv2.duration_minutes;
+      return ocupadosDia.some(o => {
+        const [oH, oM] = o.start_time.slice(0,5).split(":").map(Number);
+        const [eH, eM] = o.end_time.slice(0,5).split(":").map(Number);
+        const oInicio = oH * 60 + oM, oFin = eH * 60 + eM;
+        return slotInicio < oFin && oInicio < slotFin;
+      });
+    });
+  };
 
   const copiarAlias = () => {
     navigator.clipboard.writeText(aliasActivo || paypalActivo || "");
@@ -798,10 +849,11 @@ export default function Reserva() {
                       {Array(offsetLunes).fill(null).map((_, i) => <div key={`e${i}`} style={s.calDayOff}></div>)}
                       {Array.from({length: diasEnMes}, (_, i) => i + 1).map(d => {
                         const seleccionable = esDiaSeleccionable(d);
+                        const lleno = seleccionable && diaSinCupo(d);
                         const esHoy = anioMes === hoy.getFullYear() && mesMes === hoy.getMonth() && d === hoy.getDate();
                         return (
-                          <div key={d} onClick={() => seleccionable && setDia(d)}
-                            style={!seleccionable ? s.calDayOff : dia === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
+                          <div key={d} onClick={() => seleccionable && !lleno && setDia(d)}
+                            style={!seleccionable ? s.calDayOff : lleno ? s.calDayLleno : dia === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
                             {d}
                           </div>
                         );
@@ -868,10 +920,11 @@ export default function Reserva() {
                       {Array(offsetLunes2).fill(null).map((_, i) => <div key={`e2${i}`} style={s.calDayOff}></div>)}
                       {Array.from({length: diasEnMes2}, (_, i) => i + 1).map(d => {
                         const seleccionable = esDiaSeleccionable2(d);
+                        const lleno = seleccionable && diaSinCupo2(d);
                         const esHoy = anioMes2 === hoy.getFullYear() && mesMes2 === hoy.getMonth() && d === hoy.getDate();
                         return (
-                          <div key={d} onClick={() => seleccionable && setDia2(d)}
-                            style={!seleccionable ? s.calDayOff : dia2 === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
+                          <div key={d} onClick={() => seleccionable && !lleno && setDia2(d)}
+                            style={!seleccionable ? s.calDayOff : lleno ? s.calDayLleno : dia2 === d ? s.calDaySelected : esHoy ? s.calDayToday : s.calDay}>
                             {d}
                           </div>
                         );
