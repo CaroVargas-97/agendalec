@@ -547,21 +547,24 @@ export default function Configuracion() {
                       const str = toStr(d);
                       const pasado = new Date(anio, mes, d) < hoy;
                       const selec = diasSeleccionados.has(str);
-                      const bloqueoDB = bloqueosDB.find(b => b.date === str);
+                      const bloqueoTotalDB = bloqueosDB.find(b => b.date === str && !b.start_time);
+                      const bloqueosParcialesDB = bloqueosDB.filter(b => b.date === str && b.start_time);
+                      const bloqueoDB = bloqueoTotalDB || bloqueosParcialesDB[0];
                       const esHoy = str === hoy.toISOString().slice(0,10);
                       let bg = "#FDFAFF", border = "0.5px solid #F0E8F8", color = "#2A1845", label = String(d);
                       if (pasado) { color = "#D0C0E0"; border = "0.5px solid #F0E8F8"; }
                       else if (selec) { bg = "#EDE8FA"; border = "1.5px solid #9B72C0"; color = "#5C3F99"; label = "✓"; }
-                      else if (bloqueoDB) {
-                        bg = bloqueoDB.start_time ? "#FEF3E8" : "#FCEBEB";
-                        border = bloqueoDB.start_time ? "1.5px solid #D97706" : "1.5px solid #C06080";
-                        color = bloqueoDB.start_time ? "#92400E" : "#A32D2D";
-                        label = bloqueoDB.start_time ? "⏰" : "🔒";
+                      else if (bloqueoTotalDB) {
+                        bg = "#FCEBEB"; border = "1.5px solid #C06080"; color = "#A32D2D"; label = "🔒";
+                      }
+                      else if (bloqueosParcialesDB.length > 0) {
+                        bg = "#FEF3E8"; border = "1.5px solid #D97706"; color = "#92400E";
+                        label = bloqueosParcialesDB.length > 1 ? `⏰${bloqueosParcialesDB.length}` : "⏰";
                       }
                       else if (esHoy) { border = "1.5px solid #9B72C0"; color = "#7B5EA7"; }
                       return (
-                        <div key={d} onClick={() => !pasado && !bloqueoDB && toggleDiaSeleccion(str)}
-                          style={{ height: "40px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: selec || bloqueoDB ? "14px" : "13px", cursor: pasado || bloqueoDB ? "default" : "pointer", fontWeight: esHoy ? "600" : "400", background: bg, border, color }}>
+                        <div key={d} onClick={() => !pasado && !bloqueoTotalDB && toggleDiaSeleccion(str)}
+                          style={{ height: "40px", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: selec || bloqueoDB ? "14px" : "13px", cursor: pasado || bloqueoTotalDB ? "default" : "pointer", fontWeight: esHoy ? "600" : "400", background: bg, border, color }}>
                           {label}
                         </div>
                       );
