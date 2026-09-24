@@ -222,6 +222,17 @@ export default function Configuracion() {
     setBloqueosDB(blocked || []);
   };
 
+  const eliminarBloqueosPasados = async () => {
+    const uid = await getUid();
+    if (!uid) return;
+    const hoyStr = new Date().toISOString().slice(0, 10);
+    await supabase.from("blocked_dates").delete().eq("professional_id", uid).lt("date", hoyStr);
+    const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
+    setBloqueosDB(blocked || []);
+    setBloqueosMsg("✓ Bloqueos anteriores eliminados");
+    setTimeout(() => setBloqueosMsg(""), 2500);
+  };
+
   const guardarOverride = async () => {
     if (!overrideFecha) return;
     setSavingOverride(true); setOverrideMsg("");
@@ -611,7 +622,14 @@ export default function Configuracion() {
 
                 {bloqueosDB.length > 0 && (
                   <div style={s.card}>
-                    <div style={s.cardTitle}>Bloqueos guardados</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                      <div style={s.cardTitle}>Bloqueos guardados</div>
+                      {bloqueosDB.some(b => b.date < new Date().toISOString().slice(0,10)) && (
+                        <button onClick={eliminarBloqueosPasados} style={{ padding: "6px 10px", background: "#fff", color: "#C06080", border: "0.5px solid #F0D0D8", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                          🗑️ Borrar los de meses anteriores
+                        </button>
+                      )}
+                    </div>
                     {bloqueosDB.map((b, i) => (
                       <div key={b.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", borderBottom: i < bloqueosDB.length - 1 ? "0.5px solid #F0E8F8" : "none" }}>
                         <div style={{ fontSize: "16px" }}>{b.start_time ? "⏰" : "🔒"}</div>
