@@ -263,6 +263,17 @@ export default function Configuracion() {
     setOverridesDB(overrides || []);
   };
 
+  const eliminarOverridesPasados = async () => {
+    const uid = await getUid();
+    if (!uid) return;
+    const hoyStr = new Date().toISOString().slice(0, 10);
+    await supabase.from("modality_overrides").delete().eq("professional_id", uid).lt("date", hoyStr);
+    const { data: overrides } = await supabase.from("modality_overrides").select("id, date, modality").eq("professional_id", uid).order("date");
+    setOverridesDB(overrides || []);
+    setOverrideMsg("✓ Excepciones anteriores eliminadas");
+    setTimeout(() => setOverrideMsg(""), 2500);
+  };
+
   const guardarServicios = async () => {
     setSaving(true); setSaveError("");
     const uid = await getUid();
@@ -687,6 +698,13 @@ export default function Configuracion() {
 
                   {overridesDB.length > 0 && (
                     <div style={{ marginTop: "14px", borderTop: "0.5px solid #F0E8F8", paddingTop: "10px" }}>
+                      {overridesDB.some(o => o.date < new Date().toISOString().slice(0,10)) && (
+                        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "6px" }}>
+                          <button onClick={eliminarOverridesPasados} style={{ padding: "6px 10px", background: "#fff", color: "#C06080", border: "0.5px solid #F0D0D8", borderRadius: "6px", fontSize: "11px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+                            🗑️ Borrar las de meses anteriores
+                          </button>
+                        </div>
+                      )}
                       {overridesDB.map((o, i) => (
                         <div key={o.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 8px", borderRadius: "8px", borderBottom: i < overridesDB.length - 1 ? "0.5px solid #F0E8F8" : "none" }}>
                           <div style={{ fontSize: "16px" }}>{o.modality === "ambas" ? "🔀" : o.modality === "virtual" ? "📹" : "📍"}</div>
