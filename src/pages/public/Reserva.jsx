@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 import { normalizarCelular } from "../../utils/whatsapp";
+import { obtenerCotizacionUSD, obtenerCotizacionEUR } from "../../utils/cotizacion";
 
 const s = {
   wrap: { minHeight: "100vh", background: "#F3EEFF", fontFamily: "'Plus Jakarta Sans', sans-serif", display: "flex", flexDirection: "column", alignItems: "center", padding: "1.5rem 1rem" },
@@ -108,6 +109,9 @@ export default function Reserva() {
   const [copiado, setCopiado] = useState(false);
   const [aceptaTyC, setAceptaTyC] = useState(false);
   const [ocupadosMes, setOcupadosMes] = useState([]);
+  const [cotizUSD, setCotizUSD] = useState(null);
+  const [cotizEUR, setCotizEUR] = useState(null);
+  const [cotizLoading, setCotizLoading] = useState(true);
   const [loadingServicios, setLoadingServicios] = useState(false);
   const [comprobante, setComprobante] = useState(null);
   const [comprobanteFallo, setComprobanteFallo] = useState(false);
@@ -115,6 +119,21 @@ export default function Reserva() {
   const [reservasCerradas, setReservasCerradas] = useState(false);
   const [blockedDatesProf, setBlockedDatesProf] = useState([]);
   const [modalityOverrides, setModalityOverrides] = useState([]);
+
+  // El precio de los servicios en USD/EUR se carga en Configuración como
+  // referencia en pesos, y acá se convierte con la cotización del día —
+  // así el valor que paga la clienta siempre refleja el dólar/euro real
+  // en vez de quedar con un número fijo desactualizado.
+  useEffect(() => {
+    let vivo = true;
+    Promise.all([obtenerCotizacionUSD(), obtenerCotizacionEUR()]).then(([usd, eur]) => {
+      if (!vivo) return;
+      setCotizUSD(usd);
+      setCotizEUR(eur);
+      setCotizLoading(false);
+    });
+    return () => { vivo = false; };
+  }, []);
 
   useEffect(() => {
     supabase.from("public_profiles").select("id, full_name, address, phone, reservas_pausadas")
@@ -202,14 +221,29 @@ export default function Reserva() {
   const esACoorinar = srv?.requires_slot === false;
   const srv2 = servicios.find(s => s.id === servicio2);
   const esACoorinar2 = srv2?.requires_slot === false;
+
+  // sv.price es el precio de referencia EN PESOS para servicios en USD/EUR
+  // (se convierte acá con la cotización del día); para servicios en ARS es
+  // directamente el precio final. Devuelve null si todavía no se pudo
+  // obtener la cotización — se usa para bloquear la reserva en ese caso
+  // en vez de mostrar/cobrar un valor incorrecto.
+  const precioEnMoneda = (sv) => {
+    if (!sv) return null;
+    if (sv.currency === "USD") return cotizUSD ? Math.round(sv.price / cotizUSD) : null;
+    if (sv.currency === "EUR") return cotizEUR ? Math.round(sv.price / cotizEUR) : null;
+    return sv.price;
+  };
+  const precioSrv = precioEnMoneda(srv);
+
   const esCortesia = !es2x1 && clientePrecio?.tipo === "cortesia";
   const esPrecioEspecial = !es2x1 && clientePrecio?.tipo === "especial" && clientePrecio.monto != null;
   // En el 2x1 no se combinan cortesía/precio especial: el total del combo
   // siempre es el precio de referencia (servicio de la Persona 1) partido
   // a la mitad entre las dos personas, sin importar si alguna de las dos
   // tiene un precio especial cargado.
-  const totalNormal = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : (srv?.price || 0);
-  const mitad2x1 = Math.round((srv?.price || 0) / 2);
+  const totalNormal = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : (precioSrv ?? 0);
+  const mitad2x1 = Math.round((precioSrv ?? 0) / 2);
+  const esperandoCotizacion = (srv?.currency === "USD" || srv?.currency === "EUR") && precioSrv == null;
   const total = es2x1 ? mitad2x1 : totalNormal;
   const total2 = mitad2x1;
   const sena = Math.round(total / 2);
@@ -745,11 +779,14 @@ export default function Reserva() {
               {moneda && (
                 <>
                   <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
-                  {servicios.filter(sv => sv.currency === moneda).map((sv, i) => (
-                    <div key={sv.id} style={servicio === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => { setServicio(sv.id); setEs2x1(false); setServicio2(null); }}>
+                  {cotizLoading && (moneda === "USD" || moneda === "EUR") && <div style={s.loadingText}>Cargando cotización del día...</div>}
+                  {servicios.filter(sv => sv.currency === moneda).map((sv, i) => {
+                    const precioSv = precioEnMoneda(sv);
+                    return (
+                    <div key={sv.id} style={servicio === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => { if (precioSv == null) return; setServicio(sv.id); setEs2x1(false); setServicio2(null); }}>
                       <div style={s.srvTop}>
                         <span style={s.srvNombre}>{sv.name}</span>
-                        <span style={s.srvPrecio}>{moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{sv.price.toLocaleString("es-AR")}</span>
+                        <span style={s.srvPrecio}>{precioSv == null ? "—" : `${moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}${precioSv.toLocaleString("es-AR")}`}</span>
                       </div>
                       <div style={s.srvDet}>
                         <span>{sv.duration_minutes} min</span>
@@ -758,25 +795,28 @@ export default function Reserva() {
                         {sv.modality === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </>
               )}
               {servicio && profSettings?.promo_2x1_activa !== false && !esLimpiezaSrv(srv) && (
                 <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", background: es2x1 ? "#FDE8F0" : "#F8F4FC", borderRadius: "10px" }}>
                   <input type="checkbox" id="es2x1r" checked={es2x1} onChange={e => { setEs2x1(e.target.checked); if (!e.target.checked) setServicio2(null); }} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
                   <label htmlFor="es2x1r" style={{ fontSize: "12px", color: es2x1 ? "#A0407A" : "#5C3F99", cursor: "pointer" }}>
-                    🎁 2x1 — reservá con alguien más, cada uno paga la mitad ({moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{Math.round((srv?.price || 0) / 2).toLocaleString("es-AR")} c/u)
+                    🎁 2x1 — reservá con alguien más, cada uno paga la mitad ({moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{mitad2x1.toLocaleString("es-AR")} c/u)
                   </label>
                 </div>
               )}
               {es2x1 && (
                 <div style={{ marginTop: "10px" }}>
                   <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí el servicio de la 2da persona</div>
-                  {servicios.filter(sv => sv.currency === moneda && !esLimpiezaSrv(sv)).map((sv, i) => (
-                    <div key={sv.id} style={servicio2 === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => setServicio2(sv.id)}>
+                  {servicios.filter(sv => sv.currency === moneda && !esLimpiezaSrv(sv)).map((sv, i) => {
+                    const precioSv = precioEnMoneda(sv);
+                    return (
+                    <div key={sv.id} style={servicio2 === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => { if (precioSv == null) return; setServicio2(sv.id); }}>
                       <div style={s.srvTop}>
                         <span style={s.srvNombre}>{sv.name}</span>
-                        <span style={s.srvPrecio}>{moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{sv.price.toLocaleString("es-AR")}</span>
+                        <span style={s.srvPrecio}>{precioSv == null ? "—" : `${moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}${precioSv.toLocaleString("es-AR")}`}</span>
                       </div>
                       <div style={s.srvDet}>
                         <span>{sv.duration_minutes} min</span>
@@ -785,7 +825,8 @@ export default function Reserva() {
                         {sv.modality === "ambas" && <span style={{ fontSize: "10px", color: "#9B72C0" }}>Virtual o presencial</span>}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

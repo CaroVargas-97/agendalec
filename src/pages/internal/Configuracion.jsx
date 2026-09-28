@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 import { pushSoportado, permisoActual, yaSuscripto, activarNotificaciones, desactivarNotificaciones } from "../../utils/push";
+import { obtenerCotizacionUSD, obtenerCotizacionEUR } from "../../utils/cotizacion";
 
 const s = {
   main: { flex: 1, padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", fontFamily: "'Plus Jakarta Sans', sans-serif" },
@@ -101,6 +102,10 @@ export default function Configuracion() {
   const [overrideMsg, setOverrideMsg] = useState("");
 
   useEffect(() => { yaSuscripto().then(setPushActivo); }, []);
+
+  const [cotizUSD, setCotizUSD] = useState(null);
+  const [cotizEUR, setCotizEUR] = useState(null);
+  useEffect(() => { obtenerCotizacionUSD().then(setCotizUSD); obtenerCotizacionEUR().then(setCotizEUR); }, []);
 
   const toggleNotificaciones = async () => {
     setPushCargando(true); setPushMsg("");
@@ -406,13 +411,17 @@ export default function Configuracion() {
             <>
               <div style={s.card}>
                 <div style={s.cardTitle}>Mis servicios</div>
-                {servicios.map((sv, i) => (
-                  <div key={i} style={{ ...s.servicioRow, borderBottom: i === servicios.length-1 ? "none" : "0.5px solid #F0E8F8" }}>
+                {servicios.map((sv, i) => {
+                  const esExtranjera = sv.currency === "USD" || sv.currency === "EUR";
+                  const cotiz = sv.currency === "USD" ? cotizUSD : sv.currency === "EUR" ? cotizEUR : null;
+                  const equivalente = esExtranjera && cotiz && sv.precio ? Math.round(parseFloat(sv.precio) / cotiz) : null;
+                  return (
+                  <div key={i} style={{ ...s.servicioRow, borderBottom: i === servicios.length-1 ? "none" : "0.5px solid #F0E8F8", flexWrap: "wrap" }}>
                     <input value={sv.nombre} onChange={e => updateServicio(i,"nombre",e.target.value)} placeholder="Nombre del servicio" style={{ ...s.input, flex: 1 }} />
                     <span style={{ fontSize: "12px", color: "#9B72C0" }}>Duración</span>
                     <input type="number" value={sv.duracion} onChange={e => updateServicio(i,"duracion",e.target.value)} style={{ ...s.input, width: "60px" }} />
                     <span style={{ fontSize: "12px", color: "#C4A8D8" }}>min</span>
-                    <span style={{ fontSize: "12px", color: "#9B72C0" }}>Precio</span>
+                    <span style={{ fontSize: "12px", color: "#9B72C0" }}>{esExtranjera ? "Precio (ref. en pesos)" : "Precio"}</span>
                     <input type="number" value={sv.precio} onChange={e => updateServicio(i,"precio",e.target.value)} style={{ ...s.input, width: "90px" }} />
                     <div style={{ display: "flex", gap: "3px" }}>
                       {["ARS","USD","EUR"].map(cur => (
@@ -425,8 +434,16 @@ export default function Configuracion() {
                       A coordinar
                     </label>
                     <button style={s.trashBtn} onClick={() => removeServicio(i)}>🗑</button>
+                    {esExtranjera && (
+                      <div style={{ width: "100%", fontSize: "11px", color: "#B89FD0", marginTop: "-4px" }}>
+                        {equivalente != null
+                          ? `≈ ${sv.currency === "USD" ? "U$S " : "€"}${equivalente.toLocaleString("es-AR")} hoy, con la cotización del día — esto es lo que ve y paga la clienta, se recalcula solo.`
+                          : "Cargando cotización del día..."}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
                 <button style={s.addBtn} onClick={addServicio}>+ Agregar servicio</button>
               </div>
               {saveError && <div style={{ fontSize: "12px", color: "#A32D2D", background: "#FCEBEB", padding: "8px 12px", borderRadius: "8px" }}>{saveError}</div>}
