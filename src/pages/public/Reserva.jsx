@@ -336,17 +336,6 @@ export default function Reserva() {
     setHora(null);
   };
 
-  // Si el mes que se está mostrando no tiene ningún día disponible
-  // (por ejemplo, quedó todo bloqueado o ya pasó), salta solo al
-  // siguiente mes en vez de dejar al cliente viendo un calendario
-  // gris sin explicación.
-  useEffect(() => {
-    if (!srv || disponibilidad.length === 0) return;
-    if (srv.modality === "ambas" && !modalidad) return;
-    const hayDisponible = Array.from({ length: diasEnMes }, (_, i) => i + 1).some(esDiaSeleccionable);
-    if (!hayDisponible && mesSiguientePermitido) cambiarMes(1);
-  }, [srv, modalidad, disponibilidad, blockedDatesProf, modalityOverrides, mesActual]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const fechaStr = dia
     ? `${anioMes}-${String(mesMes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`
     : "";
@@ -453,13 +442,6 @@ export default function Reserva() {
     setHora2(null);
   };
 
-  useEffect(() => {
-    if (!es2x1 || !srv2 || disponibilidad.length === 0) return;
-    if (srv2.modality === "ambas" && !modalidad2) return;
-    const hayDisponible = Array.from({ length: diasEnMes2 }, (_, i) => i + 1).some(esDiaSeleccionable2);
-    if (!hayDisponible && mesSiguientePermitido2) cambiarMes2(1);
-  }, [es2x1, srv2, modalidad2, disponibilidad, blockedDatesProf, modalityOverrides, mesActual2]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const fechaStr2 = dia2
     ? `${anioMes2}-${String(mesMes2 + 1).padStart(2, "0")}-${String(dia2).padStart(2, "0")}`
     : "";
@@ -486,6 +468,24 @@ export default function Reserva() {
       });
     });
   };
+
+  // Si el mes que se está mostrando no tiene ningún día con lugar (ya sea
+  // porque no hay nada configurado/todo bloqueado, o porque ya se ocupó
+  // todo el mes), salta solo al siguiente mes en vez de dejar a la
+  // clienta viendo un calendario sin nada disponible.
+  useEffect(() => {
+    if (!srv || disponibilidad.length === 0) return;
+    if (srv.modality === "ambas" && !modalidad) return;
+    const hayDisponible = Array.from({ length: diasEnMes }, (_, i) => i + 1).some(d => esDiaSeleccionable(d) && !diaSinCupo(d));
+    if (!hayDisponible && mesSiguientePermitido) cambiarMes(1);
+  }, [srv, modalidad, disponibilidad, blockedDatesProf, modalityOverrides, mesActual, ocupadosMes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!es2x1 || !srv2 || disponibilidad.length === 0) return;
+    if (srv2.modality === "ambas" && !modalidad2) return;
+    const hayDisponible = Array.from({ length: diasEnMes2 }, (_, i) => i + 1).some(d => esDiaSeleccionable2(d) && !diaSinCupo2(d));
+    if (!hayDisponible && mesSiguientePermitido2) cambiarMes2(1);
+  }, [es2x1, srv2, modalidad2, disponibilidad, blockedDatesProf, modalityOverrides, mesActual2, ocupadosMes2]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const copiarAlias = () => {
     navigator.clipboard.writeText(aliasActivo || paypalActivo || "");
