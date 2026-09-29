@@ -170,7 +170,7 @@ export default function Reserva() {
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }, { data: overrides }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto, promo_2x1_activa, promo_2x1_fecha_limite").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto, promo_2x1_activa, promo_2x1_fecha_inicio, promo_2x1_fecha_limite").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
@@ -255,6 +255,11 @@ export default function Reserva() {
   const cbuActivo = esPaypal ? null : srv?.currency === "USD" ? profSettings?.cbu_usd : profSettings?.cbu;
   const paypalActivo = esPaypal ? profSettings?.paypal_link : null;
   const paypalUrl = paypalActivo ? (paypalActivo.startsWith("http") ? paypalActivo : `https://${paypalActivo}`) : null;
+  // La opción 2x1 no aparece antes de "válido desde" ni después de
+  // "válido hasta" (ambos opcionales) — así no hay que ir prendiendo y
+  // apagando el switch a mano cada vez que arranca/termina la promo.
+  const promo2x1Disponible = profSettings?.promo_2x1_activa !== false
+    && (!profSettings?.promo_2x1_fecha_inicio || new Date() >= new Date(profSettings.promo_2x1_fecha_inicio + "T00:00:00"));
 
   // Calendar helpers
   const hoy = new Date();
@@ -799,7 +804,7 @@ export default function Reserva() {
                   })}
                 </>
               )}
-              {servicio && profSettings?.promo_2x1_activa !== false && !esLimpiezaSrv(srv) && (
+              {servicio && promo2x1Disponible && !esLimpiezaSrv(srv) && (
                 <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", background: es2x1 ? "#FDE8F0" : "#F8F4FC", borderRadius: "10px" }}>
                   <input type="checkbox" id="es2x1r" checked={es2x1} onChange={e => { setEs2x1(e.target.checked); if (!e.target.checked) setServicio2(null); }} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
                   <label htmlFor="es2x1r" style={{ fontSize: "12px", color: es2x1 ? "#A0407A" : "#5C3F99", cursor: "pointer" }}>

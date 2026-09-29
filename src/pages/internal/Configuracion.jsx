@@ -61,6 +61,7 @@ export default function Configuracion() {
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
   const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false });
   const [promo2x1Activa, setPromo2x1Activa] = useState(true);
+  const [promo2x1FechaInicio, setPromo2x1FechaInicio] = useState("");
   const [promo2x1FechaLimite, setPromo2x1FechaLimite] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -178,6 +179,7 @@ export default function Configuracion() {
         setPausas({ pausa: cfg.break_minutes ?? 15, anticipacion: cfg.min_advance_hours ?? 24, cancelacion: cfg.cancellation_hours ?? 24 });
         setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", paypal_link: cfg.paypal_link || "", mp_enabled: cfg.mp_enabled || false });
         setPromo2x1Activa(cfg.promo_2x1_activa !== false);
+        setPromo2x1FechaInicio(cfg.promo_2x1_fecha_inicio || "");
         setPromo2x1FechaLimite(cfg.promo_2x1_fecha_limite || "");
         setMesManualAbierto(cfg.mes_manual_abierto || null);
       }
@@ -339,7 +341,7 @@ export default function Configuracion() {
     setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled, promo_2x1_activa: promo2x1Activa, promo_2x1_fecha_limite: promo2x1FechaLimite || null }, { onConflict: "professional_id" });
+    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled, promo_2x1_activa: promo2x1Activa, promo_2x1_fecha_inicio: promo2x1FechaInicio || null, promo_2x1_fecha_limite: promo2x1FechaLimite || null }, { onConflict: "professional_id" });
     if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
@@ -538,7 +540,14 @@ export default function Configuracion() {
                 </div>
                 {promo2x1Activa && (
                   <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid #F0E8F8" }}>
-                    <label style={s.label}>Válido hasta (opcional)</label>
+                    <label style={s.label}>Válido desde (opcional)</label>
+                    <input type="date" value={promo2x1FechaInicio} onChange={e => setPromo2x1FechaInicio(e.target.value)} style={{ ...s.inputFull, marginTop: "4px", maxWidth: "200px" }} />
+                    <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>
+                      {promo2x1FechaInicio
+                        ? `La opción 2x1 no va a aparecer en la reserva hasta esa fecha — dejá el campo vacío para que esté disponible ya mismo.`
+                        : "Sin fecha de inicio: la opción 2x1 aparece ya mismo en la reserva mientras el switch esté prendido."}
+                    </div>
+                    <label style={{ ...s.label, marginTop: "12px", display: "block" }}>Válido hasta (opcional)</label>
                     <input type="date" value={promo2x1FechaLimite} onChange={e => setPromo2x1FechaLimite(e.target.value)} style={{ ...s.inputFull, marginTop: "4px", maxWidth: "200px" }} />
                     <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>
                       {promo2x1FechaLimite
