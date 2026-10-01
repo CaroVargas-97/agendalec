@@ -353,6 +353,15 @@ export default function Configuracion() {
   const toggleDia = (i) => { const d = [...dias]; d[i].activo = !d[i].activo; setDias(d); };
   const updateDia = (i, key, val) => { const d = [...dias]; d[i][key] = val; setDias(d); };
   const updateServicio = (i, key, val) => { const sv = [...servicios]; sv[i][key] = val; setServicios(sv); };
+
+  // Elegir qué sesiones entran en la promo directo desde la sección
+  // Promoción. Guarda al instante en la base (no depende del botón
+  // Guardar) y afecta todas las variantes de moneda de esa terapia.
+  const toggleServicioPromo = async (nombreKey, nuevoValor) => {
+    setServicios(prev => prev.map(sv => (sv.nombre || "").trim().toLowerCase() === nombreKey ? { ...sv, promoElegible: nuevoValor } : sv));
+    const ids = servicios.filter(sv => sv.id && (sv.nombre || "").trim().toLowerCase() === nombreKey).map(sv => sv.id);
+    if (ids.length > 0) await supabase.from("services").update({ promo_elegible: nuevoValor }).in("id", ids);
+  };
   const removeServicio = (i) => setServicios(servicios.filter((_, idx) => idx !== i));
   const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true }]);
 
@@ -537,7 +546,7 @@ export default function Configuracion() {
               </div>
               <div style={s.card}>
                 <div style={s.cardTitle}>Promoción</div>
-                <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "10px" }}>Una sola promo activa a la vez para sesiones individuales (no aplica a Limpiezas). Elegí el tipo que corresponda cada mes.</div>
+                <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "10px" }}>Una sola promo activa a la vez. Elegí el tipo que corresponda cada mes y qué sesiones entran.</div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
                   <div>
                     <div style={{ fontSize: "13px", color: "#2A1845" }}>🎉 Promoción activa</div>
@@ -581,6 +590,28 @@ export default function Configuracion() {
                       {promoFechaLimite
                         ? `La promo solo se va a ofrecer para turnos hasta esa fecha — dejá el campo vacío para que no tenga límite.`
                         : "Sin fecha límite: la promo se ofrece para cualquier turno mientras el switch esté prendido."}
+                    </div>
+                    <div style={{ marginTop: "14px", paddingTop: "12px", borderTop: "0.5px solid #F0E8F8" }}>
+                      <label style={s.label}>¿Qué sesiones entran en la promo?</label>
+                      <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "2px", marginBottom: "8px" }}>Tildá las terapias que participan de la promo. Se guarda al instante.</div>
+                      {(() => {
+                        const grupos = [];
+                        const vistos = new Set();
+                        servicios.filter(sv => sv.id && (sv.nombre || "").trim()).forEach(sv => {
+                          const key = sv.nombre.trim().toLowerCase();
+                          if (vistos.has(key)) return;
+                          vistos.add(key);
+                          const variantes = servicios.filter(s => (s.nombre || "").trim().toLowerCase() === key);
+                          grupos.push({ key, nombre: sv.nombre.trim(), elegible: variantes.every(s => s.promoElegible !== false) });
+                        });
+                        if (grupos.length === 0) return <div style={{ fontSize: "12px", color: "#B89FD0" }}>Guardá primero tus servicios para poder elegirlos.</div>;
+                        return grupos.map(g => (
+                          <label key={g.key} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 0", fontSize: "13px", color: "#2A1845", cursor: "pointer" }}>
+                            <input type="checkbox" checked={g.elegible} onChange={e => toggleServicioPromo(g.key, e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px" }} />
+                            {g.nombre}
+                          </label>
+                        ));
+                      })()}
                     </div>
                   </div>
                 )}
