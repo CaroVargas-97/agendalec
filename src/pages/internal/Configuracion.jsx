@@ -57,7 +57,7 @@ const getUid = async () => {
 export default function Configuracion() {
   const [tab, setTab] = useState("disponibilidad");
   const [dias, setDias] = useState(defaultDias);
-  const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true }]);
+  const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
   const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false });
   const [promoActiva, setPromoActiva] = useState(true);
@@ -164,7 +164,7 @@ export default function Configuracion() {
       } catch (_) {}
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid).eq("active", true);
-      if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS", requiresSlot: sv.requires_slot !== false })));
+      if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS", requiresSlot: sv.requires_slot !== false, promoElegible: sv.promo_elegible !== false })));
 
       const { data: avail } = await supabase.from("availability").select("*").eq("professional_id", uid).order("day_of_week");
       if (avail && avail.length > 0) {
@@ -300,13 +300,13 @@ export default function Configuracion() {
 
     // Update existing services
     for (const sv of existentes) {
-      const { error } = await supabase.from("services").update({ name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", requires_slot: sv.requiresSlot !== false }).eq("id", sv.id);
+      const { error } = await supabase.from("services").update({ name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", requires_slot: sv.requiresSlot !== false, promo_elegible: sv.promoElegible !== false }).eq("id", sv.id);
       if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     }
 
     // Insert new services
     if (nuevos.length > 0) {
-      const { error } = await supabase.from("services").insert(nuevos.map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", active: true, requires_slot: sv.requiresSlot !== false })));
+      const { error } = await supabase.from("services").insert(nuevos.map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", active: true, requires_slot: sv.requiresSlot !== false, promo_elegible: sv.promoElegible !== false })));
       if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     }
 
@@ -354,7 +354,7 @@ export default function Configuracion() {
   const updateDia = (i, key, val) => { const d = [...dias]; d[i][key] = val; setDias(d); };
   const updateServicio = (i, key, val) => { const sv = [...servicios]; sv[i][key] = val; setServicios(sv); };
   const removeServicio = (i) => setServicios(servicios.filter((_, idx) => idx !== i));
-  const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS" }]);
+  const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true }]);
 
   const getModStyle = (mod) => mod === "presencial" ? s.modPillP : mod === "virtual" ? s.modPillV : mod === "ambas" ? s.modPillPV : s.modPill;
   const getModLabel = (mod) => mod === "presencial" ? "Solo presencial" : mod === "virtual" ? "Solo virtual" : "Virtual y presencial";
@@ -438,6 +438,10 @@ export default function Configuracion() {
                     <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#9B72C0", cursor: "pointer", whiteSpace: "nowrap" }}>
                       <input type="checkbox" checked={sv.requiresSlot === false} onChange={e => updateServicio(i, "requiresSlot", e.target.checked ? false : true)} style={{ accentColor: "#9B72C0" }} />
                       A coordinar
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#9B72C0", cursor: "pointer", whiteSpace: "nowrap" }}>
+                      <input type="checkbox" checked={sv.promoElegible !== false} onChange={e => updateServicio(i, "promoElegible", e.target.checked)} style={{ accentColor: "#9B72C0" }} />
+                      Entra en promo
                     </label>
                     <button style={s.trashBtn} onClick={() => removeServicio(i)}>🗑</button>
                     {esExtranjera && (

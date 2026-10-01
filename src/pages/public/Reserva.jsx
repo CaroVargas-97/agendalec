@@ -70,6 +70,9 @@ const StepDots = ({ step }) => (
 
 const inicioMes = () => { const d = new Date(); d.setDate(1); d.setHours(0,0,0,0); return d; };
 const esLimpiezaSrv = (sv) => !!sv?.name?.toLowerCase().includes("limpieza");
+// Un servicio entra en las promos (2x1 o descuento) salvo que se lo haya
+// marcado explícitamente como no elegible en Configuración → Servicios.
+const promoElegible = (sv) => sv?.promo_elegible !== false;
 
 export default function Reserva() {
   const [step, setStep] = useState(1);
@@ -246,10 +249,10 @@ export default function Reserva() {
   const descuentoActivo = promoDisponible && promoTipo === "descuento";
   const descuentoPct = profSettings?.promo_descuento_pct || 0;
   // Aplica el descuento % (si está activo) a un precio ya convertido a la
-  // moneda del servicio; no se aplica a Limpiezas ni cuando ya hay un
-  // precio especial/cortesía cargado para la clienta.
+  // moneda del servicio; solo a los servicios marcados como elegibles para
+  // promo, y no cuando ya hay un precio especial/cortesía cargado.
   const aplicarDescuento = (sv, precio) => {
-    if (precio == null || !descuentoActivo || !descuentoPct || esLimpiezaSrv(sv)) return precio;
+    if (precio == null || !descuentoActivo || !descuentoPct || !promoElegible(sv)) return precio;
     return Math.round(precio * (1 - descuentoPct / 100));
   };
 
@@ -800,7 +803,7 @@ export default function Reserva() {
                   {cotizLoading && (moneda === "USD" || moneda === "EUR") && <div style={s.loadingText}>Cargando cotización del día...</div>}
                   {descuentoActivo && descuentoPct > 0 && (
                     <div style={{ marginBottom: "10px", padding: "8px 12px", background: "#FDE8F0", borderRadius: "10px", fontSize: "12px", color: "#A0407A" }}>
-                      💸 {descuentoPct}% OFF en sesiones individuales (no aplica a Limpiezas)
+                      💸 {descuentoPct}% OFF en las sesiones seleccionadas
                     </div>
                   )}
                   {servicios.filter(sv => sv.currency === moneda).map((sv, i) => {
@@ -827,7 +830,7 @@ export default function Reserva() {
                   })}
                 </>
               )}
-              {servicio && es2x1PromoActiva && !esLimpiezaSrv(srv) && (
+              {servicio && es2x1PromoActiva && promoElegible(srv) && (
                 <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", background: es2x1 ? "#FDE8F0" : "#F8F4FC", borderRadius: "10px" }}>
                   <input type="checkbox" id="es2x1r" checked={es2x1} onChange={e => { setEs2x1(e.target.checked); if (!e.target.checked) setServicio2(null); }} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
                   <label htmlFor="es2x1r" style={{ fontSize: "12px", color: es2x1 ? "#A0407A" : "#5C3F99", cursor: "pointer" }}>
@@ -838,7 +841,7 @@ export default function Reserva() {
               {es2x1 && (
                 <div style={{ marginTop: "10px" }}>
                   <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí el servicio de la 2da persona</div>
-                  {servicios.filter(sv => sv.currency === moneda && !esLimpiezaSrv(sv)).map((sv, i) => {
+                  {servicios.filter(sv => sv.currency === moneda && promoElegible(sv)).map((sv, i) => {
                     const precioSv = precioEnMoneda(sv);
                     return (
                     <div key={sv.id} style={servicio2 === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => { if (precioSv == null) return; setServicio2(sv.id); }}>
