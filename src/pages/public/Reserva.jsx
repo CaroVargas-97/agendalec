@@ -170,7 +170,7 @@ export default function Reserva() {
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }, { data: overrides }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto, promo_2x1_activa, promo_2x1_fecha_inicio, promo_2x1_fecha_limite").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto, promo_activa, promo_tipo, promo_descuento_pct, promo_fecha_inicio, promo_fecha_limite").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
@@ -235,13 +235,31 @@ export default function Reserva() {
   };
   const precioSrv = precioEnMoneda(srv);
 
+  // La promo (2x1 o descuento %, una sola a la vez) no aparece antes de
+  // "válido desde" ni después de "válido hasta" (ambos opcionales) — así
+  // no hay que ir prendiendo y apagando el switch a mano cada vez que
+  // arranca/termina.
+  const promoDisponible = profSettings?.promo_activa !== false
+    && (!profSettings?.promo_fecha_inicio || new Date() >= new Date(profSettings.promo_fecha_inicio + "T00:00:00"));
+  const promoTipo = profSettings?.promo_tipo || "2x1";
+  const es2x1PromoActiva = promoDisponible && promoTipo === "2x1";
+  const descuentoActivo = promoDisponible && promoTipo === "descuento";
+  const descuentoPct = profSettings?.promo_descuento_pct || 0;
+  // Aplica el descuento % (si está activo) a un precio ya convertido a la
+  // moneda del servicio; no se aplica a Limpiezas ni cuando ya hay un
+  // precio especial/cortesía cargado para la clienta.
+  const aplicarDescuento = (sv, precio) => {
+    if (precio == null || !descuentoActivo || !descuentoPct || esLimpiezaSrv(sv)) return precio;
+    return Math.round(precio * (1 - descuentoPct / 100));
+  };
+
   const esCortesia = !es2x1 && clientePrecio?.tipo === "cortesia";
   const esPrecioEspecial = !es2x1 && clientePrecio?.tipo === "especial" && clientePrecio.monto != null;
   // En el 2x1 no se combinan cortesía/precio especial: el total del combo
   // siempre es el precio de referencia (servicio de la Persona 1) partido
   // a la mitad entre las dos personas, sin importar si alguna de las dos
   // tiene un precio especial cargado.
-  const totalNormal = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : (precioSrv ?? 0);
+  const totalNormal = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : aplicarDescuento(srv, precioSrv ?? 0);
   const mitad2x1 = Math.round((precioSrv ?? 0) / 2);
   const esperandoCotizacion = (srv?.currency === "USD" || srv?.currency === "EUR") && precioSrv == null;
   const total = es2x1 ? mitad2x1 : totalNormal;
@@ -255,11 +273,6 @@ export default function Reserva() {
   const cbuActivo = esPaypal ? null : srv?.currency === "USD" ? profSettings?.cbu_usd : profSettings?.cbu;
   const paypalActivo = esPaypal ? profSettings?.paypal_link : null;
   const paypalUrl = paypalActivo ? (paypalActivo.startsWith("http") ? paypalActivo : `https://${paypalActivo}`) : null;
-  // La opción 2x1 no aparece antes de "válido desde" ni después de
-  // "válido hasta" (ambos opcionales) — así no hay que ir prendiendo y
-  // apagando el switch a mano cada vez que arranca/termina la promo.
-  const promo2x1Disponible = profSettings?.promo_2x1_activa !== false
-    && (!profSettings?.promo_2x1_fecha_inicio || new Date() >= new Date(profSettings.promo_2x1_fecha_inicio + "T00:00:00"));
 
   // Calendar helpers
   const hoy = new Date();
@@ -280,7 +293,7 @@ export default function Reserva() {
     // El 2x1 puede tener fecha límite (ej: "solo para septiembre") — pasado
     // ese día, esos días quedan fuera del calendario mientras el 2x1 esté
     // tildado, sin afectar una reserva normal (sin 2x1) para esa misma fecha.
-    if (es2x1 && profSettings?.promo_2x1_fecha_limite && fechaObj > new Date(profSettings.promo_2x1_fecha_limite + "T23:59:59")) return false;
+    if (es2x1 && profSettings?.promo_fecha_limite && fechaObj > new Date(profSettings.promo_fecha_limite + "T23:59:59")) return false;
     const fechaStr = `${anioMes}-${String(mesMes + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     if (blockedDatesProf.some(b => b.date === fechaStr && !b.start_time)) return false;
     const dow = fechaObj.getDay();
@@ -386,7 +399,7 @@ export default function Reserva() {
     const fechaObj = new Date(anioMes2, mesMes2, d);
     if (fechaObj < hoy) return false;
     if (fechaObj > finVentanaReservas()) return false;
-    if (profSettings?.promo_2x1_fecha_limite && fechaObj > new Date(profSettings.promo_2x1_fecha_limite + "T23:59:59")) return false;
+    if (profSettings?.promo_fecha_limite && fechaObj > new Date(profSettings.promo_fecha_limite + "T23:59:59")) return false;
     const fechaStr2d = `${anioMes2}-${String(mesMes2 + 1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
     if (blockedDatesProf.some(b => b.date === fechaStr2d && !b.start_time)) return false;
     const dow = fechaObj.getDay();
@@ -785,13 +798,23 @@ export default function Reserva() {
                 <>
                   <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
                   {cotizLoading && (moneda === "USD" || moneda === "EUR") && <div style={s.loadingText}>Cargando cotización del día...</div>}
+                  {descuentoActivo && descuentoPct > 0 && (
+                    <div style={{ marginBottom: "10px", padding: "8px 12px", background: "#FDE8F0", borderRadius: "10px", fontSize: "12px", color: "#A0407A" }}>
+                      💸 {descuentoPct}% OFF en sesiones individuales (no aplica a Limpiezas)
+                    </div>
+                  )}
                   {servicios.filter(sv => sv.currency === moneda).map((sv, i) => {
-                    const precioSv = precioEnMoneda(sv);
+                    const precioListaOriginal = precioEnMoneda(sv);
+                    const precioSv = aplicarDescuento(sv, precioListaOriginal);
+                    const conDescuento = descuentoActivo && precioSv !== precioListaOriginal;
                     return (
                     <div key={sv.id} style={servicio === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => { if (precioSv == null) return; setServicio(sv.id); setEs2x1(false); setServicio2(null); }}>
                       <div style={s.srvTop}>
                         <span style={s.srvNombre}>{sv.name}</span>
-                        <span style={s.srvPrecio}>{precioSv == null ? "—" : `${moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}${precioSv.toLocaleString("es-AR")}`}</span>
+                        <span style={s.srvPrecio}>
+                          {conDescuento && <span style={{ textDecoration: "line-through", color: "#C4A8D8", fontWeight: "400", marginRight: "6px" }}>{moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}{precioListaOriginal.toLocaleString("es-AR")}</span>}
+                          {precioSv == null ? "—" : `${moneda === "USD" ? "U$S " : moneda === "EUR" ? "€" : "$"}${precioSv.toLocaleString("es-AR")}`}
+                        </span>
                       </div>
                       <div style={s.srvDet}>
                         <span>{sv.duration_minutes} min</span>
@@ -804,7 +827,7 @@ export default function Reserva() {
                   })}
                 </>
               )}
-              {servicio && promo2x1Disponible && !esLimpiezaSrv(srv) && (
+              {servicio && es2x1PromoActiva && !esLimpiezaSrv(srv) && (
                 <div style={{ marginTop: "14px", display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", background: es2x1 ? "#FDE8F0" : "#F8F4FC", borderRadius: "10px" }}>
                   <input type="checkbox" id="es2x1r" checked={es2x1} onChange={e => { setEs2x1(e.target.checked); if (!e.target.checked) setServicio2(null); }} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
                   <label htmlFor="es2x1r" style={{ fontSize: "12px", color: es2x1 ? "#A0407A" : "#5C3F99", cursor: "pointer" }}>
@@ -854,9 +877,9 @@ export default function Reserva() {
             <div style={s.sub}>{es2x1 ? `Persona 1 · ${srv?.name}` : `${srv?.name} con ${prof}`} · {srv?.duration_minutes} min</div>
           </div>
 
-          {es2x1 && profSettings?.promo_2x1_fecha_limite && (
+          {es2x1 && profSettings?.promo_fecha_limite && (
             <div style={{ background: "#FDE8F0", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A0407A" }}>
-              🎁 El 2x1 solo está disponible para turnos hasta el {new Date(profSettings.promo_2x1_fecha_limite + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}.
+              🎁 El 2x1 solo está disponible para turnos hasta el {new Date(profSettings.promo_fecha_limite + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}.
             </div>
           )}
 

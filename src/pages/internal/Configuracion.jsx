@@ -60,9 +60,11 @@ export default function Configuracion() {
   const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
   const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false });
-  const [promo2x1Activa, setPromo2x1Activa] = useState(true);
-  const [promo2x1FechaInicio, setPromo2x1FechaInicio] = useState("");
-  const [promo2x1FechaLimite, setPromo2x1FechaLimite] = useState("");
+  const [promoActiva, setPromoActiva] = useState(true);
+  const [promoTipo, setPromoTipo] = useState("2x1");
+  const [promoDescuentoPct, setPromoDescuentoPct] = useState("");
+  const [promoFechaInicio, setPromoFechaInicio] = useState("");
+  const [promoFechaLimite, setPromoFechaLimite] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -178,9 +180,11 @@ export default function Configuracion() {
       if (cfg) {
         setPausas({ pausa: cfg.break_minutes ?? 15, anticipacion: cfg.min_advance_hours ?? 24, cancelacion: cfg.cancellation_hours ?? 24 });
         setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", paypal_link: cfg.paypal_link || "", mp_enabled: cfg.mp_enabled || false });
-        setPromo2x1Activa(cfg.promo_2x1_activa !== false);
-        setPromo2x1FechaInicio(cfg.promo_2x1_fecha_inicio || "");
-        setPromo2x1FechaLimite(cfg.promo_2x1_fecha_limite || "");
+        setPromoActiva(cfg.promo_activa !== false);
+        setPromoTipo(cfg.promo_tipo || "2x1");
+        setPromoDescuentoPct(cfg.promo_descuento_pct ?? "");
+        setPromoFechaInicio(cfg.promo_fecha_inicio || "");
+        setPromoFechaLimite(cfg.promo_fecha_limite || "");
         setMesManualAbierto(cfg.mes_manual_abierto || null);
       }
 
@@ -341,7 +345,7 @@ export default function Configuracion() {
     setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled, promo_2x1_activa: promo2x1Activa, promo_2x1_fecha_inicio: promo2x1FechaInicio || null, promo_2x1_fecha_limite: promo2x1FechaLimite || null }, { onConflict: "professional_id" });
+    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled, promo_activa: promoActiva, promo_tipo: promoTipo, promo_descuento_pct: promoTipo === "descuento" ? (parseFloat(promoDescuentoPct) || 0) : null, promo_fecha_inicio: promoFechaInicio || null, promo_fecha_limite: promoFechaLimite || null }, { onConflict: "professional_id" });
     if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
@@ -528,31 +532,51 @@ export default function Configuracion() {
                 )}
               </div>
               <div style={s.card}>
-                <div style={s.cardTitle}>Promociones</div>
+                <div style={s.cardTitle}>Promoción</div>
+                <div style={{ fontSize: "12px", color: "#9B72C0", marginBottom: "10px" }}>Una sola promo activa a la vez para sesiones individuales (no aplica a Limpiezas). Elegí el tipo que corresponda cada mes.</div>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
                   <div>
-                    <div style={{ fontSize: "13px", color: "#2A1845" }}>🎁 2x1 en sesiones individuales</div>
-                    <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "2px" }}>Si está apagado, no aparece la opción 2x1 en la reserva pública.</div>
+                    <div style={{ fontSize: "13px", color: "#2A1845" }}>🎉 Promoción activa</div>
+                    <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "2px" }}>Si está apagado, no aparece ninguna promo en la reserva pública.</div>
                   </div>
-                  <button onClick={() => setPromo2x1Activa(v => !v)} style={{ width: "44px", height: "24px", borderRadius: "12px", border: "none", cursor: "pointer", background: promo2x1Activa ? "#9B72C0" : "#E0D0F0", position: "relative", flexShrink: 0 }}>
-                    <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "#fff", position: "absolute", top: "3px", left: promo2x1Activa ? "23px" : "3px", transition: "left 0.15s" }}></div>
+                  <button onClick={() => setPromoActiva(v => !v)} style={{ width: "44px", height: "24px", borderRadius: "12px", border: "none", cursor: "pointer", background: promoActiva ? "#9B72C0" : "#E0D0F0", position: "relative", flexShrink: 0 }}>
+                    <div style={{ width: "18px", height: "18px", borderRadius: "50%", background: "#fff", position: "absolute", top: "3px", left: promoActiva ? "23px" : "3px", transition: "left 0.15s" }}></div>
                   </button>
                 </div>
-                {promo2x1Activa && (
+                {promoActiva && (
                   <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid #F0E8F8" }}>
+                    <label style={s.label}>Tipo de promoción</label>
+                    <div style={{ display: "flex", gap: "8px", marginTop: "4px", marginBottom: "12px" }}>
+                      <button onClick={() => setPromoTipo("2x1")} style={{ flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: promoTipo === "2x1" ? "1.5px solid #9B72C0" : "0.5px solid #E0D0F0", background: promoTipo === "2x1" ? "#EDE8FA" : "#fff", color: promoTipo === "2x1" ? "#5C3F99" : "#B89FD0" }}>
+                        🎁 2x1
+                      </button>
+                      <button onClick={() => setPromoTipo("descuento")} style={{ flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", border: promoTipo === "descuento" ? "1.5px solid #9B72C0" : "0.5px solid #E0D0F0", background: promoTipo === "descuento" ? "#EDE8FA" : "#fff", color: promoTipo === "descuento" ? "#5C3F99" : "#B89FD0" }}>
+                        💸 Descuento %
+                      </button>
+                    </div>
+                    {promoTipo === "descuento" && (
+                      <div style={{ marginBottom: "12px" }}>
+                        <label style={s.label}>Porcentaje de descuento</label>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "4px" }}>
+                          <input type="number" min="1" max="99" value={promoDescuentoPct} onChange={e => setPromoDescuentoPct(e.target.value)} style={{ ...s.inputFull, maxWidth: "100px" }} />
+                          <span style={{ fontSize: "13px", color: "#9B72C0" }}>%</span>
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Se aplica directo sobre el precio de cada sesión individual en la reserva — la clienta ve el precio ya con el descuento.</div>
+                      </div>
+                    )}
                     <label style={s.label}>Válido desde (opcional)</label>
-                    <input type="date" value={promo2x1FechaInicio} onChange={e => setPromo2x1FechaInicio(e.target.value)} style={{ ...s.inputFull, marginTop: "4px", maxWidth: "200px" }} />
+                    <input type="date" value={promoFechaInicio} onChange={e => setPromoFechaInicio(e.target.value)} style={{ ...s.inputFull, marginTop: "4px", maxWidth: "200px" }} />
                     <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>
-                      {promo2x1FechaInicio
-                        ? `La opción 2x1 no va a aparecer en la reserva hasta esa fecha — dejá el campo vacío para que esté disponible ya mismo.`
-                        : "Sin fecha de inicio: la opción 2x1 aparece ya mismo en la reserva mientras el switch esté prendido."}
+                      {promoFechaInicio
+                        ? `La promo no va a aparecer en la reserva hasta esa fecha — dejá el campo vacío para que esté disponible ya mismo.`
+                        : "Sin fecha de inicio: la promo aparece ya mismo en la reserva mientras el switch esté prendido."}
                     </div>
                     <label style={{ ...s.label, marginTop: "12px", display: "block" }}>Válido hasta (opcional)</label>
-                    <input type="date" value={promo2x1FechaLimite} onChange={e => setPromo2x1FechaLimite(e.target.value)} style={{ ...s.inputFull, marginTop: "4px", maxWidth: "200px" }} />
+                    <input type="date" value={promoFechaLimite} onChange={e => setPromoFechaLimite(e.target.value)} style={{ ...s.inputFull, marginTop: "4px", maxWidth: "200px" }} />
                     <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>
-                      {promo2x1FechaLimite
-                        ? `El 2x1 solo se va a ofrecer para turnos hasta esa fecha — dejá el campo vacío para que no tenga límite.`
-                        : "Sin fecha límite: el 2x1 se ofrece para cualquier turno mientras el switch esté prendido."}
+                      {promoFechaLimite
+                        ? `La promo solo se va a ofrecer para turnos hasta esa fecha — dejá el campo vacío para que no tenga límite.`
+                        : "Sin fecha límite: la promo se ofrece para cualquier turno mientras el switch esté prendido."}
                     </div>
                   </div>
                 )}
