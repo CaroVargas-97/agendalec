@@ -217,7 +217,13 @@ export default function Configuracion() {
       start_time: bloqueoTodoDia ? null : bloqueoHoraInicio,
       end_time: bloqueoTodoDia ? null : bloqueoHoraFin,
     }));
-    await supabase.from("blocked_dates").insert(toInsert);
+    const { error: insertError } = await supabase.from("blocked_dates").insert(toInsert);
+    if (insertError) {
+      setSavingBloqueos(false);
+      setBloqueosMsg("⚠️ No se pudo guardar el bloqueo: " + insertError.message);
+      setTimeout(() => setBloqueosMsg(""), 6000);
+      return;
+    }
     const { data: blocked } = await supabase.from("blocked_dates").select("id, date, start_time, end_time, reason").eq("professional_id", uid).order("date");
     setBloqueosDB(blocked || []);
     setDiasSeleccionados(new Set());
@@ -741,7 +747,7 @@ export default function Configuracion() {
                   </div>
                 )}
 
-                {bloqueosMsg && <div style={{ fontSize: "12px", color: "#3B6D11", background: "#EAF3DE", padding: "10px 14px", borderRadius: "8px" }}>{bloqueosMsg}</div>}
+                {bloqueosMsg && <div style={{ fontSize: "12px", color: bloqueosMsg.startsWith("⚠️") ? "#A32D2D" : "#3B6D11", background: bloqueosMsg.startsWith("⚠️") ? "#FCEBEB" : "#EAF3DE", padding: "10px 14px", borderRadius: "8px" }}>{bloqueosMsg}</div>}
 
                 <div style={s.card}>
                   <div style={s.cardTitle}>Excepciones de modalidad</div>
