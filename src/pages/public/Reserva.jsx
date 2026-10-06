@@ -104,8 +104,8 @@ export default function Reserva() {
   const [ocupadosMes2, setOcupadosMes2] = useState([]);
   const [form2, setForm2] = useState({ nombre: "", celular: "", mail: "" });
   const [clienteReconocido2, setClienteReconocido2] = useState(false);
-  const [nombreEncontrado, setNombreEncontrado] = useState(null);
-  const [nombreEncontrado2, setNombreEncontrado2] = useState(null);
+  const [mailAjeno, setMailAjeno] = useState(false);
+  const [mailAjeno2, setMailAjeno2] = useState(false);
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -503,45 +503,28 @@ export default function Reserva() {
     setTimeout(() => setCopiado(false), 2000);
   };
 
-  const buscarClientePorMail = async (mail) => {
-    if (!mail || !mail.includes("@")) return;
-    const { data: rows } = await supabase.rpc("buscar_cliente_por_email", { p_email: mail.trim().toLowerCase() });
-    const data = rows?.[0];
-    if (data) {
-      setForm(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
-      setClienteReconocido(true);
-      setNombreEncontrado(data.full_name || null);
-      setClientePrecio(data.price_type && data.price_type !== "normal" ? { tipo: data.price_type, monto: data.custom_price } : null);
-    } else {
-      setClienteReconocido(false);
-      setNombreEncontrado(null);
-      setClientePrecio(null);
-    }
+  // Reconoce a la clienta por su mail SIN traer nombre/teléfono al navegador
+  // (así nadie puede cosechar datos probando mails). La función server-side
+  // solo devuelve: si el mail existe, si el nombre tipeado coincide con el
+  // guardado (para avisar si se puso el mail de otra persona, sin mostrar el
+  // nombre ajeno), y el tipo de precio (para cortesía/precio especial).
+  const verificarCliente = async (mail, nombre) => {
+    if (!mail || !mail.includes("@")) { setClienteReconocido(false); setClientePrecio(null); setMailAjeno(false); return; }
+    const { data: rows } = await supabase.rpc("verificar_cliente", { p_email: mail.trim().toLowerCase(), p_nombre: nombre || null });
+    const d = rows?.[0];
+    if (!d || !d.reconocido) { setClienteReconocido(false); setClientePrecio(null); setMailAjeno(false); return; }
+    setClienteReconocido(true);
+    setClientePrecio(d.price_type && d.price_type !== "normal" ? { tipo: d.price_type, monto: d.custom_price } : null);
+    setMailAjeno(!d.nombre_coincide);
   };
 
-  const buscarClientePorMail2 = async (mail) => {
-    if (!mail || !mail.includes("@")) return;
-    const { data: rows } = await supabase.rpc("buscar_cliente_por_email", { p_email: mail.trim().toLowerCase() });
-    const data = rows?.[0];
-    if (data) {
-      setForm2(f => ({ ...f, nombre: data.full_name || f.nombre, celular: data.phone || f.celular }));
-      setClienteReconocido2(true);
-      setNombreEncontrado2(data.full_name || null);
-    } else {
-      setClienteReconocido2(false);
-      setNombreEncontrado2(null);
-    }
-  };
-
-  // Si el mail ya pertenece a otro cliente pero el nombre tipeado no
-  // coincide, es señal de que alguien puso un mail equivocado (por ejemplo
-  // el de otra persona, a mano o por costumbre) — sin este aviso, la
-  // reserva se engancha en silencio al cliente existente con el nombre
-  // viejo, aunque en pantalla diga otro nombre.
-  const nombreNoCoincide = (nombreTipeado, nombreEnc) => {
-    if (!nombreEnc) return false;
-    const norm = (s) => s.trim().toLowerCase();
-    return norm(nombreTipeado || "") !== "" && norm(nombreTipeado) !== norm(nombreEnc);
+  const verificarCliente2 = async (mail, nombre) => {
+    if (!mail || !mail.includes("@")) { setClienteReconocido2(false); setMailAjeno2(false); return; }
+    const { data: rows } = await supabase.rpc("verificar_cliente", { p_email: mail.trim().toLowerCase(), p_nombre: nombre || null });
+    const d = rows?.[0];
+    if (!d || !d.reconocido) { setClienteReconocido2(false); setMailAjeno2(false); return; }
+    setClienteReconocido2(true);
+    setMailAjeno2(!d.nombre_coincide);
   };
 
   const calcEndTime = (horaSel, srvSel) => {
@@ -1053,7 +1036,7 @@ export default function Reserva() {
           </div>
           <div style={s.field}>
             <label style={s.label}>Mail</label>
-            <input type="email" value={form.mail} onChange={e => { setForm({...form, mail: e.target.value}); setClienteReconocido(false); }} onBlur={e => buscarClientePorMail(e.target.value)} placeholder="tu@mail.com" style={s.input} />
+            <input type="email" value={form.mail} onChange={e => { setForm({...form, mail: e.target.value}); setClienteReconocido(false); }} onBlur={e => verificarCliente(e.target.value, form.nombre)} placeholder="tu@mail.com" style={s.input} />
           </div>
           {clienteReconocido && (
             <div style={{ background: "#EAF3DE", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#3B6D11" }}>
@@ -1070,10 +1053,10 @@ export default function Reserva() {
               ✨ Tenés un precio especial aplicado.
             </div>
           )}
-          <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
-          {nombreNoCoincide(form.nombre, nombreEncontrado) && (
+          <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} onBlur={e => verificarCliente(form.mail, e.target.value)} placeholder="Laura Gómez" style={s.input} /></div>
+          {mailAjeno && (
             <div style={{ background: "#FCEBEB", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A32D2D" }}>
-              ⚠️ Ese mail ya está registrado a nombre de <strong>{nombreEncontrado}</strong>. Si sos otra persona, usá un mail distinto.
+              ⚠️ Ese mail ya está registrado a nombre de otra persona. Si sos vos, fijate que hayas escrito bien tu nombre; si sos otra persona, usá un mail distinto.
             </div>
           )}
           <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ... (o +código de país si sos del exterior)" style={s.input} /></div>
@@ -1083,15 +1066,15 @@ export default function Reserva() {
               <div style={{ fontSize: "11px", fontWeight: "500", color: "#A0407A", textTransform: "uppercase", letterSpacing: "0.4px" }}>🎁 Datos de la 2da persona</div>
               <div style={s.field}>
                 <label style={s.label}>Mail</label>
-                <input type="email" value={form2.mail} onChange={e => { setForm2({...form2, mail: e.target.value}); setClienteReconocido2(false); }} onBlur={e => buscarClientePorMail2(e.target.value)} placeholder="mail@ejemplo.com" style={s.input} />
+                <input type="email" value={form2.mail} onChange={e => { setForm2({...form2, mail: e.target.value}); setClienteReconocido2(false); }} onBlur={e => verificarCliente2(e.target.value, form2.nombre)} placeholder="mail@ejemplo.com" style={s.input} />
               </div>
               {clienteReconocido2 && (
                 <div style={{ background: "#EAF3DE", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#3B6D11" }}>✓ Encontramos sus datos.</div>
               )}
-              <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form2.nombre} onChange={e => setForm2({...form2, nombre: e.target.value})} placeholder="Nombre del acompañante" style={s.input} /></div>
-              {nombreNoCoincide(form2.nombre, nombreEncontrado2) && (
+              <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form2.nombre} onChange={e => setForm2({...form2, nombre: e.target.value})} onBlur={e => verificarCliente2(form2.mail, e.target.value)} placeholder="Nombre del acompañante" style={s.input} /></div>
+              {mailAjeno2 && (
                 <div style={{ background: "#FCEBEB", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A32D2D" }}>
-                  ⚠️ Ese mail ya está registrado a nombre de <strong>{nombreEncontrado2}</strong>. Si es otra persona, usá un mail distinto.
+                  ⚠️ Ese mail ya está registrado a nombre de otra persona. Si es otra persona, usá un mail distinto.
                 </div>
               )}
               <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form2.celular} onChange={e => setForm2({...form2, celular: e.target.value})} placeholder="+54 9 11 ... (o +código de país si sos del exterior)" style={s.input} /></div>
