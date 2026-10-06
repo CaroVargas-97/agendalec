@@ -139,7 +139,7 @@ export default function Reserva() {
   }, []);
 
   useEffect(() => {
-    supabase.from("public_profiles").select("id, full_name, address, phone, reservas_pausadas")
+    supabase.rpc("obtener_profesionales_publicos")
       .then(({ data }) => {
         const profs = data || [];
         setProfesionales(profs);
@@ -200,10 +200,7 @@ export default function Reserva() {
     const mes = mesActual.getMonth() + 1;
     const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
     const hasta = `${anio}-${String(mes).padStart(2, "0")}-${String(new Date(anio, mes, 0).getDate()).padStart(2, "0")}`;
-    supabase.from("turnos_ocupados").select("date, start_time, end_time")
-      .eq("professional_id", profData.id).gte("date", desde).lte("date", hasta)
-      .in("status", ["pending", "confirmed", "partial"])
-      .not("start_time", "is", null)
+    supabase.rpc("obtener_turnos_ocupados", { p_professional_id: profData.id, p_desde: desde, p_hasta: hasta })
       .then(({ data }) => setOcupadosMes(data || []));
   }, [profData, mesActual]);
 
@@ -213,10 +210,7 @@ export default function Reserva() {
     const mes = mesActual2.getMonth() + 1;
     const desde = `${anio}-${String(mes).padStart(2, "0")}-01`;
     const hasta = `${anio}-${String(mes).padStart(2, "0")}-${String(new Date(anio, mes, 0).getDate()).padStart(2, "0")}`;
-    supabase.from("turnos_ocupados").select("date, start_time, end_time")
-      .eq("professional_id", profData.id).gte("date", desde).lte("date", hasta)
-      .in("status", ["pending", "confirmed", "partial"])
-      .not("start_time", "is", null)
+    supabase.rpc("obtener_turnos_ocupados", { p_professional_id: profData.id, p_desde: desde, p_hasta: hasta })
       .then(({ data }) => setOcupadosMes2(data || []));
   }, [profData, mesActual2]);
 
