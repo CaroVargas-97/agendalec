@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { supabase } from "../../supabase";
 import { authHeaders } from "../../utils/apiAuth";
 import { cuando } from "../../utils/fecha";
@@ -29,11 +29,34 @@ const s = {
   btnPagoTotal: { padding: "6px 12px", background: "#3B6D11", color: "#fff", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   btnSaldo: { padding: "6px 12px", background: "#5C3F99", color: "#fff", border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: "500", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" },
   emptyText: { fontSize: "13px", color: "#B89FD0", textAlign: "center", padding: "2rem 0" },
+  semanaHeader: { fontSize: "11px", fontWeight: "600", color: "#9B72C0", textTransform: "uppercase", letterSpacing: "0.5px", margin: "14px 2px 8px", paddingBottom: "4px", borderBottom: "1px solid #F0E8F8" },
 };
 
 const symFor = (cur) => cur === "USD" ? "U$S " : cur === "EUR" ? "€" : "$";
 const iniciales = (nombre) => nombre?.split(" ").map(n => n[0]).join("").slice(0,2).toUpperCase() || "?";
 const es2x1 = (notes) => !!notes?.includes("2x1");
+// Agrupar las listas por semana (lunes a domingo) con un encabezado, para
+// que Caro vea de un vistazo qué le queda en cada semana.
+const lunesDe = (dateStr) => {
+  const d = new Date(dateStr + "T00:00:00");
+  const dow = d.getDay();
+  d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+const semanaKey = (dateStr) => dateStr ? lunesDe(dateStr).toISOString().slice(0, 10) : "zzz-coordinar";
+const semanaLabel = (dateStr) => {
+  if (!dateStr) return "Sin fecha (a coordinar)";
+  const lunes = lunesDe(dateStr);
+  const domingo = new Date(lunes); domingo.setDate(domingo.getDate() + 6);
+  const hoyLunes = lunesDe(new Date().toLocaleDateString("en-CA"));
+  const dif = Math.round((lunes - hoyLunes) / 604800000);
+  if (dif === 0) return "Esta semana";
+  if (dif === 1) return "Próxima semana";
+  if (dif === -1) return "Semana pasada";
+  const fmt = (dt) => dt.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+  return `Semana del ${fmt(lunes)} al ${fmt(domingo)}`;
+};
 const Tag2x1 = () => <span style={{ fontSize: "10px", padding: "1px 6px", borderRadius: "10px", background: "#FDE8F0", color: "#A0407A", marginLeft: "6px", verticalAlign: "middle" }}>🎁 2x1</span>;
 
 const metrics = [
@@ -356,7 +379,11 @@ export default function Cobros() {
               pendientes.length === 0 ? (
                 <div style={s.emptyText}>No hay señas pendientes de confirmación</div>
               ) : pendientes.map((t, i) => (
-                <div key={i} style={{ ...s.cobroRow, background: "#FDF0D5" }}>
+                <Fragment key={t.id || i}>
+                {(i === 0 || semanaKey(pendientes[i-1].date) !== semanaKey(t.date)) && (
+                  <div style={s.semanaHeader}>{semanaLabel(t.date)}</div>
+                )}
+                <div style={{ ...s.cobroRow, background: "#FDF0D5" }}>
                   <div style={{ ...s.cobroAvatar, color: "#92400E" }}>{iniciales(t.clients?.full_name)}</div>
                   <div style={{ flex: 1, minWidth: "180px" }}>
                     <div style={{ ...s.cobroNombre, color: "#78350F" }}>{t.clients?.full_name}{es2x1(t.notes) && <Tag2x1 />}</div>
@@ -389,6 +416,7 @@ export default function Cobros() {
                     <button style={{ padding: "6px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => cancelarTurno(t.id)}>✗</button>
                   </div>
                 </div>
+                </Fragment>
               ))
             )}
 
@@ -396,7 +424,11 @@ export default function Cobros() {
               saldos.length === 0 ? (
                 <div style={s.emptyText}>No hay saldos pendientes</div>
               ) : saldos.map((p, i) => (
-                <div key={i} style={{ ...s.cobroRow, background: "#EAE0FA" }}>
+                <Fragment key={p.id || i}>
+                {(i === 0 || semanaKey(saldos[i-1].appointments?.date) !== semanaKey(p.appointments?.date)) && (
+                  <div style={s.semanaHeader}>{semanaLabel(p.appointments?.date)}</div>
+                )}
+                <div style={{ ...s.cobroRow, background: "#EAE0FA" }}>
                   <div style={{ ...s.cobroAvatar, color: "#5C3F99" }}>{iniciales(p.appointments?.clients?.full_name)}</div>
                   <div style={{ flex: 1, minWidth: "180px" }}>
                     <div style={{ ...s.cobroNombre, color: "#4C1D95" }}>{p.appointments?.clients?.full_name}{es2x1(p.appointments?.notes) && <Tag2x1 />}</div>
@@ -420,6 +452,7 @@ export default function Cobros() {
                     <button style={{ padding: "6px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => cancelarTurno(p.appointment_id)}>✗</button>
                   </div>
                 </div>
+                </Fragment>
               ))
             )}
 
