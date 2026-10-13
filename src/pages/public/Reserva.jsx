@@ -569,6 +569,24 @@ export default function Reserva() {
     setGuardando(true);
     setComprobanteFallo(false);
     try {
+      // Comprobante primero: si se adjuntó uno, se sube ANTES de crear el
+      // turno. Si la subida falla, se corta acá y no se crea ningún turno,
+      // así nunca queda una reserva pagada sin su comprobante guardado.
+      let comprobanteUrl = null;
+      if (comprobante) {
+        const ext = comprobante.name.split(".").pop();
+        const { data: uploadData, error: errUpload } = await supabase.storage
+          .from("comprobantes")
+          .upload(`${crypto.randomUUID()}-comprobante.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
+        if (errUpload || !uploadData) {
+          setError("No pudimos subir el comprobante. Probá de nuevo, o sacá una captura/foto nueva (imagen o PDF).");
+          setGuardando(false);
+          return;
+        }
+        const { data: { publicUrl: rawUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+        comprobanteUrl = `${rawUrl}?t=${Date.now()}`;
+      }
+
       if (es2x1) {
         const { data: resultado, error: errRpc } = await supabase.rpc("crear_reserva_2x1", {
           p_professional_id: profData.id,
@@ -581,25 +599,14 @@ export default function Reserva() {
         });
         if (errRpc) throw errRpc;
 
-        if (comprobante) {
-          const ext = comprobante.name.split(".").pop();
-          const { data: uploadData, error: errUpload } = await supabase.storage
-            .from("comprobantes")
-            .upload(`${resultado.turno_1}-2x1.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
-          if (errUpload) {
-            console.error("Error subiendo comprobante:", errUpload.message);
-            setComprobanteFallo(true);
-          } else if (uploadData) {
-            const { data: { publicUrl: rawUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
-            const publicUrl = `${rawUrl}?t=${Date.now()}`;
-            // Un solo comprobante cubre la transferencia combinada de las dos
-            // señas: se adjunta al pago de cada una de las dos personas.
-            const [{ data: ok1, error: errU1 }, { data: ok2, error: errU2 }] = await Promise.all([
-              supabase.rpc("adjuntar_comprobante", { p_payment_id: resultado.pago_1, p_receipt_url: publicUrl }),
-              supabase.rpc("adjuntar_comprobante", { p_payment_id: resultado.pago_2, p_receipt_url: publicUrl }),
-            ]);
-            if (errU1 || !ok1 || errU2 || !ok2) { console.error("Error guardando comprobante 2x1"); setComprobanteFallo(true); }
-          }
+        if (comprobanteUrl) {
+          // Un solo comprobante cubre la transferencia combinada de las dos
+          // señas: se adjunta al pago de cada una de las dos personas.
+          const [{ data: ok1, error: errU1 }, { data: ok2, error: errU2 }] = await Promise.all([
+            supabase.rpc("adjuntar_comprobante", { p_payment_id: resultado.pago_1, p_receipt_url: comprobanteUrl }),
+            supabase.rpc("adjuntar_comprobante", { p_payment_id: resultado.pago_2, p_receipt_url: comprobanteUrl }),
+          ]);
+          if (errU1 || !ok1 || errU2 || !ok2) { console.error("Error guardando comprobante 2x1"); setComprobanteFallo(true); }
         }
 
         const cuandoTxt1 = esACoorinar ? "a coordinar" : `${fechaLabel} ${hora} hs`;
@@ -650,26 +657,12 @@ export default function Reserva() {
       );
       if (errPago) throw errPago;
 
-      if (comprobante) {
-        const ext = comprobante.name.split(".").pop();
-        const { data: uploadData, error: errUpload } = await supabase.storage
-          .from("comprobantes")
-          .upload(`${turnoId}-sena.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
-        if (errUpload) {
-          console.error("Error subiendo comprobante:", errUpload.message);
-          setComprobanteFallo(true);
-        } else if (uploadData) {
-          const { data: { publicUrl: rawUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
-      // Sin esto, resubir con el mismo nombre de archivo deja el link
-      // idéntico al anterior y el navegador sigue mostrando la imagen vieja
-      // en caché aunque el archivo ya haya cambiado del lado del servidor.
-      const publicUrl = `${rawUrl}?t=${Date.now()}`;
-          // Se usa una función de servidor en vez de un update directo: la
-          // policy de RLS para esto venía fallando en silencio (200 OK,
-          // pero sin escribir nada) para el rol anónimo en esta instancia.
-          const { data: ok, error: errUpdate } = await supabase.rpc("adjuntar_comprobante", { p_payment_id: pagoId, p_receipt_url: publicUrl });
-          if (errUpdate || !ok) { console.error("Error guardando comprobante:", errUpdate?.message || "no se encontró el pago"); setComprobanteFallo(true); }
-        }
+      if (comprobanteUrl) {
+        // Se usa una función de servidor en vez de un update directo: la
+        // policy de RLS para esto venía fallando en silencio para el rol
+        // anónimo en esta instancia.
+        const { data: ok, error: errUpdate } = await supabase.rpc("adjuntar_comprobante", { p_payment_id: pagoId, p_receipt_url: comprobanteUrl });
+        if (errUpdate || !ok) { console.error("Error guardando comprobante:", errUpdate?.message || "no se encontró el pago"); setComprobanteFallo(true); }
       }
 
       // Aviso a la profesional de que entró una reserva nueva.
