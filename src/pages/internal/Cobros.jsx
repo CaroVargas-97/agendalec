@@ -221,6 +221,24 @@ export default function Cobros() {
     cargar();
   };
 
+  // Perdonar la seña de un turno ya reservado: lo convierte en cortesía
+  // (sin cargo) sin depender de que el mail coincida. Pone todos los pagos
+  // en $0/pagados y el turno en confirmado con total 0, así sale de "Señas
+  // a confirmar"/"Saldos pendientes" y cuenta como cortesía en Estadísticas.
+  const marcarCortesia = async (id) => {
+    if (procesando) return;
+    if (!window.confirm("¿Marcar este turno como cortesía? Queda sin cargo (seña en $0) y se cierra como confirmado.")) return;
+    setProcesando(id);
+    const ahora = new Date().toISOString();
+    const { error: errPagos } = await supabase.from("payments").update({ amount: 0, status: "paid", paid_at: ahora }).eq("appointment_id", id);
+    if (errPagos) { alert("No se pudo marcar la cortesía: " + errPagos.message); setProcesando(null); return; }
+    const { error: errTurno } = await supabase.from("appointments").update({ status: "confirmed", total_price: 0 }).eq("id", id);
+    if (errTurno) { alert("No se pudo cerrar el turno: " + errTurno.message); setProcesando(null); return; }
+    authHeaders().then(headers => fetch("/api/confirmar-turno", { method: "POST", headers, body: JSON.stringify({ appointmentId: id }) }));
+    setProcesando(null);
+    cargar();
+  };
+
   const subirComprobante = async (pagoId, appointmentId, tipo, file) => {
     if (!file) return;
     setSubiendoSaldo(pagoId);
@@ -348,6 +366,9 @@ export default function Cobros() {
                     </button>
                     <button style={{ ...s.btnPagoTotal, opacity: procesando === t.id ? 0.5 : 1 }} disabled={procesando === t.id} onClick={() => pagarTodo(t.id, t.total_price)}>
                       {procesando === t.id ? "..." : "💰 Pagó todo"}
+                    </button>
+                    <button style={{ padding: "6px 10px", background: "#FDE8F0", color: "#A0407A", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif", opacity: procesando === t.id ? 0.5 : 1 }} disabled={procesando === t.id} onClick={() => marcarCortesia(t.id)}>
+                      {procesando === t.id ? "..." : "🎁 Cortesía"}
                     </button>
                     <button style={{ padding: "6px 10px", background: "#FCEBEB", color: "#A32D2D", border: "none", borderRadius: "6px", fontSize: "12px", cursor: "pointer", fontFamily: "'Plus Jakarta Sans', sans-serif" }} onClick={() => cancelarTurno(t.id)}>✗</button>
                   </div>
