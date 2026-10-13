@@ -97,12 +97,28 @@ export default function Cobros() {
     const idsLimpieza = new Set((svsLimpieza || []).map(sv => sv.id));
     const noEsLimpieza = (serviceId) => !idsLimpieza.has(serviceId);
 
+    // Orden por fecha+hora del turno (el más próximo primero), así Caro va
+    // bajando en orden en vez de tener que buscar. Los turnos "a coordinar"
+    // (sin fecha) quedan al final.
+    const porFechaTurno = (getDate, getTime) => (a, b) => {
+      const da = getDate(a), db = getDate(b);
+      if (!da && !db) return 0;
+      if (!da) return 1;
+      if (!db) return -1;
+      if (da !== db) return da < db ? -1 : 1;
+      const ta = getTime(a) || "", tb = getTime(b) || "";
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
+    };
+
     const conSenaPendiente = (turnos || [])
       .filter(t => noEsLimpieza(t.service_id))
-      .filter(t => t.payments?.some(p => p.type === "seña" && p.status === "pending"));
+      .filter(t => t.payments?.some(p => p.type === "seña" && p.status === "pending"))
+      .sort(porFechaTurno(t => t.date, t => t.start_time));
     setPendientes(conSenaPendiente);
 
-    setSaldos((pagosSaldo || []).filter(p => noEsLimpieza(p.appointments?.service_id)));
+    setSaldos((pagosSaldo || [])
+      .filter(p => noEsLimpieza(p.appointments?.service_id))
+      .sort(porFechaTurno(p => p.appointments?.date, p => p.appointments?.start_time)));
     setHistorial((confirmados || []).filter(t => noEsLimpieza(t.service_id)));
 
     const asistentesGrupales = (eventos || []).flatMap(ev =>
