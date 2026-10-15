@@ -1,20 +1,29 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { supabase } from "./supabase";
 import Login from "./pages/internal/Login";
 import Registro from "./pages/internal/Registro";
-import Dashboard from "./pages/internal/Dashboard";
-import Agenda from "./pages/internal/Agenda";
-import Configuracion from "./pages/internal/Configuracion";
-import Clientes from "./pages/internal/Clientes";
-import Cobros from "./pages/internal/Cobros";
-import Estadisticas from "./pages/internal/Estadisticas";
-import Grupales from "./pages/internal/Grupales";
-import Limpiezas from "./pages/internal/Limpiezas";
-import Reserva from "./pages/public/Reserva";
-import Saldo from "./pages/public/Saldo";
-import Terminos from "./pages/public/Terminos";
-import ResetPassword from "./pages/internal/ResetPassword";
 import Layout from "./components/internal/Layout";
+// Carga diferida: cada pantalla baja su propio pedazo solo cuando se abre,
+// en vez de que todo (panel + reserva) venga en un solo archivo gigante.
+// Así la primera carga —sobre todo la reserva pública— es mucho más liviana.
+const Dashboard = lazy(() => import("./pages/internal/Dashboard"));
+const Agenda = lazy(() => import("./pages/internal/Agenda"));
+const Configuracion = lazy(() => import("./pages/internal/Configuracion"));
+const Clientes = lazy(() => import("./pages/internal/Clientes"));
+const Cobros = lazy(() => import("./pages/internal/Cobros"));
+const Estadisticas = lazy(() => import("./pages/internal/Estadisticas"));
+const Grupales = lazy(() => import("./pages/internal/Grupales"));
+const Limpiezas = lazy(() => import("./pages/internal/Limpiezas"));
+const Reserva = lazy(() => import("./pages/public/Reserva"));
+const Saldo = lazy(() => import("./pages/public/Saldo"));
+const Terminos = lazy(() => import("./pages/public/Terminos"));
+const ResetPassword = lazy(() => import("./pages/internal/ResetPassword"));
+
+const Cargando = () => (
+  <div style={{ minHeight: "100vh", background: "#F8F4FC", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+    <div style={{ color: "#9B72C0", fontSize: "14px" }}>Cargando...</div>
+  </div>
+);
 
 function App() {
   const [session, setSession] = useState(null);
@@ -55,10 +64,12 @@ function App() {
   }, []);
 
   const path = window.location.pathname;
-  if (path === "/reservar") return <Reserva />;
-  if (path === "/saldo") return <Saldo />;
-  if (path === "/terminos") return <Terminos />;
-  if (path === "/reset-password") return <ResetPassword />;
+  const publica = path === "/reservar" ? <Reserva />
+    : path === "/saldo" ? <Saldo />
+    : path === "/terminos" ? <Terminos />
+    : path === "/reset-password" ? <ResetPassword />
+    : null;
+  if (publica) return <Suspense fallback={<Cargando />}>{publica}</Suspense>;
 
   if (loading) return (
     <div style={{ minHeight: "100vh", background: "#F8F4FC", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -103,7 +114,9 @@ function App() {
 
   return (
     <Layout page={page} setPage={setPage}>
-      {renderPage()}
+      <Suspense fallback={<Cargando />}>
+        {renderPage()}
+      </Suspense>
     </Layout>
   );
 }
