@@ -48,6 +48,26 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Una vez logueada, se precargan en segundo plano los "pedazos" de cada
+  // sección del panel (sin frenar la carga inicial), así cambiar de sección
+  // es instantáneo en vez de bajar el pedazo recién al hacer clic.
+  useEffect(() => {
+    if (!session) return;
+    const precargar = () => {
+      import("./pages/internal/Agenda");
+      import("./pages/internal/Cobros");
+      import("./pages/internal/Clientes");
+      import("./pages/internal/Estadisticas");
+      import("./pages/internal/Grupales");
+      import("./pages/internal/Limpiezas");
+      import("./pages/internal/Configuracion");
+    };
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
+    const cancel = window.cancelIdleCallback || clearTimeout;
+    const id = idle(precargar);
+    return () => cancel(id);
+  }, [session]);
+
   // Si la app ya estaba abierta cuando llega una notificación, el service
   // worker no navega la pestaña por su cuenta (Safari/iOS lo ignora) —
   // en cambio manda este mensaje y acá se cambia de pantalla a mano.
