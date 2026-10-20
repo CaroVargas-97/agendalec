@@ -123,6 +123,14 @@ export default function Reserva() {
   const [blockedDatesProf, setBlockedDatesProf] = useState([]);
   const [modalityOverrides, setModalityOverrides] = useState([]);
 
+  // Flujo de constelaciones grupales (reserva pública de eventos grupales).
+  const [tipoReserva, setTipoReserva] = useState(null); // null = elegir tipo; "individual" | "grupal"
+  const [grupales, setGrupales] = useState([]);
+  const [loadingGrupales, setLoadingGrupales] = useState(false);
+  const [eventoSel, setEventoSel] = useState(null);
+  const [grupalStep, setGrupalStep] = useState(1); // 1 = elegir evento, 2 = datos+pago, 3 = ok
+  const [modalidadGrupal, setModalidadGrupal] = useState(null);
+
   // El precio de los servicios en USD/EUR se carga en Configuración como
   // referencia en pesos, y acá se convierte con la cotización del día —
   // así el valor que paga la clienta siempre refleja el dólar/euro real
@@ -189,6 +197,18 @@ export default function Reserva() {
     };
     cargar();
   }, [prof]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Al elegir "Constelación grupal": se autoselecciona la profesional (hay
+  // una) para tener su alias/datos de pago, y se cargan los eventos próximos.
+  useEffect(() => {
+    if (tipoReserva !== "grupal") return;
+    if (!prof && profesionales[0]) setProf(profesionales[0].full_name);
+    setLoadingGrupales(true);
+    supabase.rpc("obtener_grupales_publicos").then(({ data }) => {
+      setGrupales(data || []);
+      setLoadingGrupales(false);
+    });
+  }, [tipoReserva, profesionales]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Se trae el mes entero de una (no solo el día elegido): así el
   // calendario puede marcar de entrada los días que técnicamente están
@@ -524,6 +544,73 @@ export default function Reserva() {
     setTimeout(() => setCopiado(false), 2000);
   };
 
+  // --- Constelaciones grupales (derivados del evento elegido) ---
+  const evento = grupales.find(e => e.id === eventoSel);
+  const eventoCompleto = evento?.capacity != null && Number(evento.anotados) >= evento.capacity;
+  const eventoSena = evento ? Math.round((evento.price ?? 0) / 2) : 0;
+  const eventoSym = evento?.currency === "USD" ? "U$S " : evento?.currency === "EUR" ? "€" : "$";
+  const eventoEsPaypal = evento?.currency === "EUR";
+  const eventoAlias = eventoEsPaypal ? null : evento?.currency === "USD" ? profSettings?.alias_usd : profSettings?.alias;
+  const eventoCbu = eventoEsPaypal ? null : evento?.currency === "USD" ? profSettings?.cbu_usd : profSettings?.cbu;
+  const eventoPaypal = eventoEsPaypal ? profSettings?.paypal_link : null;
+  const eventoPaypalUrl = eventoPaypal ? (eventoPaypal.startsWith("http") ? eventoPaypal : `https://${eventoPaypal}`) : null;
+  const eventoModEfectiva = evento?.modality === "ambas" ? modalidadGrupal : evento?.modality;
+
+  const copiarAliasGrupal = () => {
+    navigator.clipboard.writeText(eventoAlias || eventoPaypal || "");
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  };
+
+  const fechaEventoTxt = (e) => {
+    if (!e?.date) return "a coordinar";
+    const f = new Date(e.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+    return e.event_time ? `${f} · ${e.event_time.slice(0,5)} hs` : f;
+  };
+
+  const confirmarGrupal = async () => {
+    setError("");
+    if (!form.nombre || !form.celular || !form.mail) { setError("Completá tus datos para anotarte."); return; }
+    if (evento?.modality === "ambas" && !modalidadGrupal) { setError("Elegí si es presencial o virtual."); return; }
+    if (!aceptaTyC) { setError("Tenés que aceptar los Términos y Condiciones."); return; }
+    const requierePago = eventoAlias || eventoPaypal;
+    if (!comprobante && requierePago) { setError("Subí el comprobante de la seña para anotarte."); return; }
+    setGuardando(true);
+    setComprobanteFallo(false);
+    try {
+      let comprobanteUrl = null;
+      if (comprobante) {
+        const ext = comprobante.name.split(".").pop();
+        const { data: uploadData, error: errUpload } = await supabase.storage
+          .from("comprobantes")
+          .upload(`${crypto.randomUUID()}-grupal.${ext}`, comprobante, { contentType: comprobante.type, upsert: true });
+        if (errUpload || !uploadData) { setError("No pudimos subir el comprobante. Probá de nuevo o sacá una foto nueva."); setGuardando(false); return; }
+        const { data: { publicUrl: rawUrl } } = supabase.storage.from("comprobantes").getPublicUrl(uploadData.path);
+        comprobanteUrl = `${rawUrl}?t=${Date.now()}`;
+      }
+      const { data: res, error: errRpc } = await supabase.rpc("anotar_en_grupal", {
+        p_event_id: evento.id, p_nombre: form.nombre, p_telefono: form.celular,
+        p_email: form.mail.trim().toLowerCase(), p_modality: eventoModEfectiva || null, p_receipt_url: comprobanteUrl,
+      });
+      if (errRpc) throw errRpc;
+      if (!res?.ok) {
+        setError(res?.motivo === "completo" ? "Ese evento se completó recién. Elegí otro, por favor." : "No se pudo anotar. Probá de nuevo.");
+        setGuardando(false);
+        return;
+      }
+      fetch("/api/notificar", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ professionalId: profData?.id, title: "🌟 Nueva constelación grupal",
+          body: `${form.nombre} se anotó a ${evento.name}${comprobante ? " · adjuntó comprobante" : ""}`, url: `/?page=grupales` }),
+      }).catch(() => {});
+      setGrupalStep(3);
+      setGuardando(false);
+    } catch (e) {
+      setError("Hubo un problema al anotarte. Probá de nuevo.");
+      setGuardando(false);
+    }
+  };
+
   // Reconoce a la clienta por su mail SIN traer nombre/teléfono al navegador
   // (así nadie puede cosechar datos probando mails). La función server-side
   // solo devuelve: si el mail existe, si el nombre tipeado coincide con el
@@ -751,10 +838,157 @@ export default function Reserva() {
           </div>
           <div style={s.logoSub}>Gestión de turnos</div>
         </div>
-        <StepDots step={step} />
+        {tipoReserva === "individual" && <StepDots step={step} />}
       </div>
 
-      {step === 1 && (
+      {!tipoReserva && (
+        <div style={s.card}>
+          <div>
+            <div style={s.title}>¿Qué querés reservar?</div>
+            <div style={s.sub}>Elegí el tipo de reserva</div>
+          </div>
+          <div style={s.profCard} onClick={() => setTipoReserva("individual")}>
+            <div style={{ ...s.avatar, background: "#C4A8D8" }}>🧘</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "14px", fontWeight: "500", color: "#2A1845" }}>Sesión individual</div>
+              <div style={{ fontSize: "12px", color: "#9B72C0" }}>Un turno personal con la profesional</div>
+            </div>
+            <span style={{ color: "#9B72C0", fontSize: "18px" }}>›</span>
+          </div>
+          <div style={s.profCard} onClick={() => setTipoReserva("grupal")}>
+            <div style={{ ...s.avatar, background: "#F4B8D1" }}>🌟</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: "14px", fontWeight: "500", color: "#2A1845" }}>Constelación grupal</div>
+              <div style={{ fontSize: "12px", color: "#9B72C0" }}>Anotate a un encuentro grupal</div>
+            </div>
+            <span style={{ color: "#9B72C0", fontSize: "18px" }}>›</span>
+          </div>
+          <a href="/" style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", textDecoration: "none", display: "block", textAlign: "center", boxSizing: "border-box" }}>← Volver al inicio</a>
+        </div>
+      )}
+
+      {tipoReserva === "grupal" && grupalStep === 1 && (
+        <div style={s.card}>
+          <div>
+            <div style={s.title}>Constelaciones grupales</div>
+            <div style={s.sub}>Elegí el encuentro al que querés anotarte</div>
+          </div>
+          {loadingGrupales && <div style={s.loadingText}>Cargando encuentros...</div>}
+          {!loadingGrupales && grupales.length === 0 && <div style={s.loadingText}>No hay encuentros grupales programados por ahora.</div>}
+          {grupales.map((e) => {
+            const completo = e.capacity != null && Number(e.anotados) >= e.capacity;
+            const sym = e.currency === "USD" ? "U$S " : e.currency === "EUR" ? "€" : "$";
+            const sena = Math.round((e.price ?? 0) / 2);
+            return (
+              <div key={e.id} style={{ ...(eventoSel === e.id ? s.servicioCardSelected : s.servicioCard), opacity: completo ? 0.6 : 1 }}
+                onClick={() => { if (completo) return; setEventoSel(e.id); setModalidadGrupal(null); }}>
+                <div style={s.srvTop}>
+                  <span style={s.srvNombre}>{e.name}</span>
+                  {completo
+                    ? <span style={{ fontSize: "11px", fontWeight: "600", color: "#A32D2D", background: "#FCEBEB", padding: "2px 8px", borderRadius: "10px" }}>Completo</span>
+                    : e.price != null && <span style={s.srvPrecio}>{sym}{e.price.toLocaleString("es-AR")}</span>}
+                </div>
+                <div style={s.srvDet}>
+                  <span style={{ textTransform: "capitalize" }}>{fechaEventoTxt(e)}</span>
+                </div>
+                {!completo && e.price != null && <div style={{ fontSize: "11px", color: "#9B72C0", marginTop: "2px" }}>Seña para reservar: {sym}{sena.toLocaleString("es-AR")}</div>}
+                {e.modality === "virtual" && <span style={s.tagV}>📹 Solo virtual</span>}
+                {e.modality === "presencial" && <span style={s.tagP}>📍 Solo presencial</span>}
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <button style={{ ...s.btnNext, background: eventoSel && !eventoCompleto ? "#9B72C0" : "#E0D0F0" }} disabled={!eventoSel || eventoCompleto} onClick={() => setGrupalStep(2)}>
+              Continuar
+            </button>
+            <button onClick={() => { setTipoReserva(null); setEventoSel(null); }} style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }}>← Volver</button>
+          </div>
+        </div>
+      )}
+
+      {tipoReserva === "grupal" && grupalStep === 2 && evento && (
+        <div style={s.card}>
+          <div>
+            <div style={s.title}>Tus datos</div>
+            <div style={s.sub}>{evento.name} · {fechaEventoTxt(evento)}</div>
+          </div>
+          <div style={s.field}><label style={s.label}>Nombre y apellido</label><input type="text" value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} placeholder="Laura Gómez" style={s.input} /></div>
+          <div style={s.field}><label style={s.label}>Mail</label><input type="email" value={form.mail} onChange={e => setForm({...form, mail: e.target.value})} placeholder="tu@mail.com" style={s.input} /></div>
+          <div style={s.field}><label style={s.label}>Celular (WhatsApp)</label><input type="tel" value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} placeholder="+54 9 11 ..." style={s.input} /></div>
+
+          {evento.modality === "ambas" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845" }}>¿Cómo vas a participar?</div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button style={modalidadGrupal === "presencial" ? s.modBtnP : s.modBtn} onClick={() => setModalidadGrupal("presencial")}>📍 Presencial</button>
+                <button style={modalidadGrupal === "virtual" ? s.modBtnV : s.modBtn} onClick={() => setModalidadGrupal("virtual")}>📹 Virtual</button>
+              </div>
+            </div>
+          )}
+
+          {(eventoAlias) && (
+            <div style={s.aliasBox}>
+              <div style={s.aliasTitulo}>Transferí la seña para reservar tu lugar{evento.currency === "USD" ? " (en dólares)" : ""}</div>
+              <div style={s.aliasValor}>{eventoAlias}</div>
+              {eventoCbu && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {eventoCbu}</div>}
+              <div style={s.aliasCopy} onClick={copiarAliasGrupal}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>{eventoSym}{eventoSena.toLocaleString("es-AR")}</strong></div>
+            </div>
+          )}
+          {eventoPaypal && (
+            <div style={s.aliasBox}>
+              <div style={s.aliasTitulo}>Pagá la seña por PayPal (en euros)</div>
+              <a href={eventoPaypalUrl} target="_blank" rel="noreferrer" style={{ ...s.aliasValor, textDecoration: "none", wordBreak: "break-all" }}>{eventoPaypal}</a>
+              <div style={s.aliasCopy} onClick={copiarAliasGrupal}>{copiado ? "✓ Copiado!" : "Copiar link"}</div>
+              <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>{eventoSym}{eventoSena.toLocaleString("es-AR")}</strong></div>
+            </div>
+          )}
+          {!eventoAlias && !eventoPaypal && (
+            <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99" }}>
+              El equipo se va a contactar con vos para coordinar el pago de la seña ({eventoSym}{eventoSena.toLocaleString("es-AR")}).
+            </div>
+          )}
+          {(eventoAlias || eventoPaypal) && (
+            <div style={s.field}>
+              <label style={s.label}>Comprobante de la seña <span style={{ color: "#A32D2D" }}>*</span></label>
+              <label style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", border: `0.5px solid ${comprobante ? "#9B72C0" : "#E0D0F0"}`, borderRadius: "10px", background: comprobante ? "#F3EEFA" : "#fff", cursor: "pointer" }}>
+                <span style={{ fontSize: "18px" }}>{comprobante ? "✅" : "📎"}</span>
+                <span style={{ fontSize: "13px", color: comprobante ? "#5C3F99" : "#B89FD0", flex: 1 }}>{comprobante ? comprobante.name : "Adjuntar captura o PDF"}</span>
+                {comprobante && <span style={{ fontSize: "11px", color: "#9B72C0", cursor: "pointer" }} onClick={ev => { ev.preventDefault(); setComprobante(null); }}>✕ quitar</span>}
+                <input type="file" accept="image/*,application/pdf" style={{ display: "none" }} onChange={ev => setComprobante(ev.target.files[0] || null)} />
+              </label>
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+            <input type="checkbox" id="tycg" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
+            <label htmlFor="tycg" style={{ fontSize: "12px", color: "#9B72C0", cursor: "pointer" }}>Acepto los <a href="/terminos" target="_blank" style={{ color: "#7B5EA7", fontWeight: "500" }}>Términos y Condiciones</a></label>
+          </div>
+          {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setGrupalStep(1)}>← Volver</button>
+            <button style={{ ...s.btnConfirmar, opacity: guardando ? 0.7 : 1 }} disabled={guardando} onClick={confirmarGrupal}>{guardando ? "Anotando..." : "✓ Anotarme"}</button>
+          </div>
+        </div>
+      )}
+
+      {tipoReserva === "grupal" && grupalStep === 3 && evento && (
+        <div style={s.card}>
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: "48px", marginBottom: "10px" }}>🌟</div>
+            <div style={{ fontSize: "18px", fontWeight: "600", color: "#2A1845", marginBottom: "6px" }}>¡Te anotaste!</div>
+            <div style={{ fontSize: "13px", color: "#9B72C0" }}>{evento.name} · {fechaEventoTxt(evento)}</div>
+            <div style={{ fontSize: "12px", color: "#B89FD0", marginTop: "10px" }}>El equipo va a revisar tu seña y confirmarte el lugar. ¡Te esperamos!</div>
+          </div>
+          {comprobanteFallo && (
+            <div style={{ background: "#FEF0F3", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#A32D2D" }}>
+              ⚠️ Te anotaste, pero no pudimos guardar el comprobante. Mandalo por WhatsApp para confirmar la seña.
+            </div>
+          )}
+          <a href="/" style={{ ...s.btnNext, background: "#9B72C0", color: "#fff", textDecoration: "none", display: "block", textAlign: "center", boxSizing: "border-box" }}>Volver al inicio</a>
+        </div>
+      )}
+
+      {tipoReserva === "individual" && step === 1 && (
         <div style={s.card}>
           <div>
             <div style={s.title}>¿Con quién querés atenderte?</div>
@@ -864,7 +1098,7 @@ export default function Reserva() {
         </div>
       )}
 
-      {step === 2 && (
+      {tipoReserva === "individual" && step === 2 && (
         <div style={s.card}>
           <div>
             <div style={s.title}>¿Cuándo querés tu turno?</div>
@@ -1042,7 +1276,7 @@ export default function Reserva() {
         </div>
       )}
 
-      {step === 3 && (
+      {tipoReserva === "individual" && step === 3 && (
         <div style={s.card}>
           <div>
             <div style={s.title}>Tus datos</div>
@@ -1205,7 +1439,7 @@ export default function Reserva() {
         </div>
       )}
 
-      {step === 4 && (
+      {tipoReserva === "individual" && step === 4 && (
         <div style={{ ...s.card, alignItems: "center", textAlign: "center" }}>
           <div style={s.pendienteCircle}>✓</div>
           <div>
