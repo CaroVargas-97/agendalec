@@ -237,7 +237,8 @@ export default function Reserva() {
   // no hay que ir prendiendo y apagando el switch a mano cada vez que
   // arranca/termina.
   const promoDisponible = profSettings?.promo_activa !== false
-    && (!profSettings?.promo_fecha_inicio || new Date() >= new Date(profSettings.promo_fecha_inicio + "T00:00:00"));
+    && (!profSettings?.promo_fecha_inicio || new Date() >= new Date(profSettings.promo_fecha_inicio + "T00:00:00"))
+    && (!profSettings?.promo_fecha_limite || new Date() <= new Date(profSettings.promo_fecha_limite + "T23:59:59"));
   const promoTipo = profSettings?.promo_tipo || "2x1";
   const es2x1PromoActiva = promoDisponible && promoTipo === "2x1";
   const descuentoActivo = promoDisponible && promoTipo === "descuento";
