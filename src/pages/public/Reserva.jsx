@@ -219,37 +219,57 @@ export default function Reserva() {
   const srv2 = servicios.find(s => s.id === servicio2);
   const esACoorinar2 = srv2?.requires_slot === false;
 
-  // sv.price es el precio de referencia EN PESOS para servicios en USD/EUR
-  // (se convierte acá con la cotización del día); para servicios en ARS es
-  // directamente el precio final. Devuelve null si todavía no se pudo
-  // obtener la cotización — se usa para bloquear la reserva en ese caso
-  // en vez de mostrar/cobrar un valor incorrecto.
-  const precioEnMoneda = (sv) => {
+  const hoyStr = new Date().toLocaleDateString("en-CA");
+  // Fecha del turno elegido (si ya se eligió). El precio y el descuento
+  // dependen de ella: un turno de noviembre puede tener otro precio y quedar
+  // fuera de la promo, aunque se reserve en octubre.
+  const fechaSel = dia ? `${mesActual.getFullYear()}-${String(mesActual.getMonth()+1).padStart(2,"0")}-${String(dia).padStart(2,"0")}` : "";
+
+  // Precio de referencia EN PESOS del servicio para una fecha dada: si tiene
+  // un cambio de precio programado (price_nuevo + desde), los turnos desde esa
+  // fecha usan el precio nuevo; el resto, el actual.
+  const precioRef = (sv, fecha) => {
     if (!sv) return null;
-    if (sv.currency === "USD") return cotizUSD ? Math.round(sv.price / cotizUSD) : null;
-    if (sv.currency === "EUR") return cotizEUR ? Math.round(sv.price / cotizEUR) : null;
+    const f = fecha || hoyStr;
+    if (sv.price_nuevo != null && sv.price_nuevo_desde && f >= sv.price_nuevo_desde) return sv.price_nuevo;
     return sv.price;
   };
-  const precioSrv = precioEnMoneda(srv);
+  // Convierte el precio de referencia a la moneda del servicio (USD/EUR con la
+  // cotización del día). Devuelve null si falta la cotización.
+  const precioEnMoneda = (sv, fecha) => {
+    const base = precioRef(sv, fecha);
+    if (base == null) return null;
+    if (sv.currency === "USD") return cotizUSD ? Math.round(base / cotizUSD) : null;
+    if (sv.currency === "EUR") return cotizEUR ? Math.round(base / cotizEUR) : null;
+    return base;
+  };
+  const precioSrv = precioEnMoneda(srv, fechaSel);
 
-  // La promo (2x1 o descuento %, una sola a la vez) no aparece antes de
-  // "válido desde" ni después de "válido hasta" (ambos opcionales) — así
-  // no hay que ir prendiendo y apagando el switch a mano cada vez que
-  // arranca/termina.
+  const promoTipo = profSettings?.promo_tipo || "2x1";
+  const descuentoPct = profSettings?.promo_descuento_pct || 0;
+  // El descuento se aplica según la FECHA DEL TURNO: solo si cae dentro del
+  // rango de la promo (y está activa y es de tipo descuento). Así un turno de
+  // noviembre no recibe el descuento de octubre aunque se reserve en octubre.
+  const descuentoEnFecha = (fecha) => {
+    if (profSettings?.promo_activa === false) return false;
+    if (promoTipo !== "descuento") return false;
+    const f = fecha || hoyStr;
+    if (profSettings?.promo_fecha_inicio && f < profSettings.promo_fecha_inicio) return false;
+    if (profSettings?.promo_fecha_limite && f > profSettings.promo_fecha_limite) return false;
+    return true;
+  };
+  const aplicarDescuento = (sv, precio, fecha) => {
+    if (precio == null || !descuentoEnFecha(fecha) || !descuentoPct || !promoElegible(sv)) return precio;
+    return Math.round(precio * (1 - descuentoPct / 100));
+  };
+  // Para los carteles del listado (todavía sin fecha elegida) se usa "hoy".
+  const descuentoActivoHoy = descuentoEnFecha(hoyStr);
+
+  // El 2x1 se ofrece según la fecha actual (es una promo del momento).
   const promoDisponible = profSettings?.promo_activa !== false
     && (!profSettings?.promo_fecha_inicio || new Date() >= new Date(profSettings.promo_fecha_inicio + "T00:00:00"))
     && (!profSettings?.promo_fecha_limite || new Date() <= new Date(profSettings.promo_fecha_limite + "T23:59:59"));
-  const promoTipo = profSettings?.promo_tipo || "2x1";
   const es2x1PromoActiva = promoDisponible && promoTipo === "2x1";
-  const descuentoActivo = promoDisponible && promoTipo === "descuento";
-  const descuentoPct = profSettings?.promo_descuento_pct || 0;
-  // Aplica el descuento % (si está activo) a un precio ya convertido a la
-  // moneda del servicio; solo a los servicios marcados como elegibles para
-  // promo, y no cuando ya hay un precio especial/cortesía cargado.
-  const aplicarDescuento = (sv, precio) => {
-    if (precio == null || !descuentoActivo || !descuentoPct || !promoElegible(sv)) return precio;
-    return Math.round(precio * (1 - descuentoPct / 100));
-  };
 
   const esCortesia = !es2x1 && clientePrecio?.tipo === "cortesia";
   const esPrecioEspecial = !es2x1 && clientePrecio?.tipo === "especial" && clientePrecio.monto != null;
@@ -257,7 +277,7 @@ export default function Reserva() {
   // siempre es el precio de referencia (servicio de la Persona 1) partido
   // a la mitad entre las dos personas, sin importar si alguna de las dos
   // tiene un precio especial cargado.
-  const totalNormal = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : aplicarDescuento(srv, precioSrv ?? 0);
+  const totalNormal = esCortesia ? (clientePrecio.monto ?? 0) : esPrecioEspecial ? clientePrecio.monto : aplicarDescuento(srv, precioSrv ?? 0, fechaSel);
   const mitad2x1 = Math.round((precioSrv ?? 0) / 2);
   const esperandoCotizacion = (srv?.currency === "USD" || srv?.currency === "EUR") && precioSrv == null;
   const total = es2x1 ? mitad2x1 : totalNormal;
@@ -772,15 +792,15 @@ export default function Reserva() {
                 <>
                   <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí un servicio</div>
                   {cotizLoading && (moneda === "USD" || moneda === "EUR") && <div style={s.loadingText}>Cargando cotización del día...</div>}
-                  {descuentoActivo && descuentoPct > 0 && (
+                  {descuentoActivoHoy && descuentoPct > 0 && (
                     <div style={{ marginBottom: "10px", padding: "8px 12px", background: "#FDE8F0", borderRadius: "10px", fontSize: "12px", color: "#A0407A" }}>
-                      💸 {descuentoPct}% OFF en las sesiones seleccionadas
+                      💸 {descuentoPct}% OFF{profSettings?.promo_fecha_limite ? ` en turnos hasta el ${new Date(profSettings.promo_fecha_limite + "T12:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "long" })}` : " en las sesiones seleccionadas"} — el precio se ajusta según la fecha que elijas.
                     </div>
                   )}
                   {servicios.filter(sv => sv.currency === moneda).map((sv, i) => {
-                    const precioListaOriginal = precioEnMoneda(sv);
-                    const precioSv = aplicarDescuento(sv, precioListaOriginal);
-                    const conDescuento = descuentoActivo && precioSv !== precioListaOriginal;
+                    const precioListaOriginal = precioEnMoneda(sv, "");
+                    const precioSv = aplicarDescuento(sv, precioListaOriginal, "");
+                    const conDescuento = descuentoActivoHoy && precioSv !== precioListaOriginal;
                     return (
                     <div key={sv.id} style={servicio === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => { if (precioSv == null) return; setServicio(sv.id); setEs2x1(false); setServicio2(null); }}>
                       <div style={s.srvTop}>
@@ -813,7 +833,7 @@ export default function Reserva() {
                 <div style={{ marginTop: "10px" }}>
                   <div style={{ fontSize: "13px", fontWeight: "500", color: "#2A1845", marginBottom: "8px" }}>Elegí el servicio de la 2da persona</div>
                   {servicios.filter(sv => sv.currency === moneda && promoElegible(sv)).map((sv, i) => {
-                    const precioSv = precioEnMoneda(sv);
+                    const precioSv = precioEnMoneda(sv, "");
                     return (
                     <div key={sv.id} style={servicio2 === sv.id ? s.servicioCardSelected : s.servicioCard} onClick={() => { if (precioSv == null) return; setServicio2(sv.id); }}>
                       <div style={s.srvTop}>

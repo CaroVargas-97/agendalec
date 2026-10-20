@@ -57,7 +57,7 @@ const getUid = async () => {
 export default function Configuracion() {
   const [tab, setTab] = useState("disponibilidad");
   const [dias, setDias] = useState(defaultDias);
-  const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true }]);
+  const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true, precioNuevo: "", precioNuevoDesde: "" }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
   const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false });
   const [promoActiva, setPromoActiva] = useState(true);
@@ -164,7 +164,7 @@ export default function Configuracion() {
       } catch (_) {}
 
       const { data: svs } = await supabase.from("services").select("*").eq("professional_id", uid).eq("active", true);
-      if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS", requiresSlot: sv.requires_slot !== false, promoElegible: sv.promo_elegible !== false })));
+      if (svs && svs.length > 0) setServicios(svs.map(sv => ({ id: sv.id, nombre: sv.name, duracion: sv.duration_minutes, precio: sv.price, modalidad: sv.modality, currency: sv.currency || "ARS", requiresSlot: sv.requires_slot !== false, promoElegible: sv.promo_elegible !== false, precioNuevo: sv.price_nuevo != null ? String(sv.price_nuevo) : "", precioNuevoDesde: sv.price_nuevo_desde || "" })));
 
       const { data: avail } = await supabase.from("availability").select("*").eq("professional_id", uid).order("day_of_week");
       if (avail && avail.length > 0) {
@@ -306,13 +306,13 @@ export default function Configuracion() {
 
     // Update existing services
     for (const sv of existentes) {
-      const { error } = await supabase.from("services").update({ name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", requires_slot: sv.requiresSlot !== false, promo_elegible: sv.promoElegible !== false }).eq("id", sv.id);
+      const { error } = await supabase.from("services").update({ name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", requires_slot: sv.requiresSlot !== false, promo_elegible: sv.promoElegible !== false, price_nuevo: (sv.precioNuevo !== "" && sv.precioNuevo != null) ? parseFloat(sv.precioNuevo) : null, price_nuevo_desde: sv.precioNuevoDesde || null }).eq("id", sv.id);
       if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     }
 
     // Insert new services
     if (nuevos.length > 0) {
-      const { error } = await supabase.from("services").insert(nuevos.map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", active: true, requires_slot: sv.requiresSlot !== false, promo_elegible: sv.promoElegible !== false })));
+      const { error } = await supabase.from("services").insert(nuevos.map(sv => ({ professional_id: uid, name: sv.nombre, duration_minutes: parseInt(sv.duracion), price: parseFloat(sv.precio), modality: sv.modalidad, currency: sv.currency || "ARS", active: true, requires_slot: sv.requiresSlot !== false, promo_elegible: sv.promoElegible !== false, price_nuevo: (sv.precioNuevo !== "" && sv.precioNuevo != null) ? parseFloat(sv.precioNuevo) : null, price_nuevo_desde: sv.precioNuevoDesde || null })));
       if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     }
 
@@ -369,7 +369,7 @@ export default function Configuracion() {
     if (ids.length > 0) await supabase.from("services").update({ promo_elegible: nuevoValor }).in("id", ids);
   };
   const removeServicio = (i) => setServicios(servicios.filter((_, idx) => idx !== i));
-  const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true }]);
+  const addServicio = () => setServicios([...servicios, { nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true, precioNuevo: "", precioNuevoDesde: "" }]);
 
   const getModStyle = (mod) => mod === "presencial" ? s.modPillP : mod === "virtual" ? s.modPillV : mod === "ambas" ? s.modPillPV : s.modPill;
   const getModLabel = (mod) => mod === "presencial" ? "Solo presencial" : mod === "virtual" ? "Solo virtual" : "Virtual y presencial";
@@ -459,6 +459,14 @@ export default function Configuracion() {
                       Entra en promo
                     </label>
                     <button style={s.trashBtn} onClick={() => removeServicio(i)}>🗑</button>
+                    <div style={{ width: "100%", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", fontSize: "12px", color: "#9B72C0", marginTop: "2px" }}>
+                      <span style={{ color: "#B89FD0" }}>Cambio de precio programado:</span>
+                      <span>Precio nuevo</span>
+                      <input type="number" value={sv.precioNuevo || ""} onChange={e => updateServicio(i,"precioNuevo",e.target.value)} placeholder="(opcional)" style={{ ...s.input, width: "100px" }} />
+                      <span>desde</span>
+                      <input type="date" value={sv.precioNuevoDesde || ""} onChange={e => updateServicio(i,"precioNuevoDesde",e.target.value)} style={{ ...s.input, width: "150px" }} />
+                      {sv.precioNuevo && sv.precioNuevoDesde && <span style={{ fontSize: "11px", color: "#B89FD0" }}>→ los turnos desde esa fecha usan el precio nuevo</span>}
+                    </div>
                     {esExtranjera && (
                       <div style={{ width: "100%", fontSize: "11px", color: "#B89FD0", marginTop: "-4px" }}>
                         {equivalente != null
