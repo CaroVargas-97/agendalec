@@ -863,7 +863,6 @@ export default function Reserva() {
             </div>
             <span style={{ color: "#9B72C0", fontSize: "18px" }}>›</span>
           </div>
-          <a href="/" style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", textDecoration: "none", display: "block", textAlign: "center", boxSizing: "border-box" }}>← Volver al inicio</a>
         </div>
       )}
 
@@ -1093,7 +1092,7 @@ export default function Reserva() {
             <button style={{ ...s.btnNext, background: prof && servicio && (!es2x1 || servicio2) ? "#9B72C0" : "#E0D0F0" }} disabled={!prof || !servicio || (es2x1 && !servicio2)} onClick={() => (esACoorinar && (!es2x1 || esACoorinar2)) ? setStep(3) : setStep(2)}>
               Continuar
             </button>
-            <a href="/" style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0", textDecoration: "none", display: "block", textAlign: "center", boxSizing: "border-box" }}>← Volver al inicio</a>
+            <button onClick={() => setTipoReserva(null)} style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }}>← Volver</button>
           </div>
         </div>
       )}
