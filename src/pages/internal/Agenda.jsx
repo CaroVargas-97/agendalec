@@ -85,6 +85,7 @@ export default function Agenda({ deepLinkTurno }) {
   const [savingEditTurno, setSavingEditTurno] = useState(false);
   const [horaActual, setHoraActual] = useState(new Date());
   const [blockedDates, setBlockedDates] = useState([]);
+  const [promoSettings, setPromoSettings] = useState(null);
   const [rangoHoras, setRangoHoras] = useState(RANGO_DEFAULT);
 
   const HORAS = Array.from({ length: rangoHoras.fin - rangoHoras.inicio }, (_, i) => `${String(rangoHoras.inicio + i).padStart(2, "0")}:00`);
@@ -146,7 +147,7 @@ export default function Agenda({ deepLinkTurno }) {
         : Promise.resolve({ data: [] }),
       turnosQuery,
       supabase.from("profiles").select("id, full_name").eq("role", "professional"),
-      supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency, requires_slot"),
+      supabase.from("services").select("id, name, duration_minutes, price, professional_id, currency, requires_slot, promo_elegible, price_nuevo, price_nuevo_desde"),
       availQuery,
     ]);
 
@@ -155,6 +156,10 @@ export default function Agenda({ deepLinkTurno }) {
     else setTurnosSemana(turnosData || []);
     setProfesionales(profs || []);
     setServicios(svs || []);
+    if (currentUid) {
+      supabase.from("settings").select("promo_activa, promo_tipo, promo_descuento_pct, promo_fecha_inicio, promo_fecha_limite")
+        .eq("professional_id", currentUid).maybeSingle().then(({ data }) => setPromoSettings(data));
+    }
 
     // La grilla sigue la disponibilidad configurada (Config → Disponibilidad)
     // en vez de horas fijas en el código. Si hay un turno cargado fuera de
@@ -505,10 +510,24 @@ export default function Agenda({ deepLinkTurno }) {
   const esACoordinarForm = servicioSeleccionado?.requires_slot === false;
   const semana = getSemana(fecha);
 
+  // ¿El servicio, en la fecha del turno, cae dentro de la promo de descuento?
+  const descuentoPromoAplica = (srv) => {
+    const p = promoSettings, fecha = form.fecha;
+    return !!(p && p.promo_activa !== false && p.promo_tipo === "descuento" && p.promo_descuento_pct
+      && srv?.promo_elegible !== false && fecha
+      && (!p.promo_fecha_inicio || fecha >= p.promo_fecha_inicio)
+      && (!p.promo_fecha_limite || fecha <= p.promo_fecha_limite));
+  };
+
   const getPrecioEfectivo = (srv) => {
     if (clienteEncontrado?.price_type === "cortesia") return clienteEncontrado.custom_price != null ? clienteEncontrado.custom_price : 0;
     if (clienteEncontrado?.price_type === "especial" && clienteEncontrado.custom_price != null) return clienteEncontrado.custom_price;
-    return srv.price;
+    // Precio según la fecha del turno (cambio de precio programado).
+    let base = srv.price;
+    if (srv.price_nuevo != null && srv.price_nuevo_desde && form.fecha && form.fecha >= srv.price_nuevo_desde) base = srv.price_nuevo;
+    // Descuento de promo si el turno cae dentro del rango y el servicio es elegible.
+    if (descuentoPromoAplica(srv)) return Math.round(base * (1 - promoSettings.promo_descuento_pct / 100));
+    return base;
   };
 
   const getPrecioInfo = () => {
@@ -517,7 +536,10 @@ export default function Agenda({ deepLinkTurno }) {
     const precio = getPrecioEfectivo(srv);
     const sena = Math.round(precio / 2);
     const sym = srv.currency === "USD" ? "U$S " : srv.currency === "EUR" ? "€" : "$";
-    const aviso = precio !== srv.price ? (clienteEncontrado.price_type === "cortesia" ? " 🎁 Cortesía aplicada" : " ✨ Precio especial aplicado") : "";
+    const aviso = clienteEncontrado?.price_type === "cortesia" ? " 🎁 Cortesía aplicada"
+      : clienteEncontrado?.price_type === "especial" && clienteEncontrado.custom_price != null ? " ✨ Precio especial aplicado"
+      : descuentoPromoAplica(srv) ? ` 💸 ${promoSettings.promo_descuento_pct}% OFF aplicado`
+      : "";
     if (estadoPago === "sena") return `Seña ${sym}${sena.toLocaleString("es-AR")} · Saldo ${sym}${sena.toLocaleString("es-AR")} pendiente${aviso}`;
     if (estadoPago === "completo") return `Pago completo ${sym}${precio.toLocaleString("es-AR")}${aviso}`;
     return `Pendiente · Seña ${sym}${sena.toLocaleString("es-AR")} a confirmar${aviso}`;
