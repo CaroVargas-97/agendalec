@@ -211,6 +211,13 @@ export default function Reserva() {
     });
   }, [tipoReserva, profesionales]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Al llegar al paso de datos/pago, se abre sola la ventana de Términos (si
+  // todavía no se aceptaron) para que se lean antes de avanzar.
+  useEffect(() => {
+    const enPago = (tipoReserva === "individual" && step === 3) || (tipoReserva === "grupal" && grupalStep === 2);
+    if (enPago && !aceptaTyC) setTycModalAbierto(true);
+  }, [step, grupalStep, tipoReserva]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Se trae el mes entero de una (no solo el día elegido): así el
   // calendario puede marcar de entrada los días que técnicamente están
   // habilitados pero ya no tienen ningún horario libre, en vez de que la
