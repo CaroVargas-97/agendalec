@@ -828,6 +828,25 @@ export default function Reserva() {
     </div>
   );
 
+  // Bloque de Términos y Condiciones que se muestra ANTES del pago, con el
+  // resumen a la vista (para que se lea sí o sí) y el checkbox de aceptación.
+  const bloqueTyc = (
+    <div style={{ background: "#FBF8FF", border: "0.5px solid #E0D0F0", borderRadius: "12px", padding: "12px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
+      <div style={{ fontSize: "12px", fontWeight: "600", color: "#5C3F99", textTransform: "uppercase", letterSpacing: "0.4px" }}>📄 Antes de pagar, leé los Términos</div>
+      <div style={{ fontSize: "12px", color: "#5C3F99", lineHeight: 1.55 }}>
+        • Se abona el <strong>50% como seña</strong> para reservar; el saldo, hasta 12 hs antes del turno.<br/>
+        • Cancelás con <strong>+24 hs</strong> → se reembolsa la seña. Con <strong>menos de 24 hs</strong> → sin reembolso.<br/>
+        • Si cancela la profesional → reprogramás o se te devuelve la seña completa.<br/>
+        • Tus datos se usan solo para gestionar el turno (Ley 25.326), no se comparten.
+      </div>
+      <a href="/terminos" target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0" }}>Ver términos completos →</a>
+      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginTop: "2px" }}>
+        <input type="checkbox" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
+        <span style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500" }}>Leí y acepto los Términos y Condiciones</span>
+      </label>
+    </div>
+  );
+
   return (
     <div style={s.wrap}>
       <div style={s.header}>
@@ -925,6 +944,15 @@ export default function Reserva() {
             </div>
           )}
 
+          {eventoModEfectiva === "virtual" && (
+            <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>📹</span>
+              <span>El encuentro es <strong>por videollamada</strong>. Te vamos a enviar el link antes.</span>
+            </div>
+          )}
+
+          {bloqueTyc}
+
           {(eventoAlias) && (
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Transferí la seña para reservar tu lugar{evento.currency === "USD" ? " (en dólares)" : ""}</div>
@@ -958,10 +986,6 @@ export default function Reserva() {
               </label>
             </div>
           )}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-            <input type="checkbox" id="tycg" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
-            <label htmlFor="tycg" style={{ fontSize: "12px", color: "#9B72C0", cursor: "pointer" }}>Acepto los <a href="/terminos" target="_blank" style={{ color: "#7B5EA7", fontWeight: "500" }}>Términos y Condiciones</a></label>
-          </div>
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setGrupalStep(1)}>← Volver</button>
@@ -1380,6 +1404,15 @@ export default function Reserva() {
             </div>
           )}
 
+          {!esCortesia && (modalidad || srv?.modality) === "virtual" && (
+            <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99", display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>📹</span>
+              <span>La sesión es <strong>por videollamada</strong>. Te vamos a enviar el link antes del turno.</span>
+            </div>
+          )}
+
+          {bloqueTyc}
+
           {aliasActivo && !esCortesia && (
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{srv?.currency === "USD" ? " (en dólares)" : ""}</div>
@@ -1419,10 +1452,6 @@ export default function Reserva() {
             </div>
           )}
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-            <input type="checkbox" id="tyc" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
-            <label htmlFor="tyc" style={{ fontSize: "12px", color: "#9B72C0", cursor: "pointer" }}>Acepto los <a href="/terminos" target="_blank" style={{ color: "#7B5EA7", fontWeight: "500" }}>Términos y Condiciones</a></label>
-          </div>
           {error && <div style={{ fontSize: "12px", color: "#A32D2D" }}>{error}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
             <button style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }} onClick={() => setStep(2)}>← Volver</button>
