@@ -111,6 +111,7 @@ export default function Reserva() {
   const [error, setError] = useState("");
   const [copiado, setCopiado] = useState(false);
   const [aceptaTyC, setAceptaTyC] = useState(false);
+  const [tycModalAbierto, setTycModalAbierto] = useState(false);
   const [ocupadosMes, setOcupadosMes] = useState([]);
   const [cotizUSD, setCotizUSD] = useState(null);
   const [cotizEUR, setCotizEUR] = useState(null);
@@ -181,7 +182,7 @@ export default function Reserva() {
       setProfData(pd);
       const [{ data: svs }, { data: cfg }, { data: avail }, { data: settings }, { data: blocked }, { data: overrides }] = await Promise.all([
         supabase.from("services").select("*").eq("professional_id", pd.id).eq("active", true),
-        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, mes_manual_abierto, promo_activa, promo_tipo, promo_descuento_pct, promo_fecha_inicio, promo_fecha_limite").eq("professional_id", pd.id).maybeSingle(),
+        supabase.from("settings").select("payment_method, alias, cbu, alias_usd, cbu_usd, paypal_link, alias_titular, mes_manual_abierto, promo_activa, promo_tipo, promo_descuento_pct, promo_fecha_inicio, promo_fecha_limite").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("availability").select("*").eq("professional_id", pd.id).eq("active", true),
         supabase.from("settings").select("break_minutes").eq("professional_id", pd.id).maybeSingle(),
         supabase.from("blocked_dates").select("date, start_time, end_time").eq("professional_id", pd.id),
@@ -828,27 +829,53 @@ export default function Reserva() {
     </div>
   );
 
-  // Bloque de Términos y Condiciones que se muestra ANTES del pago, con el
-  // resumen a la vista (para que se lea sí o sí) y el checkbox de aceptación.
+  // Bloque de Términos y Condiciones que se muestra ANTES del pago: abre la
+  // ventana completa de los términos para que se lean sí o sí, y recién ahí
+  // se aceptan.
   const bloqueTyc = (
     <div style={{ background: "#FBF8FF", border: "0.5px solid #E0D0F0", borderRadius: "12px", padding: "12px 14px", display: "flex", flexDirection: "column", gap: "8px" }}>
-      <div style={{ fontSize: "12px", fontWeight: "600", color: "#5C3F99", textTransform: "uppercase", letterSpacing: "0.4px" }}>📄 Antes de pagar, leé los Términos</div>
-      <div style={{ fontSize: "12px", color: "#5C3F99", lineHeight: 1.55 }}>
-        • Se abona el <strong>50% como seña</strong> para reservar; el saldo, hasta 12 hs antes del turno.<br/>
-        • Cancelás con <strong>+24 hs</strong> → se reembolsa la seña. Con <strong>menos de 24 hs</strong> → sin reembolso.<br/>
-        • Si cancela la profesional → reprogramás o se te devuelve la seña completa.<br/>
-        • Tus datos se usan solo para gestionar el turno (Ley 25.326), no se comparten.
-      </div>
-      <a href="/terminos" target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: "#9B72C0" }}>Ver términos completos →</a>
-      <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginTop: "2px" }}>
-        <input type="checkbox" checked={aceptaTyC} onChange={e => setAceptaTyC(e.target.checked)} style={{ accentColor: "#9B72C0", width: "16px", height: "16px", cursor: "pointer" }} />
-        <span style={{ fontSize: "13px", color: "#5C3F99", fontWeight: "500" }}>Leí y acepto los Términos y Condiciones</span>
-      </label>
+      <div style={{ fontSize: "12px", fontWeight: "600", color: "#5C3F99", textTransform: "uppercase", letterSpacing: "0.4px" }}>📄 Términos y Condiciones</div>
+      {aceptaTyC ? (
+        <div style={{ fontSize: "13px", color: "#3B6D11", fontWeight: "500" }}>✓ Leíste y aceptaste los Términos y Condiciones</div>
+      ) : (
+        <>
+          <div style={{ fontSize: "12px", color: "#9B72C0" }}>Antes de pagar, leé y aceptá los Términos y Condiciones.</div>
+          <button onClick={() => setTycModalAbierto(true)} style={{ ...s.btnNext, background: "#9B72C0", color: "#fff", padding: "11px" }}>Leer y aceptar los Términos</button>
+        </>
+      )}
+    </div>
+  );
+
+  // Contenido completo de los Términos (igual que la página /terminos).
+  const terminosContenido = (
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "13px", color: "#5C3F99", lineHeight: 1.6 }}>
+      <div style={{ fontWeight: "600", color: "#3B2460" }}>Reservas y pagos</div>
+      <div>Al reservar, la persona abona el 50% como seña. El saldo restante debe pagarse dentro de las 12 horas previas al turno mediante transferencia bancaria o Mercado Pago según indique el profesional.</div>
+      <div style={{ fontWeight: "600", color: "#3B2460" }}>Cancelación por la persona</div>
+      <div style={{ background: "#F3EEFA", padding: "10px 14px", borderRadius: "8px", borderLeft: "3px solid #9B72C0", color: "#3B2460" }}>Con <strong>más de 24hs</strong> de anticipación → reembolso completo de la seña.<br/>Con <strong>menos de 24hs</strong> → sin reembolso.</div>
+      <div style={{ fontWeight: "600", color: "#3B2460" }}>Cancelación por el profesional</div>
+      <div style={{ background: "#FDE8F0", padding: "10px 14px", borderRadius: "8px", borderLeft: "3px solid #E88BB0", color: "#A0407A" }}>Si el profesional cancela (por enfermedad u otro motivo), la persona puede elegir: <strong>reprogramar</strong> o recibir el <strong>reembolso completo</strong> de la seña, sin importar el plazo.</div>
+      <div style={{ fontWeight: "600", color: "#3B2460" }}>Datos personales</div>
+      <div>Los datos (nombre y celular) se usan solo para gestionar los turnos, bajo la Ley 25.326 de Protección de Datos Personales de Argentina. No se comparten con terceros.</div>
+      <div style={{ fontWeight: "600", color: "#3B2460" }}>Personas del exterior</div>
+      <div>Para pagos en moneda extranjera, el profesional coordina el medio de pago directamente por WhatsApp.</div>
     </div>
   );
 
   return (
     <div style={s.wrap}>
+      {tycModalAbierto && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(42,24,69,0.55)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }} onClick={() => setTycModalAbierto(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: "16px", maxWidth: "500px", width: "100%", maxHeight: "85vh", display: "flex", flexDirection: "column", overflow: "hidden", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+            <div style={{ padding: "16px 18px", borderBottom: "0.5px solid #F0E8F8", fontSize: "15px", fontWeight: "600", color: "#2A1845" }}>Términos y Condiciones</div>
+            <div style={{ padding: "16px 18px", overflowY: "auto" }}>{terminosContenido}</div>
+            <div style={{ padding: "14px 18px", borderTop: "0.5px solid #F0E8F8", display: "flex", gap: "8px" }}>
+              <button onClick={() => setTycModalAbierto(false)} style={{ ...s.btnNext, background: "#fff", color: "#9B72C0", border: "0.5px solid #E0D0F0" }}>Cerrar</button>
+              <button onClick={() => { setAceptaTyC(true); setTycModalAbierto(false); }} style={{ ...s.btnConfirmar }}>Acepto</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={s.header}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "6px", ...s.logo }}>
@@ -947,7 +974,7 @@ export default function Reserva() {
           {eventoModEfectiva === "virtual" && (
             <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "16px" }}>📹</span>
-              <span>El encuentro es <strong>por videollamada</strong>. Te vamos a enviar el link antes.</span>
+              <span>El encuentro es <strong>por videollamada</strong>. {prof || "La profesional"} se va a comunicar con vos para coordinarla.</span>
             </div>
           )}
 
@@ -957,6 +984,7 @@ export default function Reserva() {
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Transferí la seña para reservar tu lugar{evento.currency === "USD" ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{eventoAlias}</div>
+              {profSettings?.alias_titular && <div style={{ fontSize: "11px", color: "#9B72C0" }}>A nombre de: <strong>{profSettings.alias_titular}</strong></div>}
               {eventoCbu && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {eventoCbu}</div>}
               <div style={s.aliasCopy} onClick={copiarAliasGrupal}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
               <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>{eventoSym}{eventoSena.toLocaleString("es-AR")}</strong></div>
@@ -1407,7 +1435,7 @@ export default function Reserva() {
           {!esCortesia && (modalidad || srv?.modality) === "virtual" && (
             <div style={{ background: "#EDE8FA", borderRadius: "10px", padding: "10px 14px", fontSize: "12px", color: "#5C3F99", display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "16px" }}>📹</span>
-              <span>La sesión es <strong>por videollamada</strong>. Te vamos a enviar el link antes del turno.</span>
+              <span>La sesión es <strong>por videollamada</strong>. {prof || "La profesional"} se va a comunicar con vos para coordinarla.</span>
             </div>
           )}
 
@@ -1417,6 +1445,7 @@ export default function Reserva() {
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Transferí la seña para confirmar tu turno{srv?.currency === "USD" ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
+              {profSettings?.alias_titular && <div style={{ fontSize: "11px", color: "#9B72C0" }}>A nombre de: <strong>{profSettings.alias_titular}</strong></div>}
               {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
               <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Monto a transferir: <strong style={{ color: "#5C3F99" }}>{sym}{(es2x1 ? sena + sena2 : sena).toLocaleString("es-AR")}</strong></div>
@@ -1479,6 +1508,7 @@ export default function Reserva() {
             <div style={s.aliasBox}>
               <div style={s.aliasTitulo}>Si aún no transferiste, hacelo ahora{srv?.currency === "USD" ? " (en dólares)" : ""}</div>
               <div style={s.aliasValor}>{aliasActivo}</div>
+              {profSettings?.alias_titular && <div style={{ fontSize: "11px", color: "#9B72C0" }}>A nombre de: <strong>{profSettings.alias_titular}</strong></div>}
               {cbuActivo && <div style={{ fontSize: "11px", color: "#9B72C0" }}>CBU: {cbuActivo}</div>}
               <div style={s.aliasCopy} onClick={copiarAlias}>{copiado ? "✓ Copiado!" : "Copiar alias"}</div>
               <div style={{ fontSize: "11px", color: "#B89FD0", marginTop: "4px" }}>Seña: <strong style={{ color: "#5C3F99" }}>{sym}{sena.toLocaleString("es-AR")}</strong></div>

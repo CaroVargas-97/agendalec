@@ -59,7 +59,7 @@ export default function Configuracion() {
   const [dias, setDias] = useState(defaultDias);
   const [servicios, setServicios] = useState([{ nombre: "", duracion: 60, precio: 0, modalidad: "ambas", currency: "ARS", requiresSlot: true, promoElegible: true, precioNuevo: "", precioNuevoDesde: "" }]);
   const [pausas, setPausas] = useState({ pausa: 15, anticipacion: 24, cancelacion: 24 });
-  const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false });
+  const [pagos, setPagos] = useState({ metodo: "transferencia", alias: "", cbu: "", alias_usd: "", cbu_usd: "", paypal_link: "", mp_enabled: false, titular: "" });
   const [promoActiva, setPromoActiva] = useState(true);
   const [promoTipo, setPromoTipo] = useState("2x1");
   const [promoDescuentoPct, setPromoDescuentoPct] = useState("");
@@ -179,7 +179,7 @@ export default function Configuracion() {
       const { data: cfg } = await supabase.from("settings").select("*").eq("professional_id", uid).maybeSingle();
       if (cfg) {
         setPausas({ pausa: cfg.break_minutes ?? 15, anticipacion: cfg.min_advance_hours ?? 24, cancelacion: cfg.cancellation_hours ?? 24 });
-        setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", paypal_link: cfg.paypal_link || "", mp_enabled: cfg.mp_enabled || false });
+        setPagos({ metodo: cfg.payment_method || "transferencia", alias: cfg.alias || "", cbu: cfg.cbu || "", alias_usd: cfg.alias_usd || "", cbu_usd: cfg.cbu_usd || "", paypal_link: cfg.paypal_link || "", mp_enabled: cfg.mp_enabled || false, titular: cfg.alias_titular || "" });
         setPromoActiva(cfg.promo_activa !== false);
         setPromoTipo(cfg.promo_tipo || "2x1");
         setPromoDescuentoPct(cfg.promo_descuento_pct ?? "");
@@ -351,7 +351,7 @@ export default function Configuracion() {
     setSaving(true); setSaveError("");
     const uid = await getUid();
     if (!uid) { setSaving(false); return; }
-    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, mp_enabled: pagos.mp_enabled, promo_activa: promoActiva, promo_tipo: promoTipo, promo_descuento_pct: promoTipo === "descuento" ? (parseFloat(promoDescuentoPct) || 0) : null, promo_fecha_inicio: promoFechaInicio || null, promo_fecha_limite: promoFechaLimite || null }, { onConflict: "professional_id" });
+    const { error } = await supabase.from("settings").upsert({ professional_id: uid, payment_method: pagos.metodo, alias: pagos.alias, cbu: pagos.cbu, alias_usd: pagos.alias_usd, cbu_usd: pagos.cbu_usd, paypal_link: pagos.paypal_link, alias_titular: pagos.titular || null, mp_enabled: pagos.mp_enabled, promo_activa: promoActiva, promo_tipo: promoTipo, promo_descuento_pct: promoTipo === "descuento" ? (parseFloat(promoDescuentoPct) || 0) : null, promo_fecha_inicio: promoFechaInicio || null, promo_fecha_limite: promoFechaLimite || null }, { onConflict: "professional_id" });
     if (error) { setSaveError("Error al guardar: " + error.message); setSaving(false); return; }
     setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000);
   };
@@ -519,6 +519,10 @@ export default function Configuracion() {
                 </div>
                 {(pagos.metodo === "transferencia" || pagos.metodo === "ambos") && (
                   <>
+                    <div style={{ marginBottom: "14px" }}>
+                      <div style={s.pausaSub}>Titular de la cuenta (el nombre que figura en tu cuenta)</div>
+                      <input type="text" value={pagos.titular} onChange={e => setPagos({...pagos,titular:e.target.value})} placeholder="Ej: María Eugenia Amor" style={{...s.inputFull, marginTop: "4px"}} />
+                    </div>
                     <div style={s.label}>Pesos (ARS)</div>
                   <div style={{ marginBottom: "6px" }}></div>
                     <div style={{ marginBottom: "10px" }}>
